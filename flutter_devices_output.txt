@@ -1,0 +1,9 @@
+﻿Found 4 connected devices:
+  SM A528B (mobile) ÔÇó RZCRB01T1NW ÔÇó android-arm64  ÔÇó Android 12 (API 31)
+  Windows (desktop) ÔÇó windows     ÔÇó windows-x64    ÔÇó Microsoft Windows [version 10.0.26200.8037]
+  Chrome (web)      ÔÇó chrome      ÔÇó web-javascript ÔÇó Google Chrome 146.0.7680.165
+  Edge (web)        ÔÇó edge        ÔÇó web-javascript ÔÇó Microsoft Edge 146.0.3856.59
+
+Run "flutter emulators" to list and start any available device emulators.
+
+If you expected another device to be detected, please run "flutter doctor" to diagnose potential issues. You may also try increasing the time to wait for connected devices with the "--device-timeout" flag. Visit https://flutter.dev/setup/ for troubleshooting tips.

@@ -1,0 +1,47 @@
+name: uiearth_flutter
+description: AgriTech - Smart Agriculture Mobile App
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  # State Management
+  flutter_riverpod: ^2.6.1
+  provider: ^6.1.5
+  # Navigation
+  go_router: ^14.8.1
+  # HTTP
+  http: ^1.6.0
+  web_socket_channel: ^3.0.2
+  # Local Storage
+  shared_preferences: ^2.5.3
+  # Charts
+  fl_chart: ^0.70.2
+  # Google Fonts
+  google_fonts: ^6.2.1
+  # Image Picker (Plant Health)
+  image_picker: ^1.1.2
+  # Map (Weather)
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+  # Intl
+  intl: ^0.20.2
+  google_maps_flutter: ^2.17.0
+  geolocator: ^14.0.2
+  lucide_icons: ^0.257.0
+  mobile_scanner: ^6.0.7
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
