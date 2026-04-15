@@ -1,0 +1,686 @@
+openapi: 3.0.3
+info:
+  title: Piston Control / AgriTech API
+  version: 1.0.0
+  description: |
+    API documentation exposed by the backend container.
+servers:
+  - url: http://localhost:8080
+    description: Local Docker backend
+tags:
+  - name: health
+  - name: auth
+  - name: devices
+  - name: schedules
+  - name: user
+  - name: avatars
+  - name: admin
+  - name: capteursol
+paths:
+  /health:
+    get:
+      tags: [health]
+      summary: Health check
+      responses:
+        '200':
+          description: Service is healthy
+    head:
+      tags: [health]
+      summary: Health check HEAD
+      responses:
+        '200':
+          description: Service is healthy
+
+  /auth:
+    get:
+      tags: [auth]
+      summary: Auth endpoint help
+      responses:
+        '200':
+          description: Auth usage payload
+
+  /auth/register:
+    post:
+      tags: [auth]
+      summary: Register user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User registered
+
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Login user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login success
+
+  /auth/verify-email:
+    post:
+      tags: [auth]
+      summary: Verify email code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                code:
+                  type: string
+              required: [userId, code]
+      responses:
+        '200':
+          description: Verification handled
+
+  /auth/resend-code:
+    post:
+      tags: [auth]
+      summary: Resend email verification code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+              required: [userId]
+      responses:
+        '200':
+          description: Code resent
+
+  /devices:
+    get:
+      tags: [devices]
+      summary: List devices for current user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Device list
+    post:
+      tags: [devices]
+      summary: Create device
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDeviceRequest'
+      responses:
+        '201':
+          description: Device created
+
+  /devices/{id}:
+    get:
+      tags: [devices]
+      summary: Get one device
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Device details
+
+  /devices/{deviceId}/pistons/{pistonNumber}:
+    post:
+      tags: [devices]
+      summary: Control piston
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: deviceId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: path
+          name: pistonNumber
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 8
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PistonCommand'
+      responses:
+        '200':
+          description: Piston command accepted
+
+  /devices/{deviceId}/pistons:
+    get:
+      tags: [devices]
+      summary: List pistons for device
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: deviceId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Pistons list
+
+  /devices/{deviceId}/stats:
+    get:
+      tags: [devices]
+      summary: Device stats
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: deviceId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Device stats
+
+  /telemetry:
+    get:
+      tags: [devices]
+      summary: User telemetry/history
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: Telemetry list
+
+  /schedules:
+    get:
+      tags: [schedules]
+      summary: List schedules
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Schedules list
+    post:
+      tags: [schedules]
+      summary: Create schedule
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateScheduleRequest'
+      responses:
+        '201':
+          description: Schedule created
+
+  /schedules/{id}:
+    get:
+      tags: [schedules]
+      summary: Get schedule by id
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Schedule
+    patch:
+      tags: [schedules]
+      summary: Update schedule
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateScheduleRequest'
+      responses:
+        '200':
+          description: Updated schedule
+    delete:
+      tags: [schedules]
+      summary: Delete schedule
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted schedule
+
+  /schedules/device/{deviceId}:
+    get:
+      tags: [schedules]
+      summary: List schedules by device
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: deviceId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Device schedules
+
+  /user/profile:
+    get:
+      tags: [user]
+      summary: Get user profile
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Profile
+    put:
+      tags: [user]
+      summary: Update user profile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: Updated profile
+
+  /user/preferences:
+    put:
+      tags: [user]
+      summary: Update user preferences
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePreferencesRequest'
+      responses:
+        '200':
+          description: Updated preferences
+
+  /user/avatar:
+    post:
+      tags: [avatars]
+      summary: Upload avatar
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                avatar:
+                  type: string
+                  format: binary
+              required: [avatar]
+      responses:
+        '200':
+          description: Avatar uploaded
+    delete:
+      tags: [avatars]
+      summary: Delete avatar
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Avatar removed
+
+  /avatars/{filename}:
+    get:
+      tags: [avatars]
+      summary: Serve avatar file
+      parameters:
+        - in: path
+          name: filename
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Avatar file
+
+  /admin/users:
+    get:
+      tags: [admin]
+      summary: List users (admin)
+      security:
+        - adminBearerAuth: []
+      responses:
+        '200':
+          description: Users list
+
+  /admin/stats:
+    get:
+      tags: [admin]
+      summary: Admin stats
+      security:
+        - adminBearerAuth: []
+      responses:
+        '200':
+          description: Stats
+
+  /admin/audit-logs:
+    get:
+      tags: [admin]
+      summary: Audit logs
+      security:
+        - adminBearerAuth: []
+      responses:
+        '200':
+          description: Logs
+
+  /wizard/parcelles:
+    post:
+      tags: [capteursol]
+      summary: Create parcelle using wizard flow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Wizard parcelle created
+
+  /parcelles:
+    get:
+      tags: [capteursol]
+      summary: List parcelles
+      responses:
+        '200':
+          description: Parcelles list
+    post:
+      tags: [capteursol]
+      summary: Create parcelle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Parcelle created
+
+  /parcelles/{id}:
+    get:
+      tags: [capteursol]
+      summary: Get parcelle details
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Parcelle details
+    patch:
+      tags: [capteursol]
+      summary: Update parcelle
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Parcelle updated
+    delete:
+      tags: [capteursol]
+      summary: Delete parcelle
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Parcelle deleted
+
+  /parcelles/{id}/vannes:
+    get:
+      tags: [capteursol]
+      summary: List vannes for parcelle
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Vannes list
+
+  /parcelles/{id}/plants:
+    get:
+      tags: [capteursol]
+      summary: List plants for parcelle
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Plants list
+
+  /vannes:
+    get:
+      tags: [capteursol]
+      summary: List vannes
+      responses:
+        '200':
+          description: Vannes list
+    post:
+      tags: [capteursol]
+      summary: Create vanne
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Vanne created
+
+  /vannes/{id}:
+    patch:
+      tags: [capteursol]
+      summary: Update vanne
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Vanne updated
+    delete:
+      tags: [capteursol]
+      summary: Delete vanne
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Vanne deleted
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    adminBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required: [email, password]
+    RegisterRequest:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          format: email
+        phoneNumber:
+          type: string
+        password:
+          type: string
+      required: [firstName, lastName, email, phoneNumber, password]
+    CreateDeviceRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        mqttClientId:
+          type: string
+      required: [name, mqttClientId]
+    PistonCommand:
+      type: object
+      properties:
+        action:
+          type: string
+          enum: [activate, deactivate]
+      required: [action]
+    CreateScheduleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        deviceId:
+          type: string
+        pistonNumber:
+          type: integer
+        action:
+          type: string
+        cronExpression:
+          type: string
+        enabled:
+          type: boolean
+      required: [name, deviceId, pistonNumber, action, cronExpression]
+    UpdateScheduleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        action:
+          type: string
+        cronExpression:
+          type: string
+        enabled:
+          type: boolean
+    UpdateProfileRequest:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        phoneNumber:
+          type: string
+        dateOfBirth:
+          type: string
+        location:
+          type: string
+        avatarUrl:
+          type: string
+    UpdatePreferencesRequest:
+      type: object
+      properties:
+        preferences:
+          type: string
