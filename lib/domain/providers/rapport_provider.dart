@@ -19,6 +19,18 @@ class RapportsNotifier extends StateNotifier<List<Rapport>> {
     state = [rapport, ...state];
   }
 
+  void addOrReplace(Rapport rapport) {
+    state = [
+      rapport,
+      ...state.where((r) => r.id != rapport.id),
+    ];
+  }
+
+  void replaceByType(RapportType type, List<Rapport> reports) {
+    final other = state.where((r) => r.type != type).toList(growable: false);
+    state = [...reports, ...other];
+  }
+
   void removeRapport(String id) {
     state = state.where((r) => r.id != id).toList();
   }

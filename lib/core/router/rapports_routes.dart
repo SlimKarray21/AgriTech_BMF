@@ -30,7 +30,7 @@ List<RouteBase> rapportsRoutes = [
             name: 'rapports-eau-detail',
             builder: (context, state) {
               final id = state.pathParameters['id']!;
-              return RapportDetailScreen(rapportId: id);
+              return RapportDetailScreen(rapportId: id, type: RapportType.eau);
             },
           ),
         ],
@@ -53,7 +53,7 @@ List<RouteBase> rapportsRoutes = [
             name: 'rapports-sol-detail',
             builder: (context, state) {
               final id = state.pathParameters['id']!;
-              return RapportDetailScreen(rapportId: id);
+              return RapportDetailScreen(rapportId: id, type: RapportType.sol);
             },
           ),
         ],

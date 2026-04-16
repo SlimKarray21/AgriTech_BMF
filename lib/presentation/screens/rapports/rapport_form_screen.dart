@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:uiearth_flutter/data/api/api_exception.dart';
 import 'package:uiearth_flutter/core/theme/app_colors.dart';
 import 'package:uiearth_flutter/data/models/rapport.dart';
+import 'package:uiearth_flutter/domain/providers/api_providers.dart';
 import 'package:uiearth_flutter/domain/providers/rapport_provider.dart';
 import 'package:intl/intl.dart';
+import 'dart:convert';
 
 /// /rapports/eau/nouveau ou /rapports/sol/nouveau
 class RapportFormScreen extends ConsumerStatefulWidget {
@@ -19,6 +22,7 @@ class _RapportFormScreenState extends ConsumerState<RapportFormScreen> {
   final _nameCtrl = TextEditingController();
   final Map<String, TextEditingController> _controllers = {};
   final Map<String, String> _values = {};
+  bool _isSaving = false;
 
   bool get isEau => widget.type == RapportType.eau;
   List<FormSection> get sections => isEau ? eauFormSections : solFormSections;
@@ -48,7 +52,8 @@ class _RapportFormScreenState extends ConsumerState<RapportFormScreen> {
     super.dispose();
   }
 
-  void _handleSave() {
+  Future<void> _handleSave() async {
+    if (_isSaving) return;
     if (_nameCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Veuillez saisir un nom de rapport'),
@@ -57,17 +62,90 @@ class _RapportFormScreenState extends ConsumerState<RapportFormScreen> {
       return;
     }
 
+    setState(() => _isSaving = true);
+
+    final now = DateTime.now();
+    final displayDate = DateFormat('dd/MM/yyyy').format(now);
+    final analysisDate = DateFormat('yyyy-MM-dd').format(now);
+    final data = numericValues;
+
+    try {
+      final api = ref.read(uiEarthApiProvider).capteurSol;
+      final payloadBase = <String, dynamic>{
+        'reportName': _nameCtrl.text.trim(),
+        // TODO: replace with selected parcelle and authenticated user mapping.
+        'parcelId': 1,
+        'userId': 1,
+        'analysisDate': analysisDate,
+        'interpretations': _serializeInterpretations(interpretations),
+      };
+
+      if (isEau) {
+        await api.createRapportEau({
+          ...payloadBase,
+          'ph': data['ph'] ?? 0.0,
+          'cewDsM': data['ce'] ?? 0.0,
+          'residuSecMgL': data['residu_sec'] ?? 0.0,
+          'chloruresMeqL': data['chlorures'] ?? 0.0,
+          'sulfatesMeqL': data['sulfates'] ?? 0.0,
+          'bicarbonatesMeqL': data['bicarbonates'] ?? 0.0,
+          'sodiumMeqL': data['sodium'] ?? 0.0,
+          'calciumMeqL': data['calcium'] ?? 0.0,
+          'magnesiumMeqL': data['magnesium'] ?? 0.0,
+          'sarRatio': data['sar'] ?? 0.0,
+          'dureteF': data['durete'] ?? 0.0,
+        });
+      } else {
+        final calcaire = data['calcaire'] ?? 0.0;
+        await api.createRapportSol({
+          ...payloadBase,
+          'argilePercent': data['argile'] ?? 0.0,
+          'limonPercent': data['limon'] ?? 0.0,
+          'sablePercent': data['sable'] ?? 0.0,
+          'ph': data['ph'] ?? 0.0,
+          'ceDsM': data['ce'] ?? 0.0,
+          'calcaireTotalPercent': calcaire,
+          'calcaireActifPercent': calcaire,
+          'moPercent': data['mo'] ?? 0.0,
+          'rapportCn': data['cn'] ?? 0.0,
+          'p2o5Ppm': data['p2o5'] ?? 0.0,
+          'k2oPpm': data['k2o'] ?? 0.0,
+          'mgoPpm': data['mgo'] ?? 0.0,
+          'cecMeq100g': data['cec'] ?? 0.0,
+          'espPercent': data['esp'] ?? 0.0,
+        });
+      }
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Sauvegarde backend échouée: ${e.message}'),
+        backgroundColor: AppColors.farmDanger,
+      ));
+      setState(() => _isSaving = false);
+      return;
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Erreur backend rapport: $e'),
+        backgroundColor: AppColors.farmDanger,
+      ));
+      setState(() => _isSaving = false);
+      return;
+    }
+
     final id = DateTime.now().millisecondsSinceEpoch.toString();
     final rapport = Rapport(
       id: id,
       type: widget.type,
       name: _nameCtrl.text.trim(),
-      date: DateFormat('dd/MM/yyyy').format(DateTime.now()),
+      date: displayDate,
       data: numericValues,
       interpretations: interpretations,
     );
 
     ref.read(rapportsProvider.notifier).addRapport(rapport);
+
+    if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(isEau
@@ -75,7 +153,20 @@ class _RapportFormScreenState extends ConsumerState<RapportFormScreen> {
           : 'Le rapport sol a été sauvegardé.'),
       backgroundColor: AppColors.farmLeaf,
     ));
+    if (mounted) {
+      setState(() => _isSaving = false);
+    }
     context.go('/rapports/$typePath');
+  }
+
+  String _serializeInterpretations(Map<String, Interpretation> interpretations) {
+    final serializable = interpretations.map(
+      (k, v) => MapEntry(k, <String, String>{
+        'text': v.text,
+        'level': v.level.name,
+      }),
+    );
+    return jsonEncode(serializable);
   }
 
   TextEditingController _controllerFor(String key) {
@@ -175,10 +266,18 @@ class _RapportFormScreenState extends ConsumerState<RapportFormScreen> {
                 width: double.infinity,
                 height: 44,
                 child: ElevatedButton.icon(
-                  onPressed: _handleSave,
-                  icon: const Icon(Icons.save, size: 16),
-                  label: const Text('Enregistrer le rapport',
-                      style: TextStyle(fontWeight: FontWeight.w700)),
+                  onPressed: _isSaving ? null : _handleSave,
+                  icon: _isSaving
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.save, size: 16),
+                  label: Text(
+                    _isSaving ? 'Enregistrement...' : 'Enregistrer le rapport',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.farmLeaf,
                     foregroundColor: Colors.white,

@@ -41,7 +41,7 @@ const Map<String, Map<String, String>> translations = {
   'index.connected': {'fr': 'Connecté', 'ar': 'متصل'},
   'index.disconnected': {'fr': 'Non connecté', 'ar': 'غير متصل'},
   'index.scan_qr': {'fr': 'Scanner QR Code', 'ar': 'مسح رمز QR'},
-  'index.scan_to_connect': {'fr': "Scannez le QR Code pour connecter l'ESP32", 'ar': 'امسح رمز QR لتوصيل ESP32'},
+  'index.scan_to_connect': {'fr': "Scannez le QR Code pour connecter un appareil", 'ar': 'امسح رمز QR لتوصيل جهاز'},
 
   // Health
   'health.title': {'fr': 'Santé Plante', 'ar': 'صحة النبات'},

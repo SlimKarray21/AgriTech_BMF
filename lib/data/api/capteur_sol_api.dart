@@ -29,4 +29,42 @@ class CapteurSolApi {
   Future<Map<String, dynamic>?> updateVanne(int id, Map<String, dynamic> body) {
     return _c.patchJson('/vannes/$id', body);
   }
+
+  Future<Map<String, dynamic>?> createRapportEau(Map<String, dynamic> body) {
+    return _c.postJson('/rapports/eau', body);
+  }
+
+  Future<Map<String, dynamic>?> createRapportSol(Map<String, dynamic> body) {
+    return _c.postJson('/rapports/sol', body);
+  }
+
+  Future<dynamic> listRapportsEau({int? userId, int? parcelId}) {
+    final q = <String, String>{};
+    if (userId != null) q['userId'] = '$userId';
+    if (parcelId != null) q['parcelId'] = '$parcelId';
+    return _c.getJsonAny('/rapports/eau', query: q.isEmpty ? null : q);
+  }
+
+  Future<Map<String, dynamic>?> getRapportEauById(String id) {
+    return _c.getJson('/rapports/eau/$id');
+  }
+
+  Future<dynamic> listRapportsSol({int? userId, int? parcelId}) {
+    final q = <String, String>{};
+    if (userId != null) q['userId'] = '$userId';
+    if (parcelId != null) q['parcelId'] = '$parcelId';
+    return _c.getJsonAny('/rapports/sol', query: q.isEmpty ? null : q);
+  }
+
+  Future<Map<String, dynamic>?> getRapportSolById(String id) {
+    return _c.getJson('/rapports/sol/$id');
+  }
+
+  Future<Map<String, dynamic>?> deleteRapportEau(String id) {
+    return _c.deleteJson('/rapports/eau/$id');
+  }
+
+  Future<Map<String, dynamic>?> deleteRapportSol(String id) {
+    return _c.deleteJson('/rapports/sol/$id');
+  }
 }

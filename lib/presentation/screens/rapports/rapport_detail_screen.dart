@@ -1,20 +1,182 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'dart:convert';
 import 'package:uiearth_flutter/core/theme/app_colors.dart';
+import 'package:uiearth_flutter/data/api/api_exception.dart';
 import 'package:uiearth_flutter/data/models/rapport.dart';
+import 'package:uiearth_flutter/domain/providers/api_providers.dart';
 import 'package:uiearth_flutter/domain/providers/rapport_provider.dart';
 
 /// /rapports/eau/:id ou /rapports/sol/:id — Détail d'un rapport.
-class RapportDetailScreen extends ConsumerWidget {
+class RapportDetailScreen extends ConsumerStatefulWidget {
   final String rapportId;
-  const RapportDetailScreen({super.key, required this.rapportId});
+  final RapportType type;
+  const RapportDetailScreen({super.key, required this.rapportId, required this.type});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final notifier = ref.read(rapportsProvider.notifier);
-    final rapport = notifier.byId(rapportId);
+  ConsumerState<RapportDetailScreen> createState() => _RapportDetailScreenState();
+}
+
+class _RapportDetailScreenState extends ConsumerState<RapportDetailScreen> {
+  bool _deleting = false;
+  bool _loading = true;
+  bool _notFound = false;
+  Rapport? _rapport;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _loadFromBackend();
+    });
+  }
+
+  Rapport _fromBackend(Map<String, dynamic> map) {
+    final type = widget.type;
+    final id = (map['id'] ?? widget.rapportId).toString();
+    final name = map['reportName']?.toString() ?? 'Rapport';
+    final date = _formatDate(map['analysisDate']?.toString());
+    final data = type == RapportType.eau ? _eauDataFromBackend(map) : _solDataFromBackend(map);
+    final interpretations = _interpretationsFromBackend(map['interpretations']);
+
+    return Rapport(
+      id: id,
+      type: type,
+      name: name,
+      date: date,
+      data: data,
+      interpretations: interpretations,
+    );
+  }
+
+  String _formatDate(String? isoDate) {
+    if (isoDate == null || isoDate.isEmpty) return '';
+    final parts = isoDate.split('-');
+    if (parts.length != 3) return isoDate;
+    return '${parts[2]}/${parts[1]}/${parts[0]}';
+  }
+
+  Map<String, double> _eauDataFromBackend(Map<String, dynamic> m) {
+    double n(String k) => (m[k] as num?)?.toDouble() ?? 0.0;
+    return {
+      'ph': n('ph'),
+      'ce': n('cewDsM'),
+      'residu_sec': n('residuSecMgL'),
+      'chlorures': n('chloruresMeqL'),
+      'sulfates': n('sulfatesMeqL'),
+      'bicarbonates': n('bicarbonatesMeqL'),
+      'sodium': n('sodiumMeqL'),
+      'calcium': n('calciumMeqL'),
+      'magnesium': n('magnesiumMeqL'),
+      'sar': n('sarRatio'),
+      'durete': n('dureteF'),
+    };
+  }
+
+  Map<String, double> _solDataFromBackend(Map<String, dynamic> m) {
+    double n(String k) => (m[k] as num?)?.toDouble() ?? 0.0;
+    return {
+      'argile': n('argilePercent'),
+      'limon': n('limonPercent'),
+      'sable': n('sablePercent'),
+      'ph': n('ph'),
+      'ce': n('ceDsM'),
+      'calcaire': n('calcaireTotalPercent'),
+      'mo': n('moPercent'),
+      'cn': n('rapportCn'),
+      'p2o5': n('p2o5Ppm'),
+      'k2o': n('k2oPpm'),
+      'mgo': n('mgoPpm'),
+      'cec': n('cecMeq100g'),
+      'esp': n('espPercent'),
+    };
+  }
+
+  Map<String, Interpretation> _interpretationsFromBackend(dynamic raw) {
+    if (raw is! String || raw.trim().isEmpty) return {};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return {};
+
+      final out = <String, Interpretation>{};
+      decoded.forEach((key, value) {
+        if (key is! String || value is! Map) return;
+        final text = value['text']?.toString();
+        final levelRaw = value['level']?.toString();
+        if (text == null || levelRaw == null) return;
+        out[key] = Interpretation(
+          text: text,
+          level: _interpLevelFromString(levelRaw),
+        );
+      });
+      return out;
+    } catch (_) {
+      return {};
+    }
+  }
+
+  InterpLevel _interpLevelFromString(String level) {
+    switch (level) {
+      case 'danger':
+        return InterpLevel.danger;
+      case 'warning':
+        return InterpLevel.warning;
+      default:
+        return InterpLevel.success;
+    }
+  }
+
+  Future<void> _loadFromBackend() async {
+    final api = ref.read(uiEarthApiProvider).capteurSol;
+    try {
+      final raw = widget.type == RapportType.eau
+          ? await api.getRapportEauById(widget.rapportId)
+          : await api.getRapportSolById(widget.rapportId);
+
+      if (!mounted) return;
+
+      if (raw != null) {
+        final rapport = _fromBackend(Map<String, dynamic>.from(raw));
+        ref.read(rapportsProvider.notifier).addOrReplace(rapport);
+        setState(() {
+          _rapport = rapport;
+          _notFound = false;
+          _loading = false;
+        });
+        return;
+      }
+
+      setState(() {
+        _notFound = true;
+        _loading = false;
+        _rapport = null;
+      });
+    } on ApiException {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final localRapport = ref.read(rapportsProvider.notifier).byId(widget.rapportId);
+    final rapport = _rapport ?? (_notFound ? null : localRapport);
+
+    if (_loading && rapport == null) {
+      return Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: CircularProgressIndicator(color: AppColors.farmLeaf),
+          ),
+        ),
+      );
+    }
 
     if (rapport == null) {
       return Scaffold(
@@ -103,10 +265,7 @@ class RapportDetailScreen extends ConsumerWidget {
                   ),
                 ),
                 GestureDetector(
-                  onTap: () {
-                    ref.read(rapportsProvider.notifier).removeRapport(rapport.id);
-                    context.go('/rapports/$typePath');
-                  },
+                  onTap: _deleting ? null : () => _deleteReport(context, rapport),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
@@ -118,7 +277,7 @@ class RapportDetailScreen extends ConsumerWidget {
                       children: [
                         Icon(Icons.delete_outline, size: 14, color: AppColors.farmDanger),
                         const SizedBox(width: 6),
-                        Text('Supprimer',
+                        Text(_deleting ? 'Suppression...' : 'Supprimer',
                             style: TextStyle(fontSize: 12, color: AppColors.farmDanger)),
                       ],
                     ),
@@ -294,6 +453,38 @@ class RapportDetailScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _deleteReport(BuildContext context, Rapport rapport) async {
+    if (_deleting) return;
+    setState(() => _deleting = true);
+
+    final api = ref.read(uiEarthApiProvider).capteurSol;
+    try {
+      if (rapport.type == RapportType.eau) {
+        await api.deleteRapportEau(rapport.id);
+      } else {
+        await api.deleteRapportSol(rapport.id);
+      }
+
+      ref.read(rapportsProvider.notifier).removeRapport(rapport.id);
+      if (!context.mounted) return;
+      context.go('/rapports/${rapport.type == RapportType.eau ? 'eau' : 'sol'}');
+    } on ApiException catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Suppression backend échouée: ${e.message}')),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur réseau lors de la suppression: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _deleting = false);
+      }
+    }
   }
 }
 
