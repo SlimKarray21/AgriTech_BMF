@@ -1,10 +1,14 @@
 package com.CapteurSol.services
 
 import com.CapteurSol.models.Parcelle
+import com.CapteurSol.models.RapportEau
+import com.CapteurSol.models.RapportSol
 import com.CapteurSol.models.Vanne
 import com.pistoncontrol.database.ParcellePlantes as ParcellePlantesTable
 import com.pistoncontrol.database.Parcelle as ParcelleTable
 import com.pistoncontrol.database.Plantes as PlantesTable
+import com.pistoncontrol.database.RapportEau as RapportEauTable
+import com.pistoncontrol.database.RapportSol as RapportSolTable
 import com.pistoncontrol.database.TypePlante as TypePlanteTable
 import com.pistoncontrol.database.Vannes as VannesTable
 import com.pistoncontrol.database.DatabaseFactory
@@ -18,6 +22,7 @@ import org.jetbrains.exposed.sql.update
 import org.jetbrains.exposed.sql.and
 import kotlinx.serialization.Serializable
 import java.time.Instant
+import java.time.LocalDate
 
 data class CreateParcelleInput(
     val nomSurface: String,
@@ -89,6 +94,47 @@ data class CreateParcelleWizardInput(
     val tailleHa: Double,
     val plants: List<WizardPlantInput>,
     val vannes: List<WizardVanneInput>,
+)
+
+data class CreateRapportEauInput(
+    val reportName: String,
+    val parcelId: Long,
+    val userId: Long,
+    val analysisDate: String,
+    val ph: Double = 0.0,
+    val cewDsM: Double = 0.0,
+    val residuSecMgL: Double = 0.0,
+    val chloruresMeqL: Double = 0.0,
+    val sulfatesMeqL: Double = 0.0,
+    val bicarbonatesMeqL: Double = 0.0,
+    val sodiumMeqL: Double = 0.0,
+    val calciumMeqL: Double = 0.0,
+    val magnesiumMeqL: Double = 0.0,
+    val sarRatio: Double = 0.0,
+    val dureteF: Double = 0.0,
+    val interpretations: String? = null,
+)
+
+data class CreateRapportSolInput(
+    val reportName: String,
+    val parcelId: Long,
+    val userId: Long,
+    val analysisDate: String,
+    val argilePercent: Double = 0.0,
+    val limonPercent: Double = 0.0,
+    val sablePercent: Double = 0.0,
+    val ph: Double = 0.0,
+    val ceDsM: Double = 0.0,
+    val calcaireTotalPercent: Double = 0.0,
+    val calcaireActifPercent: Double = 0.0,
+    val moPercent: Double = 0.0,
+    val rapportCn: Double = 0.0,
+    val p2o5Ppm: Double = 0.0,
+    val k2oPpm: Double = 0.0,
+    val mgoPpm: Double = 0.0,
+    val cecMeq100g: Double = 0.0,
+    val espPercent: Double = 0.0,
+    val interpretations: String? = null,
 )
 
 @Serializable
@@ -166,7 +212,13 @@ class CapteurSolService {
         val vannes = listVannes(parcelId = id, userId = userId)
 
         val culture = plants.firstOrNull()?.name ?: "-"
-        val status = if (vannes.isEmpty()) "non connecté" else "connecté"
+        // A parcelle is connected only when linked to soil/climate data sources.
+        // Having configured valves alone should not mark it as connected.
+        val status = if (parcelle.fkSol != null || parcelle.fkClimat != null) {
+            "connecté"
+        } else {
+            "non connecté"
+        }
 
         return ParcelleDetails(
             parcelle = parcelle,
@@ -277,6 +329,113 @@ class CapteurSolService {
 
     suspend fun deleteVanne(id: Long): Boolean = DatabaseFactory.dbQuery {
         VannesTable.deleteWhere { VannesTable.id eq id } > 0
+    }
+
+    suspend fun listRapportsEau(userId: Long?, parcelId: Long?): List<RapportEau> = DatabaseFactory.dbQuery {
+        val query = when {
+            userId != null && parcelId != null ->
+                RapportEauTable.select { (RapportEauTable.userId eq userId) and (RapportEauTable.parcelId eq parcelId) }
+            userId != null ->
+                RapportEauTable.select { RapportEauTable.userId eq userId }
+            parcelId != null ->
+                RapportEauTable.select { RapportEauTable.parcelId eq parcelId }
+            else -> RapportEauTable.selectAll()
+        }
+        query.map(::toRapportEau)
+    }
+
+    suspend fun getRapportEauById(id: Long): RapportEau? = DatabaseFactory.dbQuery {
+        RapportEauTable.select { RapportEauTable.id eq id }
+            .singleOrNull()
+            ?.let(::toRapportEau)
+    }
+
+    suspend fun createRapportEau(input: CreateRapportEauInput): RapportEau = DatabaseFactory.dbQuery {
+        require(input.reportName.isNotBlank()) { "reportName is required" }
+
+        val analysisDate = LocalDate.parse(input.analysisDate)
+        val now = Instant.now()
+        val id = RapportEauTable.insert {
+            it[reportName] = input.reportName
+            it[parcelId] = input.parcelId
+            it[userId] = input.userId
+            it[RapportEauTable.analysisDate] = analysisDate
+            it[ph] = input.ph
+            it[cewDsM] = input.cewDsM
+            it[residuSecMgL] = input.residuSecMgL
+            it[chloruresMeqL] = input.chloruresMeqL
+            it[sulfatesMeqL] = input.sulfatesMeqL
+            it[bicarbonatesMeqL] = input.bicarbonatesMeqL
+            it[sodiumMeqL] = input.sodiumMeqL
+            it[calciumMeqL] = input.calciumMeqL
+            it[magnesiumMeqL] = input.magnesiumMeqL
+            it[sarRatio] = input.sarRatio
+            it[dureteF] = input.dureteF
+            it[interpretations] = input.interpretations
+            it[createdAt] = now
+            it[updatedAt] = now
+        } get RapportEauTable.id
+
+        toRapportEau(RapportEauTable.select { RapportEauTable.id eq id }.single())
+    }
+
+    suspend fun deleteRapportEau(id: Long): Boolean = DatabaseFactory.dbQuery {
+        RapportEauTable.deleteWhere { RapportEauTable.id eq id } > 0
+    }
+
+    suspend fun listRapportsSol(userId: Long?, parcelId: Long?): List<RapportSol> = DatabaseFactory.dbQuery {
+        val query = when {
+            userId != null && parcelId != null ->
+                RapportSolTable.select { (RapportSolTable.userId eq userId) and (RapportSolTable.parcelId eq parcelId) }
+            userId != null ->
+                RapportSolTable.select { RapportSolTable.userId eq userId }
+            parcelId != null ->
+                RapportSolTable.select { RapportSolTable.parcelId eq parcelId }
+            else -> RapportSolTable.selectAll()
+        }
+        query.map(::toRapportSol)
+    }
+
+    suspend fun getRapportSolById(id: Long): RapportSol? = DatabaseFactory.dbQuery {
+        RapportSolTable.select { RapportSolTable.id eq id }
+            .singleOrNull()
+            ?.let(::toRapportSol)
+    }
+
+    suspend fun createRapportSol(input: CreateRapportSolInput): RapportSol = DatabaseFactory.dbQuery {
+        require(input.reportName.isNotBlank()) { "reportName is required" }
+
+        val analysisDate = LocalDate.parse(input.analysisDate)
+        val now = Instant.now()
+        val id = RapportSolTable.insert {
+            it[reportName] = input.reportName
+            it[parcelId] = input.parcelId
+            it[userId] = input.userId
+            it[RapportSolTable.analysisDate] = analysisDate
+            it[argilePercent] = input.argilePercent
+            it[limonPercent] = input.limonPercent
+            it[sablePercent] = input.sablePercent
+            it[ph] = input.ph
+            it[ceDsM] = input.ceDsM
+            it[calcaireTotalPercent] = input.calcaireTotalPercent
+            it[calcaireActifPercent] = input.calcaireActifPercent
+            it[moPercent] = input.moPercent
+            it[rapportCn] = input.rapportCn
+            it[p2o5Ppm] = input.p2o5Ppm
+            it[k2oPpm] = input.k2oPpm
+            it[mgoPpm] = input.mgoPpm
+            it[cecMeq100g] = input.cecMeq100g
+            it[espPercent] = input.espPercent
+            it[interpretations] = input.interpretations
+            it[createdAt] = now
+            it[updatedAt] = now
+        } get RapportSolTable.id
+
+        toRapportSol(RapportSolTable.select { RapportSolTable.id eq id }.single())
+    }
+
+    suspend fun deleteRapportSol(id: Long): Boolean = DatabaseFactory.dbQuery {
+        RapportSolTable.deleteWhere { RapportSolTable.id eq id } > 0
     }
 
     suspend fun createParcelleWizard(input: CreateParcelleWizardInput): WizardCreateResult = DatabaseFactory.dbQuery {
@@ -397,5 +556,52 @@ class CapteurSolService {
         scheduleStart = row[VannesTable.scheduleStart],
         updatedAt = row[VannesTable.updatedAt].toString(),
         userId = row[VannesTable.userId],
+    )
+
+    private fun toRapportEau(row: ResultRow): RapportEau = RapportEau(
+        id = row[RapportEauTable.id],
+        reportName = row[RapportEauTable.reportName],
+        parcelId = row[RapportEauTable.parcelId],
+        userId = row[RapportEauTable.userId],
+        analysisDate = row[RapportEauTable.analysisDate].toString(),
+        ph = row[RapportEauTable.ph],
+        cewDsM = row[RapportEauTable.cewDsM],
+        residuSecMgL = row[RapportEauTable.residuSecMgL],
+        chloruresMeqL = row[RapportEauTable.chloruresMeqL],
+        sulfatesMeqL = row[RapportEauTable.sulfatesMeqL],
+        bicarbonatesMeqL = row[RapportEauTable.bicarbonatesMeqL],
+        sodiumMeqL = row[RapportEauTable.sodiumMeqL],
+        calciumMeqL = row[RapportEauTable.calciumMeqL],
+        magnesiumMeqL = row[RapportEauTable.magnesiumMeqL],
+        sarRatio = row[RapportEauTable.sarRatio],
+        dureteF = row[RapportEauTable.dureteF],
+        interpretations = row[RapportEauTable.interpretations],
+        createdAt = row[RapportEauTable.createdAt].toString(),
+        updatedAt = row[RapportEauTable.updatedAt].toString(),
+    )
+
+    private fun toRapportSol(row: ResultRow): RapportSol = RapportSol(
+        id = row[RapportSolTable.id],
+        reportName = row[RapportSolTable.reportName],
+        parcelId = row[RapportSolTable.parcelId],
+        userId = row[RapportSolTable.userId],
+        analysisDate = row[RapportSolTable.analysisDate].toString(),
+        argilePercent = row[RapportSolTable.argilePercent],
+        limonPercent = row[RapportSolTable.limonPercent],
+        sablePercent = row[RapportSolTable.sablePercent],
+        ph = row[RapportSolTable.ph],
+        ceDsM = row[RapportSolTable.ceDsM],
+        calcaireTotalPercent = row[RapportSolTable.calcaireTotalPercent],
+        calcaireActifPercent = row[RapportSolTable.calcaireActifPercent],
+        moPercent = row[RapportSolTable.moPercent],
+        rapportCn = row[RapportSolTable.rapportCn],
+        p2o5Ppm = row[RapportSolTable.p2o5Ppm],
+        k2oPpm = row[RapportSolTable.k2oPpm],
+        mgoPpm = row[RapportSolTable.mgoPpm],
+        cecMeq100g = row[RapportSolTable.cecMeq100g],
+        espPercent = row[RapportSolTable.espPercent],
+        interpretations = row[RapportSolTable.interpretations],
+        createdAt = row[RapportSolTable.createdAt].toString(),
+        updatedAt = row[RapportSolTable.updatedAt].toString(),
     )
 }
