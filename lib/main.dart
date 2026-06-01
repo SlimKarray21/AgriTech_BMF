@@ -37,7 +37,7 @@ class AgriTechApp extends ConsumerStatefulWidget {
 }
 
 class _AgriTechAppState extends ConsumerState<AgriTechApp> {
-  static const bool _bypassAuthForDev = true;
+  static const bool _bypassAuthForDev = false;
 
   @override
   Widget build(BuildContext context) {

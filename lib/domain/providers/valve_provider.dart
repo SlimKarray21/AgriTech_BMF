@@ -217,7 +217,7 @@ class ValveProvider extends ChangeNotifier {
             schedule: v.schedule,
             startTime: _parseSchedule(v.schedule).$1,
             endTime: _parseSchedule(v.schedule).$2,
-            selectedWeekDays: v.isAuto ? <int>{1, 3, 5} : <int>{},
+            selectedWeekDays: Set<int>.from(v.selectedWeekDays),
             nbPlants: v.nbPlants,
             debit: v.debit,
             lastAction: v.lastAction,

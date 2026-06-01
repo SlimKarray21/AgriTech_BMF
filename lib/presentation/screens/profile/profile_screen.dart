@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart' as p;
 import 'package:uiearth_flutter/core/theme/app_colors.dart';
 import 'package:uiearth_flutter/domain/providers/api_providers.dart';
@@ -17,6 +18,49 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   String _farmName = 'Ferme Soleil';
   String _farmLocation = 'Tunis';
   String _ownerName = 'Ahmed Fermier';
+  bool _loadingProfile = false;
+  String? _aboType;
+  DateTime? _aboStart;
+  DateTime? _aboEnd;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    setState(() => _loadingProfile = true);
+    try {
+      final profile = await ref.read(uiEarthApiProvider).user.getProfile();
+      if (!mounted || profile == null) return;
+
+      final firstName = profile['firstName']?.toString().trim();
+      final lastName = profile['lastName']?.toString().trim();
+      final location = profile['location']?.toString().trim();
+      final fullName = [firstName, lastName]
+          .where((e) => e != null && e.isNotEmpty)
+          .join(' ')
+          .trim();
+
+      DateTime? parseDate(String? raw) {
+        if (raw == null || raw.trim().isEmpty) return null;
+        return DateTime.tryParse(raw);
+      }
+
+      setState(() {
+        if (fullName.isNotEmpty) _ownerName = fullName;
+        if (location != null && location.isNotEmpty) _farmLocation = location;
+        _aboType = profile['typeAbo']?.toString();
+        _aboStart = parseDate(profile['dateDebAbo']?.toString());
+        _aboEnd = parseDate(profile['dateExpAbo']?.toString());
+      });
+    } catch (_) {
+      // Keep local fallback values when profile endpoint is unavailable.
+    } finally {
+      if (mounted) setState(() => _loadingProfile = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +70,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     if (_subPage == 'parametres') return _settings(theme);
     if (_subPage == 'aide') return _help(theme);
+    if (_subPage == 'abonnement') return _subscription(theme);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
@@ -62,6 +107,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         const Divider(height: 32),
         _Menu(Icons.settings_outlined, 'Paramètres', () => setState(() => _subPage = 'parametres'), theme),
         _Menu(Icons.shield_outlined, 'Confidentialité', () {}, theme),
+        _Menu(Icons.workspace_premium_outlined, 'Abonnement', () => setState(() => _subPage = 'abonnement'), theme),
         _Menu(Icons.help_outline, 'Aide & Support', () => setState(() => _subPage = 'aide'), theme),
         const Divider(height: 32),
         GestureDetector(
@@ -130,6 +176,76 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       Text('Version 1.0.0 • © 2026', textAlign: TextAlign.center, style: theme.textTheme.labelSmall),
     ],
   );
+
+  Widget _subscription(ThemeData theme) {
+    String formatDate(DateTime? d) {
+      if (d == null) return '—';
+      return DateFormat('dd/MM/yyyy').format(d);
+    }
+
+    String remainingText() {
+      if (_aboEnd == null) return 'Aucun abonnement actif';
+      final today = DateTime.now();
+      final end = DateTime(_aboEnd!.year, _aboEnd!.month, _aboEnd!.day);
+      final now = DateTime(today.year, today.month, today.day);
+      final days = end.difference(now).inDays;
+      if (days < 0) return 'Expiré';
+      if (days == 0) return 'Expire aujourd\'hui';
+      return '$days jours restants';
+    }
+
+    final typeAbo = (_aboType == null || _aboType!.trim().isEmpty) ? 'Non abonné' : _aboType!;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+      children: [
+        _header('Abonnement', theme),
+        if (_loadingProfile)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: theme.colorScheme.outline),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.workspace_premium, color: AppColors.farmLeaf),
+                    const SizedBox(width: 8),
+                    Text('Type: $typeAbo', style: theme.textTheme.titleSmall),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text('Date début: ${formatDate(_aboStart)}', style: theme.textTheme.bodyMedium),
+                const SizedBox(height: 6),
+                Text('Date fin: ${formatDate(_aboEnd)}', style: theme.textTheme.bodyMedium),
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.farmLeaf.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    'Temps restant: ${remainingText()}',
+                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
 }
 
 class _Stat extends StatelessWidget {

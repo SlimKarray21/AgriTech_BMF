@@ -48,6 +48,8 @@ class ApiClient {
     if (r.statusCode >= 200 && r.statusCode < 300) return;
     String msg = 'HTTP ${r.statusCode}';
     String? userId;
+    int? otpLength;
+    int? expiresInMinutes;
     try {
       final map = jsonDecode(r.body);
       if (map is Map) {
@@ -59,11 +61,24 @@ class ApiClient {
         if (map['userId'] is String) {
           userId = map['userId'] as String;
         }
+        if (map['otpLength'] is int) {
+          otpLength = map['otpLength'] as int;
+        }
+        if (map['expiresInMinutes'] is int) {
+          expiresInMinutes = map['expiresInMinutes'] as int;
+        }
       }
     } catch (_) {
       if (r.body.isNotEmpty) msg = r.body;
     }
-    throw ApiException(msg, statusCode: r.statusCode, body: r.body, userId: userId);
+    throw ApiException(
+      msg,
+      statusCode: r.statusCode,
+      body: r.body,
+      userId: userId,
+      otpLength: otpLength,
+      expiresInMinutes: expiresInMinutes,
+    );
   }
 
   Future<Map<String, dynamic>?> getJson(

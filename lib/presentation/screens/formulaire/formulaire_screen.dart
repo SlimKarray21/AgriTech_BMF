@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:provider/provider.dart' as p;
 import 'package:uiearth_flutter/core/l10n/app_localizations.dart';
@@ -18,27 +19,82 @@ class FormulaireScreen extends ConsumerStatefulWidget {
 
 class _FormulaireScreenState extends ConsumerState<FormulaireScreen> {
   int _step = 0;
-  bool _multiPlant = false;
   bool _isSaving = false;
 
-  // Step 1 data
   final _nameCtrl = TextEditingController();
   final _areaCtrl = TextEditingController();
   final String _country = 'Tunisie';
   final _gouvernoratCtrl = TextEditingController();
   final _cityCtrl = TextEditingController();
 
-  // Step 2 data
+  static const Map<String, List<String>> _tunisiaGovernoratesCities = {
+    'Ariana': ['Ariana Ville', 'Raoued', 'Soukra', 'Kalaat Landalous', 'Mnihla', 'Ettadhamen'],
+    'Béja': ['Béja', 'Amdoun', 'Testour', 'Medjez El Bab', 'Nefza', 'Teboursouk'],
+    'Ben Arous': ['Ben Arous', 'Hammam Lif', 'Hammam Chott', 'Ezzahra', 'Fouchana', 'Mornag', 'Rades', 'Boumhel'],
+    'Bizerte': ['Bizerte', 'Menzel Bourguiba', 'Mateur', 'Ras Jebel', 'Sejnane', 'Ghar El Melh', 'Tinja'],
+    'Gabès': ['Gabès Ville', 'Ghannouch', 'Matmata', 'Mareth', 'El Hamma', 'Métouia'],
+    'Gafsa': ['Gafsa', 'Métlaoui', 'Redeyef', 'Moularès', 'Sened', 'El Ksar'],
+    'Jendouba': ['Jendouba', 'Tabarka', 'Aïn Draham', 'Fernana', 'Ghardimaou', 'Bou Salem'],
+    'Kairouan': ['Kairouan', 'Chebika', 'Sbikha', 'Haffouz', 'Oueslatia', 'Nasrallah'],
+    'Kasserine': ['Kasserine', 'Sbeitla', 'Foussana', 'Thala', 'Feriana', 'Sbiba'],
+    'Kébili': ['Kébili', 'Douz', 'Souk Lahad', 'El Faouar'],
+    'Kef': ['Le Kef', 'Tajerouine', 'Dahmani', 'Sakiet Sidi Youssef', 'Kalaat Senan'],
+    'Mahdia': ['Mahdia', 'Ksour Essef', 'Chebba', 'El Jem', 'Melloulèche', 'Boumerdès'],
+    'Manouba': ['Manouba', 'Oued Ellil', 'Tebourba', 'Borj El Amri', 'Douar Hicher'],
+    'Médenine': ['Médenine', 'Djerba Midoun', 'Djerba Houmt Souk', 'Zarzis', 'Ben Guerdane', 'Ajim'],
+    'Monastir': ['Monastir', 'Moknine', 'Ksibet El Mediouni', 'Jemmal', 'Bekalta', 'Ksar Hellal', 'Teboulba'],
+    'Nabeul': ['Nabeul', 'Hammamet', 'Dar Chaabane', 'Kelibia', 'Korba', 'Menzel Temime', 'Soliman'],
+    'Sfax': ['Sfax Ville', 'Sakiet Ezzit', 'Sakiet Eddaier', 'Agareb', 'Menzel Chaker', 'El Amra', 'Jebeniana', 'Mahres', 'Kerkennah', 'Thyna', 'Bir Ali Ben Khalifa', 'Skhira'],
+    'Sidi Bouzid': ['Sidi Bouzid', 'Meknassy', 'Regueb', 'Menzel Bouzaiane', 'Bir El Hafey', 'Cebbala'],
+    'Siliana': ['Siliana', 'Gaafour', 'Bouarada', 'El Krib', 'Makthar'],
+    'Sousse': ['Sousse Ville', 'Hammam Sousse', 'Kalaa Kebira', 'Kalaa Seghira', 'Msaken', 'Akouda', 'Enfidha', 'Sidi Bou Ali'],
+    'Tataouine': ['Tataouine', 'Remada', 'Bir Lahmar', 'Dehiba', 'Ghomrassen'],
+    'Tozeur': ['Tozeur', 'Nefta', 'Degache', 'Tameghza'],
+    'Tunis': ['Tunis Centre Ville', 'La Marsa', 'Le Bardo', 'Carthage', 'La Goulette', 'El Omrane', 'Bab Bhar', 'Bab Souika', 'Sidi El Béchir'],
+    'Zaghouan': ['Zaghouan', 'Zriba', 'Bir Mcherga', 'El Fahs', 'Nadhour'],
+  };
+
+  static const Map<String, List<String>> _plantTypesByCategory = {
+    'Cultures maraichères': [
+      'Tomate',
+      'Piment',
+      'Pomme de terre',
+      'Oignon',
+      'Ail',
+      'Carotte',
+      'Laitue',
+      'Courgette',
+      'Aubergine',
+      'Concombre',
+    ],
+    'Arbres fruitiers': [
+      'Olivier',
+      'Oranger',
+      'Citronnier',
+      'Mandarinier',
+      'Pommier',
+      'Poirier',
+      'Pêcher',
+      'Abricotier',
+      'Grenadier',
+      'Figuier',
+    ],
+    'Grandes cultures': ['Blé', 'Orge', 'Avoine', 'Maïs', 'Sorgho'],
+    'Légumineuses': ['Pois chiche', 'Lentille', 'Fève', 'Haricot'],
+    'Cultures spéciales': ['Palmier dattier', 'Vigne', 'Pastèque', 'Melon', 'Fraisier'],
+  };
+
+  int _nbPlants = 1;
   final List<Map<String, TextEditingController>> _plants = [
     {
       'name': TextEditingController(),
+      'category': TextEditingController(),
       'type': TextEditingController(),
       'age': TextEditingController(text: '1'),
       'count': TextEditingController(text: '100'),
     },
   ];
 
-  // Step 3 data
   int _nbVannes = 1;
   final List<Map<String, TextEditingController>> _vannes = [
     {
@@ -48,14 +104,24 @@ class _FormulaireScreenState extends ConsumerState<FormulaireScreen> {
     },
   ];
 
-  void _addPlant() {
+  void _updatePlantCount(int count) {
     setState(() {
-      _plants.add({
-        'name': TextEditingController(),
-        'type': TextEditingController(),
-        'age': TextEditingController(text: '1'),
-        'count': TextEditingController(text: '50'),
-      });
+      _nbPlants = count;
+      while (_plants.length < count) {
+        _plants.add({
+          'name': TextEditingController(),
+          'category': TextEditingController(),
+          'type': TextEditingController(),
+          'age': TextEditingController(text: '1'),
+          'count': TextEditingController(text: '50'),
+        });
+      }
+      while (_plants.length > count) {
+        final removed = _plants.removeLast();
+        for (final c in removed.values) {
+          c.dispose();
+        }
+      }
     });
   }
 
@@ -73,6 +139,16 @@ class _FormulaireScreenState extends ConsumerState<FormulaireScreen> {
         _vannes.removeLast();
       }
     });
+  }
+
+  String? _findCategoryForType(String type) {
+    if (type.isEmpty) return null;
+    for (final entry in _plantTypesByCategory.entries) {
+      if (entry.value.contains(type)) {
+        return entry.key;
+      }
+    }
+    return null;
   }
 
   Future<void> _save() async {
@@ -131,7 +207,6 @@ class _FormulaireScreenState extends ConsumerState<FormulaireScreen> {
       vannes: vannes,
     );
 
-    // Keep local UX responsive, but persist to backend wizard endpoint.
     final api = ref.read(uiEarthApiProvider);
     ParcelleData savedParcelle = parcelle;
     setState(() => _isSaving = true);
@@ -141,8 +216,6 @@ class _FormulaireScreenState extends ConsumerState<FormulaireScreen> {
         'localisation':
             '${_cityCtrl.text.trim()}, ${_gouvernoratCtrl.text.trim()}, $_country',
         'typeSol': 'standard',
-        // TODO: map with authenticated backend user (currently UUID in auth domain).
-        'fkUser': 1,
         'tailleHa': areaHa,
         'plants': plants
             .map((p) => {
@@ -253,18 +326,20 @@ class _FormulaireScreenState extends ConsumerState<FormulaireScreen> {
     final langState = ref.watch(languageProvider);
     final theme = Theme.of(context);
 
-    final stepTitles = [
-      langState.t('wizard.step1'),
-      langState.t('wizard.step2'),
-      langState.t('wizard.step3'),
-    ];
+    final stepTitles = [langState.t('wizard.step2'), langState.t('wizard.step3')];
 
     return Scaffold(
       appBar: AppBar(
         title: Row(children: [
           const Icon(Icons.add_circle_outline, size: 22),
           const SizedBox(width: 8),
-          Text(langState.t('wizard.title')),
+          Expanded(
+            child: Text(
+              langState.t('wizard.title'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ]),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -273,11 +348,10 @@ class _FormulaireScreenState extends ConsumerState<FormulaireScreen> {
       ),
       body: Column(
         children: [
-          // Step indicator
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
             child: Row(
-              children: List.generate(3, (i) {
+              children: List.generate(2, (i) {
                 final isActive = i == _step;
                 final isDone = i < _step;
                 return Expanded(
@@ -316,7 +390,9 @@ class _FormulaireScreenState extends ConsumerState<FormulaireScreen> {
                               color: isActive
                                   ? theme.colorScheme.onSurface
                                   : theme.colorScheme.onSurface
-                                      .withValues(alpha: 0.4))),
+                                      .withValues(alpha: 0.4)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
                     ),
                   ]),
                 );
@@ -325,19 +401,16 @@ class _FormulaireScreenState extends ConsumerState<FormulaireScreen> {
           ),
           const Divider(height: 1),
 
-          // Step content
           Expanded(
             child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
               children: [
-                if (_step == 0) _buildStep0(langState, theme),
-                if (_step == 1) _buildStep1(langState, theme),
-                if (_step == 2) _buildStep2(langState, theme),
+                if (_step == 0) _buildStep1(langState, theme),
+                if (_step == 1) _buildStep2(langState, theme),
               ],
             ),
           ),
 
-          // Navigation buttons
           Container(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
             decoration: BoxDecoration(
@@ -358,7 +431,7 @@ class _FormulaireScreenState extends ConsumerState<FormulaireScreen> {
                 child: ElevatedButton(
                   onPressed: _isSaving
                       ? null
-                      : _step < 2
+                      : _step < 1
                           ? () => setState(() => _step++)
                           : _save,
                   child: _isSaving
@@ -367,7 +440,7 @@ class _FormulaireScreenState extends ConsumerState<FormulaireScreen> {
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : Text(_step < 2
+                      : Text(_step < 1
                           ? langState.t('wizard.next')
                           : langState.t('wizard.save')),
                 ),
@@ -379,106 +452,112 @@ class _FormulaireScreenState extends ConsumerState<FormulaireScreen> {
     );
   }
 
-  Widget _buildStep0(LanguageState langState, ThemeData theme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(langState.t('wizard.question'),
-            style: theme.textTheme.titleSmall),
-        const SizedBox(height: 12),
-        Row(children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => _multiPlant = false),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: !_multiPlant
-                      ? AppColors.farmLeaf.withValues(alpha: 0.1)
-                      : theme.colorScheme.secondary,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                      color: !_multiPlant
-                          ? AppColors.farmLeaf
-                          : theme.colorScheme.outline),
-                ),
-                child: Column(children: [
-                  Icon(Icons.eco,
-                      color: !_multiPlant
-                          ? AppColors.farmLeaf
-                          : theme.colorScheme.onSurface.withValues(alpha: 0.4)),
-                  const SizedBox(height: 8),
-                  Text(langState.t('wizard.no'),
-                      style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: !_multiPlant
-                              ? AppColors.farmLeaf
-                              : theme.colorScheme.onSurface)),
-                ]),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => _multiPlant = true),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: _multiPlant
-                      ? AppColors.farmLeaf.withValues(alpha: 0.1)
-                      : theme.colorScheme.secondary,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                      color: _multiPlant
-                          ? AppColors.farmLeaf
-                          : theme.colorScheme.outline),
-                ),
-                child: Column(children: [
-                  Icon(Icons.forest,
-                      color: _multiPlant
-                          ? AppColors.farmLeaf
-                          : theme.colorScheme.onSurface.withValues(alpha: 0.4)),
-                  const SizedBox(height: 8),
-                  Text(langState.t('wizard.yes'),
-                      style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: _multiPlant
-                              ? AppColors.farmLeaf
-                              : theme.colorScheme.onSurface)),
-                ]),
-              ),
-            ),
-          ),
-        ]),
-      ],
-    );
-  }
-
   Widget _buildStep1(LanguageState langState, ThemeData theme) {
+    final selectedGovernorate = _gouvernoratCtrl.text.isEmpty ? null : _gouvernoratCtrl.text;
+    final cities = selectedGovernorate == null
+        ? const <String>[]
+        : (_tunisiaGovernoratesCities[selectedGovernorate] ?? const <String>[]);
+    final selectedCity = _cityCtrl.text.isEmpty ? null : _cityCtrl.text;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _FormField(langState.t('wizard.surface_name'), _nameCtrl),
         const SizedBox(height: 12),
         _FormField(langState.t('wizard.area_ha'), _areaCtrl,
-            keyboardType: TextInputType.number),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*([\.,]\d*)?$')),
+            ]),
         const SizedBox(height: 12),
         _FormField(langState.t('wizard.country'),
             TextEditingController(text: _country),
             enabled: false),
         const SizedBox(height: 12),
-        _FormField(langState.t('wizard.gouvernorat'), _gouvernoratCtrl),
+        _DropdownField(
+          label: langState.t('wizard.gouvernorat'),
+          value: selectedGovernorate,
+          items: _tunisiaGovernoratesCities.keys.toList(growable: false),
+          onChanged: (value) {
+            setState(() {
+              _gouvernoratCtrl.text = value ?? '';
+              _cityCtrl.text = '';
+            });
+          },
+        ),
         const SizedBox(height: 12),
-        _FormField(langState.t('wizard.city'), _cityCtrl),
+        _DropdownField(
+          label: langState.t('wizard.city'),
+          value: cities.contains(selectedCity) ? selectedCity : null,
+          items: cities,
+          hintText: selectedGovernorate == null
+              ? 'Choisissez d\'abord un gouvernorat'
+              : null,
+          onChanged: selectedGovernorate == null
+              ? null
+              : (value) {
+                  setState(() {
+                    _cityCtrl.text = value ?? '';
+                  });
+                },
+        ),
         const SizedBox(height: 20),
 
-        // Plants
-        Text(langState.t('wizard.plant'),
-            style: theme.textTheme.titleSmall),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final controls = Row(mainAxisSize: MainAxisSize.min, children: [
+              IconButton(
+                onPressed:
+                    _nbPlants > 1 ? () => _updatePlantCount(_nbPlants - 1) : null,
+                icon: const Icon(Icons.remove_circle_outline, size: 20),
+                color: AppColors.farmDanger,
+              ),
+              Text('$_nbPlants',
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w800)),
+              IconButton(
+                onPressed: () => _updatePlantCount(_nbPlants + 1),
+                icon: const Icon(Icons.add_circle_outline, size: 20),
+                color: AppColors.farmLeaf,
+              ),
+            ]);
+            if (constraints.maxWidth < 260) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(langState.t('wizard.plant'), style: theme.textTheme.titleSmall),
+                  const SizedBox(height: 6),
+                  controls,
+                ],
+              );
+            }
+            return Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    langState.t('wizard.plant'),
+                    style: theme.textTheme.titleSmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                controls,
+              ],
+            );
+          },
+        ),
         const SizedBox(height: 8),
         ...List.generate(_plants.length, (i) {
           final p = _plants[i];
+          final selectedCategory = p['category']!.text.isNotEmpty
+            ? p['category']!.text
+            : _findCategoryForType(p['type']!.text);
+          final typeOptions = selectedCategory == null
+            ? const <String>[]
+            : (_plantTypesByCategory[selectedCategory] ?? const <String>[]);
+          final selectedPlantType = typeOptions.contains(p['type']!.text)
+            ? p['type']!.text
+            : null;
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(12),
@@ -489,10 +568,37 @@ class _FormulaireScreenState extends ConsumerState<FormulaireScreen> {
             child: Column(children: [
               _FormField(langState.t('wizard.plant_name'), p['name']!),
               const SizedBox(height: 8),
+              _DropdownField(
+                label: langState.t('wizard.plant_category'),
+                value: selectedCategory,
+                items: _plantTypesByCategory.keys.toList(growable: false),
+                hintText: langState.t('wizard.plant_choose_category'),
+                onChanged: (value) {
+                  setState(() {
+                    p['category']!.text = value ?? '';
+                    p['type']!.text = '';
+                  });
+                },
+              ),
+              const SizedBox(height: 8),
               Row(children: [
                 Expanded(
-                    child: _FormField(
-                        langState.t('wizard.plant_type'), p['type']!)),
+                  child: _DropdownField(
+                    label: langState.t('wizard.plant_type'),
+                    value: selectedPlantType,
+                    items: typeOptions,
+                    hintText: selectedCategory == null
+                      ? langState.t('wizard.plant_choose_category_first')
+                      : langState.t('wizard.plant_choose_type'),
+                    onChanged: selectedCategory == null
+                        ? null
+                        : (value) {
+                            setState(() {
+                              p['type']!.text = value ?? '';
+                            });
+                          },
+                  ),
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                     child: _FormField(
@@ -505,15 +611,6 @@ class _FormulaireScreenState extends ConsumerState<FormulaireScreen> {
             ]),
           );
         }),
-
-        if (_multiPlant)
-          TextButton.icon(
-            onPressed: _addPlant,
-            icon:
-                const Icon(Icons.add_circle_outline, size: 16, color: AppColors.farmLeaf),
-            label: Text(langState.t('wizard.add_plant'),
-                style: const TextStyle(color: AppColors.farmLeaf)),
-          ),
       ],
     );
   }
@@ -522,12 +619,9 @@ class _FormulaireScreenState extends ConsumerState<FormulaireScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(langState.t('wizard.nb_vannes'),
-                style: theme.textTheme.titleSmall),
-            Row(children: [
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final controls = Row(mainAxisSize: MainAxisSize.min, children: [
               IconButton(
                 onPressed:
                     _nbVannes > 1 ? () => _updateVanneCount(_nbVannes - 1) : null,
@@ -543,8 +637,32 @@ class _FormulaireScreenState extends ConsumerState<FormulaireScreen> {
                 icon: const Icon(Icons.add_circle_outline, size: 20),
                 color: AppColors.farmLeaf,
               ),
-            ]),
-          ],
+            ]);
+            if (constraints.maxWidth < 260) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(langState.t('wizard.nb_vannes'),
+                      style: theme.textTheme.titleSmall),
+                  const SizedBox(height: 6),
+                  controls,
+                ],
+              );
+            }
+            return Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    langState.t('wizard.nb_vannes'),
+                    style: theme.textTheme.titleSmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                controls,
+              ],
+            );
+          },
         ),
         const SizedBox(height: 12),
         ...List.generate(_vannes.length, (i) {
@@ -588,10 +706,11 @@ class _FormField extends StatelessWidget {
   final String label;
   final TextEditingController controller;
   final TextInputType? keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
   final bool enabled;
 
   const _FormField(this.label, this.controller,
-      {this.keyboardType, this.enabled = true});
+      {this.keyboardType, this.inputFormatters, this.enabled = true});
 
   @override
   Widget build(BuildContext context) {
@@ -603,6 +722,7 @@ class _FormField extends StatelessWidget {
         TextField(
           controller: controller,
           keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
           enabled: enabled,
           decoration: InputDecoration(
             contentPadding:
@@ -617,6 +737,59 @@ class _FormField extends StatelessWidget {
                     BorderSide(color: Theme.of(context).colorScheme.outline)),
           ),
           style: const TextStyle(fontSize: 13),
+        ),
+      ],
+    );
+  }
+}
+
+class _DropdownField extends StatelessWidget {
+  final String label;
+  final String? value;
+  final List<String> items;
+  final ValueChanged<String?>? onChanged;
+  final String? hintText;
+
+  const _DropdownField({
+    required this.label,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+    this.hintText,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: Theme.of(context).textTheme.labelMedium),
+        const SizedBox(height: 4),
+        DropdownButtonFormField<String>(
+          value: value,
+          items: items
+              .map(
+                (item) => DropdownMenuItem<String>(
+                  value: item,
+                  child: Text(item, style: const TextStyle(fontSize: 13)),
+                ),
+              )
+              .toList(growable: false),
+          onChanged: onChanged,
+          decoration: InputDecoration(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            hintText: hintText,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: Theme.of(context).colorScheme.outline),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: Theme.of(context).colorScheme.outline),
+            ),
+          ),
+          style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface),
+          isExpanded: true,
         ),
       ],
     );

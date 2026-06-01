@@ -16,7 +16,7 @@ class VanneInfo {
 }
 
 class ParcellesNotifier extends StateNotifier<List<ParcelleData>> {
-  ParcellesNotifier() : super(initialParcelles);
+  ParcellesNotifier() : super(const []);
 
   void replaceAll(List<ParcelleData> parcelles) {
     state = List<ParcelleData>.from(parcelles);

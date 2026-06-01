@@ -57,7 +57,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         }
       }
 
-      if (!mounted || remoteParcelles.isEmpty) return;
+      if (!mounted) return;
       ref.read(parcellesProvider.notifier).replaceAll(remoteParcelles);
       p.Provider.of<ValveProvider>(context, listen: false)
           .replaceFromParcelles(remoteParcelles);
@@ -124,35 +124,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
         const SizedBox(height: 12),
 
-        // Reports Button
+        // Reports Icon Button
         GestureDetector(
           onTap: () => context.push('/rapports'),
           child: Container(
             height: 48,
             decoration: BoxDecoration(
-              color: AppColors.farmLeaf,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.farmLeaf.withValues(alpha: 0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
-                ),
-              ],
+              color: AppColors.farmLeaf.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.farmLeaf.withValues(alpha: 0.2)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.description_outlined, color: Colors.white, size: 18),
+                Icon(Icons.note_add_outlined, color: AppColors.farmLeaf, size: 20),
                 const SizedBox(width: 8),
                 Text(
                   langState.t('nav.reports'),
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: AppColors.farmLeaf,
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
                   ),
                 ),
+                const SizedBox(width: 4),
+                Icon(Icons.chevron_right, color: AppColors.farmLeaf.withValues(alpha: 0.6), size: 18),
               ],
             ),
           ),

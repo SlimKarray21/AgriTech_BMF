@@ -1,6 +1,10 @@
 ﻿import 'dart:convert';
+import 'dart:math' as math;
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
 
 class WeatherData {
   final int temp;
@@ -9,6 +13,7 @@ class WeatherData {
   final int weatherCode;
   final List<dynamic> daily;
   final List<dynamic> hourlyTemp;
+  final List<dynamic> hourlyWind;
   final List<dynamic> dailyRain;
 
   WeatherData({
@@ -18,12 +23,13 @@ class WeatherData {
     required this.weatherCode,
     required this.daily,
     required this.hourlyTemp,
+    required this.hourlyWind,
     required this.dailyRain,
   });
 }
 
 class WeatherScreen extends StatefulWidget {
-  const WeatherScreen({Key? key}) : super(key: key);
+  const WeatherScreen({super.key});
 
   @override
   State<WeatherScreen> createState() => _WeatherScreenState();
@@ -73,7 +79,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
 
     try {
       final url =
-          'https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_sum&hourly=temperature_2m&timezone=auto&forecast_days=7';
+          'https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_sum&hourly=temperature_2m,wind_speed_10m&timezone=auto&forecast_days=7';
       final response = await http.get(Uri.parse(url));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -94,6 +100,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
         final now = DateTime.now();
         int currentHour = now.hour;
         List<dynamic> hourlyTemp = [];
+        List<dynamic> hourlyWind = [];
         for (int i = 0; i < 8; i++) {
           int idx = currentHour + i * 3;
           if (idx < data['hourly']['time'].length) {
@@ -101,6 +108,10 @@ class _WeatherScreenState extends State<WeatherScreen> {
             hourlyTemp.add({
               "hour": "${tDate.hour}h",
               "temp": data['hourly']['temperature_2m'][idx].round(),
+            });
+            hourlyWind.add({
+              "hour": "${tDate.hour}h",
+              "wind": data['hourly']['wind_speed_10m'][idx].round(),
             });
           }
         }
@@ -122,6 +133,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
             weatherCode: data['current']['weather_code'],
             daily: daily,
             hourlyTemp: hourlyTemp,
+            hourlyWind: hourlyWind,
             dailyRain: dailyRain,
           );
         });
@@ -255,6 +267,12 @@ class _WeatherScreenState extends State<WeatherScreen> {
                 ),
               ),
 
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: _buildMapCard(),
+              ),
+              const SizedBox(height: 16),
+
               if (_loading && _weather == null)
                 const Padding(
                   padding: EdgeInsets.all(48.0),
@@ -267,6 +285,81 @@ class _WeatherScreenState extends State<WeatherScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildMapCard() {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(left: 6, top: 2, bottom: 8),
+            child: Text(
+              'Localisation',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+            ),
+          ),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: SizedBox(
+              height: 190,
+              child: FlutterMap(
+                key: ValueKey('$_lat,$_lng'),
+                options: MapOptions(
+                  initialCenter: LatLng(_lat, _lng),
+                  initialZoom: 9.5,
+                ),
+                children: [
+                  TileLayer(
+                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.uiearth.mobile',
+                  ),
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: LatLng(_lat, _lng),
+                        width: 42,
+                        height: 42,
+                        child: const Icon(
+                          Icons.location_on,
+                          color: Colors.red,
+                          size: 36,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Icon(Icons.place, size: 14, color: Colors.green),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  _locationName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.grey.shade700,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -286,7 +379,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
               border: Border.all(color: Colors.grey.shade200),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.02),
+                  color: Colors.black.withValues(alpha: 0.02),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -363,7 +456,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
               border: Border.all(color: Colors.grey.shade200),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.02),
+                  color: Colors.black.withValues(alpha: 0.02),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -417,7 +510,224 @@ class _WeatherScreenState extends State<WeatherScreen> {
               ],
             ),
           ),
+          const SizedBox(height: 20),
+
+          _buildCurveCard(
+            title: 'Température (24h)',
+            color: Colors.orange,
+            labels: _weather!.hourlyTemp
+                .map<String>((p) => p['hour'].toString())
+                .toList(growable: false),
+            values: _weather!.hourlyTemp
+                .map<double>((p) => (p['temp'] as num).toDouble())
+                .toList(growable: false),
+            unitSuffix: '°C',
+          ),
+          const SizedBox(height: 20),
+
+          _buildCurveCard(
+            title: 'Précipitations (7 jours)',
+            color: Colors.blue,
+            labels: _weather!.dailyRain
+                .map<String>((p) => p['day'].toString())
+                .toList(growable: false),
+            values: _weather!.dailyRain
+                .map<double>((p) => (p['rain'] as num).toDouble())
+                .toList(growable: false),
+            unitSuffix: ' mm',
+            asBarChart: true,
+          ),
+          const SizedBox(height: 20),
+
+          _buildCurveCard(
+            title: 'Vent (24h)',
+            color: Colors.teal,
+            labels: _weather!.hourlyWind
+                .map<String>((p) => p['hour'].toString())
+                .toList(growable: false),
+            values: _weather!.hourlyWind
+                .map<double>((p) => (p['wind'] as num).toDouble())
+                .toList(growable: false),
+            unitSuffix: ' km/h',
+          ),
           const SizedBox(height: 32),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCurveCard({
+    required String title,
+    required Color color,
+    required List<String> labels,
+    required List<double> values,
+    required String unitSuffix,
+    bool curved = true,
+    bool asBarChart = false,
+  }) {
+    if (values.isEmpty) return const SizedBox.shrink();
+
+    final minValue = values.reduce(math.min);
+    final maxValue = values.reduce(math.max);
+    final padding = ((maxValue - minValue).abs() * 0.2) + 1;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 180,
+            child: asBarChart
+                ? BarChart(
+                    BarChartData(
+                      minY: 0,
+                      maxY: maxValue + padding,
+                      gridData: FlGridData(
+                        show: true,
+                        drawVerticalLine: false,
+                        horizontalInterval: 1,
+                        getDrawingHorizontalLine: (_) => FlLine(
+                          color: Colors.grey.shade200,
+                          strokeWidth: 1,
+                        ),
+                      ),
+                      borderData: FlBorderData(show: false),
+                      titlesData: FlTitlesData(
+                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 40,
+                            interval: (maxValue / 3).clamp(1, 1000),
+                            getTitlesWidget: (value, _) => Text(
+                              '${value.toStringAsFixed(0)}$unitSuffix',
+                              style: TextStyle(fontSize: 9, color: Colors.grey.shade600),
+                            ),
+                          ),
+                        ),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            interval: values.length > 6 ? 2 : 1,
+                            getTitlesWidget: (value, _) {
+                              final idx = value.toInt();
+                              if (idx < 0 || idx >= labels.length) return const SizedBox.shrink();
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: Text(
+                                  labels[idx],
+                                  style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      barGroups: List<BarChartGroupData>.generate(
+                        values.length,
+                        (i) => BarChartGroupData(
+                          x: i,
+                          barRods: [
+                            BarChartRodData(
+                              toY: values[i],
+                              color: color,
+                              width: 14,
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(4),
+                                topRight: Radius.circular(4),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                : LineChart(
+                    LineChartData(
+                      minX: 0,
+                      maxX: (values.length - 1).toDouble(),
+                      minY: minValue - padding,
+                      maxY: maxValue + padding,
+                      gridData: FlGridData(
+                        show: true,
+                        drawVerticalLine: false,
+                        horizontalInterval: 1,
+                        getDrawingHorizontalLine: (_) => FlLine(
+                          color: Colors.grey.shade200,
+                          strokeWidth: 1,
+                        ),
+                      ),
+                      borderData: FlBorderData(show: false),
+                      titlesData: FlTitlesData(
+                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 40,
+                            interval: ((maxValue - minValue) / 3).clamp(1, 1000),
+                            getTitlesWidget: (value, _) => Text(
+                              '${value.toStringAsFixed(0)}$unitSuffix',
+                              style: TextStyle(fontSize: 9, color: Colors.grey.shade600),
+                            ),
+                          ),
+                        ),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            interval: values.length > 6 ? 2 : 1,
+                            getTitlesWidget: (value, _) {
+                              final idx = value.toInt();
+                              if (idx < 0 || idx >= labels.length) return const SizedBox.shrink();
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: Text(
+                                  labels[idx],
+                                  style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      lineBarsData: [
+                        LineChartBarData(
+                          spots: List<FlSpot>.generate(
+                            values.length,
+                            (i) => FlSpot(i.toDouble(), values[i]),
+                          ),
+                          isCurved: curved,
+                          color: color,
+                          barWidth: 3,
+                          dotData: FlDotData(
+                            show: true,
+                            getDotPainter: (_, __, ___, ____) => FlDotCirclePainter(
+                              radius: 2.8,
+                              color: color,
+                              strokeWidth: 0,
+                            ),
+                          ),
+                          belowBarData: BarAreaData(
+                            show: true,
+                            color: color.withValues(alpha: 0.15),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+          ),
         ],
       ),
     );

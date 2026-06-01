@@ -58,7 +58,7 @@ class ValvesScreen extends ConsumerWidget {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.water_drop_outlined, size: 14, color: theme.colorScheme.onSurface),
+                      Icon(Icons.water_drop_outlined, size: 14, color: AppColors.farmLeaf),
                       const SizedBox(width: 6),
                       Text(langState.t('vannes.title'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: theme.colorScheme.onSurface)),
                     ],
@@ -76,7 +76,7 @@ class ValvesScreen extends ConsumerWidget {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.history, size: 14, color: theme.colorScheme.onSurface.withValues(alpha: 0.4)),
+                        Icon(Icons.history, size: 14, color: AppColors.farmLeaf.withValues(alpha: 0.4)),
                         const SizedBox(width: 6),
                         Text(langState.t('vannes.history'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: theme.colorScheme.onSurface.withValues(alpha: 0.4))),
                       ],

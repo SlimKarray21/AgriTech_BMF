@@ -8,6 +8,7 @@ class Vanne {
   final double debit;
   final String lastAction;
   final String? schedule;
+  final Set<int> selectedWeekDays;
   final int nbPlants;
 
   const Vanne({
@@ -18,6 +19,7 @@ class Vanne {
     this.debit = 0,
     this.lastAction = '',
     this.schedule,
+    this.selectedWeekDays = const <int>{},
     this.nbPlants = 0,
   });
 
@@ -29,6 +31,7 @@ class Vanne {
     double? debit,
     String? lastAction,
     String? schedule,
+    Set<int>? selectedWeekDays,
     int? nbPlants,
   }) {
     return Vanne(
@@ -39,6 +42,7 @@ class Vanne {
       debit: debit ?? this.debit,
       lastAction: lastAction ?? this.lastAction,
       schedule: schedule ?? this.schedule,
+      selectedWeekDays: selectedWeekDays ?? this.selectedWeekDays,
       nbPlants: nbPlants ?? this.nbPlants,
     );
   }
@@ -49,6 +53,25 @@ class Vanne {
     final schedule = (start != null && start.isNotEmpty && end != null && end.isNotEmpty)
         ? '$start - $end'
         : null;
+    final rawDays = map['scheduleDays'];
+    final selectedDays = <int>{};
+
+    if (rawDays is List) {
+      for (final d in rawDays) {
+        final parsed = int.tryParse(d.toString());
+        if (parsed != null && parsed >= 1 && parsed <= 7) {
+          selectedDays.add(parsed);
+        }
+      }
+    } else if (rawDays is String && rawDays.trim().isNotEmpty) {
+      for (final part in rawDays.split(',')) {
+        final parsed = int.tryParse(part.trim());
+        if (parsed != null && parsed >= 1 && parsed <= 7) {
+          selectedDays.add(parsed);
+        }
+      }
+    }
+
     return Vanne(
       backendId: (map['id'] as num?)?.toInt(),
       name: map['name']?.toString() ?? 'Vanne',
@@ -57,6 +80,7 @@ class Vanne {
       debit: (map['debit'] as num?)?.toDouble() ?? 0,
       lastAction: map['lastAction']?.toString() ?? '',
       schedule: schedule,
+      selectedWeekDays: selectedDays,
       nbPlants: (map['nbPlants'] as num?)?.toInt() ?? 0,
     );
   }

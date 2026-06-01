@@ -88,7 +88,7 @@ class HistoryScreen extends ConsumerWidget {
                       child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                        const Icon(Icons.agriculture, size: 14),
+                        Icon(Icons.agriculture, size: 14, color: AppColors.farmLeaf),
                         const SizedBox(width: 6),
                         Text(langState.t('history.operations')),
                       ])),
@@ -96,7 +96,7 @@ class HistoryScreen extends ConsumerWidget {
                       child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                        const Icon(Icons.water_drop_outlined, size: 14),
+                        Icon(Icons.water_drop_outlined, size: 14, color: AppColors.farmLeaf),
                         const SizedBox(width: 6),
                         Text(langState.t('history.valve_actions')),
                       ])),

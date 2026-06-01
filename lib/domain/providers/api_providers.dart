@@ -33,12 +33,15 @@ class UserJwtNotifier extends Notifier<String?> {
 
   Future<void> setToken(String? token) async {
     final prefs = ref.read(sharedPreferencesProvider);
-    if (token == null || token.isEmpty) {
+    final normalized = token
+        ?.replaceFirst(RegExp(r'^Bearer\s+', caseSensitive: false), '')
+        .trim();
+    if (normalized == null || normalized.isEmpty) {
       await prefs.remove(_jwtPrefsKey);
       state = null;
     } else {
-      await prefs.setString(_jwtPrefsKey, token);
-      state = token;
+      await prefs.setString(_jwtPrefsKey, normalized);
+      state = normalized;
     }
   }
 }

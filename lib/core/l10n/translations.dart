@@ -1,6 +1,4 @@
-/// All FR/AR translations matching the original LanguageContext.tsx.
 const Map<String, Map<String, String>> translations = {
-  // Bottom nav
   'nav.home': {'fr': 'Parcelles', 'ar': 'القطع'},
   'nav.health': {'fr': 'Santé', 'ar': 'الصحة'},
   'nav.valves': {'fr': 'Vannes', 'ar': 'الصمامات'},
@@ -8,7 +6,6 @@ const Map<String, Map<String, String>> translations = {
   'nav.profile': {'fr': 'Profil', 'ar': 'الملف'},
   'nav.reports': {'fr': 'Rapports', 'ar': 'التقارير'},
 
-  // Index page
   'index.title': {'fr': 'Mes Parcelles', 'ar': 'قطعي الزراعية'},
   'index.parcelles': {'fr': 'parcelles', 'ar': 'قطع'},
   'index.total': {'fr': 'ha total', 'ar': 'هكتار إجمالي'},
@@ -43,7 +40,6 @@ const Map<String, Map<String, String>> translations = {
   'index.scan_qr': {'fr': 'Scanner QR Code', 'ar': 'مسح رمز QR'},
   'index.scan_to_connect': {'fr': "Scannez le QR Code pour connecter un appareil", 'ar': 'امسح رمز QR لتوصيل جهاز'},
 
-  // Health
   'health.title': {'fr': 'Santé Plante', 'ar': 'صحة النبات'},
   'health.subtitle': {'fr': 'Prenez une photo de votre plante pour diagnostiquer son état', 'ar': 'التقط صورة لنباتك لتشخيص حالته'},
   'health.photo_title': {'fr': 'Photographiez votre plante', 'ar': 'صوّر نباتك'},
@@ -61,12 +57,10 @@ const Map<String, Map<String, String>> translations = {
   'health.step2': {'fr': "L'IA analyse les symptômes visibles", 'ar': 'يحلل الذكاء الاصطناعي الأعراض المرئية'},
   'health.step3': {'fr': 'Recevez un diagnostic et des recommandations', 'ar': 'احصل على تشخيص وتوصيات'},
 
-  // Severity
   'severity.low': {'fr': 'faible', 'ar': 'ضعيف'},
   'severity.medium': {'fr': 'moyen', 'ar': 'متوسط'},
   'severity.high': {'fr': 'élevé', 'ar': 'مرتفع'},
 
-  // Vannes
   'vannes.title': {'fr': 'Électrovannes', 'ar': 'الصمامات الكهربائية'},
   'vannes.subtitle': {'fr': "Gestion de l'irrigation", 'ar': 'إدارة الري'},
   'vannes.open': {'fr': 'Ouvertes', 'ar': 'مفتوحة'},
@@ -86,7 +80,6 @@ const Map<String, Map<String, String>> translations = {
   'vannes.history': {'fr': 'Historique', 'ar': 'السجل'},
   'vannes.history_coming': {'fr': 'Historique des opérations à venir', 'ar': 'سجل العمليات القادمة'},
 
-  // Wizard
   'wizard.title': {'fr': 'Nouveau projet', 'ar': 'مشروع جديد'},
   'wizard.step1': {'fr': 'Question', 'ar': 'سؤال'},
   'wizard.step2': {'fr': 'Surface & Plante', 'ar': 'السطح والنبات'},
@@ -104,7 +97,11 @@ const Map<String, Map<String, String>> translations = {
   'wizard.nb_vannes': {'fr': 'Nb vannes', 'ar': 'عدد الصمامات'},
   'wizard.plant': {'fr': 'Plante', 'ar': 'نبتة'},
   'wizard.plant_name': {'fr': 'Nom plante', 'ar': 'اسم النبتة'},
+  'wizard.plant_category': {'fr': 'Catégorie', 'ar': 'الفئة'},
   'wizard.plant_type': {'fr': 'Type', 'ar': 'النوع'},
+  'wizard.plant_choose_category': {'fr': 'Choisir une catégorie', 'ar': 'اختر فئة'},
+  'wizard.plant_choose_category_first': {'fr': 'Choisir d\'abord une catégorie', 'ar': 'اختر فئة أولاً'},
+  'wizard.plant_choose_type': {'fr': 'Choisir un type', 'ar': 'اختر نوعاً'},
   'wizard.plant_age': {'fr': 'Âge', 'ar': 'العمر'},
   'wizard.plant_count': {'fr': 'Nombre de plantes', 'ar': 'عدد النباتات'},
   'wizard.add_plant': {'fr': 'Ajouter une plante', 'ar': 'إضافة نبتة'},
@@ -116,7 +113,6 @@ const Map<String, Map<String, String>> translations = {
   'wizard.next': {'fr': 'Suivant', 'ar': 'التالي'},
   'wizard.save': {'fr': 'Enregistrer', 'ar': 'حفظ'},
 
-  // Reports
   'reports.overview': {'fr': 'Vue d\'ensemble', 'ar': 'نظرة عامة'},
   'reports.parcelles': {'fr': 'Parcelles', 'ar': 'القطع'},
   'reports.area': {'fr': 'Surface', 'ar': 'المساحة'},
@@ -124,16 +120,13 @@ const Map<String, Map<String, String>> translations = {
   'reports.valves_open': {'fr': 'Vannes ouvertes', 'ar': 'صمامات مفتوحة'},
   'reports.per_parcelle': {'fr': 'Détail par parcelle', 'ar': 'تفاصيل لكل قطعة'},
 
-  // History
   'history.operations': {'fr': 'Opérations', 'ar': 'العمليات'},
   'history.valve_actions': {'fr': 'Actions vannes', 'ar': 'إجراءات الصمامات'},
   'history.no_data': {'fr': 'Aucune donnée disponible', 'ar': 'لا توجد بيانات'},
 
-  // Form
   'form.fill_required': {'fr': 'Veuillez remplir les champs obligatoires', 'ar': 'يرجى ملء الحقول المطلوبة'},
   'form.success': {'fr': 'Parcelle ajoutée :', 'ar': 'تمت إضافة القطعة:'},
 
-  // Rapports
   'rapports.title': {'fr': 'Rapports', 'ar': 'التقارير'},
   'rapports.choose_type': {'fr': 'Choisissez le type de rapport', 'ar': 'اختر نوع التقرير'},
   'rapports.eau': {'fr': 'Rapports d\'eau', 'ar': 'تقارير المياه'},
