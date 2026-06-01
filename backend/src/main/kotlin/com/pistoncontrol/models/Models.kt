@@ -34,6 +34,9 @@ data class UserProfileResponse(
     val phoneNumber: String?,
     val dateOfBirth: String?,
     val location: String?,
+    val typeAbo: String?,
+    val dateDebAbo: String?,
+    val dateExpAbo: String?,
     val avatarUrl: String?,
     val preferences: String
 )

@@ -20,7 +20,8 @@ data class RegisterRequest(
 @Serializable
 data class LoginResponse(
     val token: String,
-    val userId: String
+    val userId: String,
+    val role: String? = null,
 )
 
 @Serializable
@@ -29,8 +30,10 @@ data class ErrorResponse(
     val message: String? = null,
     /** Présent quand la connexion est refusée tant que l’e-mail n’est pas vérifié (ex. 403). */
     val userId: String? = null,
+    val otpLength: Int? = null,
+    val expiresInMinutes: Long? = null,
 ) {
-    constructor(errorMessage: String) : this(error = errorMessage, message = errorMessage, userId = null)
+    constructor(errorMessage: String) : this(error = errorMessage, message = errorMessage, userId = null, otpLength = null, expiresInMinutes = null)
 }
 
 @Serializable
@@ -40,7 +43,12 @@ data class VerifyEmailRequest(val userId: String, val code: String)
 data class ResendCodeRequest(val userId: String)
 
 @Serializable
-data class RegisterResponse(val userId: String, val message: String)
+data class RegisterResponse(
+    val userId: String,
+    val message: String,
+    val otpLength: Int? = null,
+    val expiresInMinutes: Long? = null,
+)
 
 @Serializable
 data class PistonCommand(

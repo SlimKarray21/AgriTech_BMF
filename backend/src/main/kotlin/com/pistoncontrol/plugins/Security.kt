@@ -24,11 +24,13 @@ fun Application.configureSecurity() {
     // by injecting a signed test JWT when no/invalid header is provided.
     val disableAuth = (System.getenv("DISABLE_AUTH") ?: "false").toBooleanStrictOrNull() == true
     val testUserId = System.getenv("TEST_AUTH_USER_ID") ?: "00000000-0000-0000-0000-000000000001"
+    val testEmail = System.getenv("TEST_AUTH_EMAIL") ?: "admin@test.local"
     val testAuthToken = JWT.create()
         .withAudience(jwtAudience)
         .withIssuer(jwtIssuer)
         .withClaim("userId", testUserId)
         .withClaim("role", "admin")
+        .withClaim("email", testEmail)
         .sign(algorithm)
 
     install(Authentication) {
@@ -47,9 +49,16 @@ fun Application.configureSecurity() {
                     .build()
             )
             validate { credential ->
-                if (credential.payload.getClaim("userId").asString() != null) {
+                val userId = credential.payload.getClaim("userId").asString() ?: credential.payload.subject
+                if (userId != null) {
                     JWTPrincipal(credential.payload)
                 } else null
+            }
+            challenge { _, _ ->
+                call.respond(
+                    HttpStatusCode.Unauthorized,
+                    UnauthorizedResponse("Token missing or invalid. Please login again.")
+                )
             }
         }
 
@@ -68,7 +77,7 @@ fun Application.configureSecurity() {
                     .build()
             )
             validate { credential ->
-                val userId = credential.payload.getClaim("userId").asString()
+                val userId = credential.payload.getClaim("userId").asString() ?: credential.payload.subject
                 val role = credential.payload.getClaim("role").asString()
 
                 if (userId != null && role == "admin") {

@@ -25,15 +25,25 @@ class AuthService(
     companion object {
         private const val TOKEN_EXPIRY_MS = 86400000L // 24 hours
         private const val MIN_PASSWORD_LENGTH = 8
-        private const val OTP_LENGTH = 6
-        private const val OTP_EXPIRY_MINUTES = 15L
-        private const val MAX_VERIFY_ATTEMPTS = 5
-        private const val MAX_RESEND_PER_HOUR = 3
+        private const val DEFAULT_OTP_LENGTH = 6
+        private const val DEFAULT_OTP_EXPIRY_MINUTES = 10L
+        private const val DEFAULT_MAX_VERIFY_ATTEMPTS = 5
+        private const val DEFAULT_MAX_RESEND_PER_HOUR = 3
     }
 
+    private val otpLength: Int = System.getenv("OTP_LENGTH")?.toIntOrNull()?.coerceIn(4, 8) ?: DEFAULT_OTP_LENGTH
+    private val otpExpiryMinutes: Long = System.getenv("OTP_EXPIRY_MINUTES")?.toLongOrNull()?.coerceIn(5L, 30L) ?: DEFAULT_OTP_EXPIRY_MINUTES
+    private val maxVerifyAttempts: Int = System.getenv("OTP_MAX_VERIFY_ATTEMPTS")?.toIntOrNull()?.coerceIn(3, 10) ?: DEFAULT_MAX_VERIFY_ATTEMPTS
+    private val maxResendPerHour: Int = System.getenv("OTP_MAX_RESEND_PER_HOUR")?.toIntOrNull()?.coerceIn(1, 10) ?: DEFAULT_MAX_RESEND_PER_HOUR
+
     sealed class AuthResult {
-        data class Success(val token: String, val userId: String) : AuthResult()
-        data class VerificationRequired(val userId: String, val message: String) : AuthResult()
+        data class Success(val token: String, val userId: String, val role: String) : AuthResult()
+        data class VerificationRequired(
+            val userId: String,
+            val message: String,
+            val otpLength: Int,
+            val expiresInMinutes: Long,
+        ) : AuthResult()
         data class Failure(val error: String, val statusCode: Int = 400) : AuthResult()
     }
 
@@ -76,12 +86,34 @@ class AuthService(
         storeVerificationCode(userId, otpCode)
 
         try {
-            emailService.sendVerificationCode(email, otpCode, firstName)
+            emailService.sendVerificationCode(
+                toEmail = email,
+                code = otpCode,
+                firstName = firstName,
+                expiresInMinutes = otpExpiryMinutes,
+            )
         } catch (e: Exception) {
             logger.error(e) { "Failed to send verification email to $email" }
+            dbQuery {
+                EmailVerificationCodes.deleteWhere {
+                    SqlExpressionBuilder.run { EmailVerificationCodes.userId eq userId }
+                }
+                Users.deleteWhere {
+                    SqlExpressionBuilder.run { Users.id eq userId }
+                }
+            }
+            return AuthResult.Failure(
+                "Failed to send verification email. Please check SMTP settings and try again.",
+                statusCode = 500,
+            )
         }
 
-        return AuthResult.VerificationRequired(userId.toString(), "Registration successful. Please verify your email with the code sent to $email")
+        return AuthResult.VerificationRequired(
+            userId.toString(),
+            "Registration successful. Please verify your email with the code sent to $email. Code expires in $otpExpiryMinutes minutes.",
+            otpLength,
+            otpExpiryMinutes,
+        )
     }
 
     suspend fun login(email: String, password: String): AuthResult {
@@ -99,12 +131,14 @@ class AuthService(
             return AuthResult.VerificationRequired(
                 userId.toString(),
                 "Email not verified. Please verify your email before logging in.",
+                otpLength,
+                otpExpiryMinutes,
             )
         }
 
         val role = user[Users.role]
-        val token = generateToken(userId, role)
-        return AuthResult.Success(token, userId.toString())
+        val token = generateToken(userId, role, user[Users.email])
+        return AuthResult.Success(token, userId.toString(), role)
     }
 
     suspend fun verifyEmail(userId: String, code: String): AuthResult {
@@ -113,6 +147,10 @@ class AuthService(
             userUuid = UUID.fromString(userId)
         } catch (e: IllegalArgumentException) {
             return AuthResult.Failure("Invalid user ID format", statusCode = 400)
+        }
+
+        if (!code.matches(Regex("^\\d{$otpLength}$"))) {
+            return AuthResult.Failure("Invalid verification code format. Please enter a $otpLength-digit code.", statusCode = 400)
         }
 
         return dbQuery {
@@ -136,7 +174,7 @@ class AuthService(
             }
 
             val currentAttempts = verificationCode[EmailVerificationCodes.attempts]
-            if (currentAttempts >= MAX_VERIFY_ATTEMPTS) {
+            if (currentAttempts >= maxVerifyAttempts) {
                 EmailVerificationCodes.deleteWhere { SqlExpressionBuilder.run { EmailVerificationCodes.userId eq userUuid } }
                 return@dbQuery AuthResult.Failure("Too many failed attempts. Please request a new code.", statusCode = 429)
             }
@@ -147,7 +185,7 @@ class AuthService(
 
             val codeHash = hashCode(code)
             if (codeHash != verificationCode[EmailVerificationCodes.codeHash]) {
-                val remaining = MAX_VERIFY_ATTEMPTS - (currentAttempts + 1)
+                val remaining = (maxVerifyAttempts - (currentAttempts + 1)).coerceAtLeast(0)
                 return@dbQuery AuthResult.Failure("Invalid verification code. $remaining attempts remaining.", statusCode = 400)
             }
 
@@ -159,8 +197,8 @@ class AuthService(
             EmailVerificationCodes.deleteWhere { SqlExpressionBuilder.run { EmailVerificationCodes.userId eq userUuid } }
 
             val role = user[Users.role]
-            val token = generateToken(userUuid, role)
-            AuthResult.Success(token, userId)
+            val token = generateToken(userUuid, role, user[Users.email])
+            AuthResult.Success(token, userId, role)
         }
     }
 
@@ -187,7 +225,7 @@ class AuthService(
                 .count()
         }
 
-        if (recentCodesCount >= MAX_RESEND_PER_HOUR) {
+        if (recentCodesCount >= maxResendPerHour) {
             return AuthResult.Failure("Too many code requests. Please wait before requesting a new code.", statusCode = 429)
         }
 
@@ -198,17 +236,29 @@ class AuthService(
         val firstName = user[Users.firstName]
 
         try {
-            emailService.sendVerificationCode(email, otpCode, firstName)
+            emailService.sendVerificationCode(
+                toEmail = email,
+                code = otpCode,
+                firstName = firstName,
+                expiresInMinutes = otpExpiryMinutes,
+            )
         } catch (e: Exception) {
             logger.error(e) { "Failed to send verification email to $email" }
             return AuthResult.Failure("Failed to send verification email. Please try again later.", statusCode = 500)
         }
 
-        return AuthResult.VerificationRequired(userId, "Verification code sent to $email")
+        return AuthResult.VerificationRequired(
+            userId,
+            "Verification code sent to $email. It expires in $otpExpiryMinutes minutes.",
+            otpLength,
+            otpExpiryMinutes,
+        )
     }
 
     private fun generateOtpCode(): String {
-        val code = SecureRandom().nextInt(900000) + 100000
+        val min = Math.pow(10.0, (otpLength - 1).toDouble()).toInt()
+        val max = Math.pow(10.0, otpLength.toDouble()).toInt() - 1
+        val code = SecureRandom().nextInt(max - min + 1) + min
         return code.toString()
     }
 
@@ -225,18 +275,20 @@ class AuthService(
                 it[EmailVerificationCodes.userId] = userId
                 it[EmailVerificationCodes.codeHash] = codeHash
                 it[EmailVerificationCodes.attempts] = 0
-                it[EmailVerificationCodes.expiresAt] = Instant.now().plusSeconds(OTP_EXPIRY_MINUTES * 60)
+                it[EmailVerificationCodes.expiresAt] = Instant.now().plusSeconds(otpExpiryMinutes * 60)
                 it[EmailVerificationCodes.createdAt] = Instant.now()
             }
         }
     }
 
-    private fun generateToken(userId: UUID, role: String): String {
+    private fun generateToken(userId: UUID, role: String, email: String? = null): String {
         return JWT.create()
             .withAudience(jwtAudience)
             .withIssuer(jwtIssuer)
+            .withSubject(userId.toString())
             .withClaim("userId", userId.toString())
             .withClaim("role", role)
+            .withClaim("email", email)
             .withExpiresAt(Date(System.currentTimeMillis() + TOKEN_EXPIRY_MS))
             .sign(Algorithm.HMAC256(jwtSecret))
     }

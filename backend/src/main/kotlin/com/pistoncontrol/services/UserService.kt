@@ -1,6 +1,7 @@
 package com.pistoncontrol.services
 
 import com.pistoncontrol.database.DatabaseFactory.dbQuery
+import com.pistoncontrol.database.Profiles
 import com.pistoncontrol.database.Users
 import com.pistoncontrol.models.*
 import org.jetbrains.exposed.sql.*
@@ -179,6 +180,12 @@ class UserService {
      * Convert database row to UserProfileResponse
      */
     private fun rowToUserProfile(row: ResultRow): UserProfileResponse {
+        val profileRow = Profiles
+            .select { Profiles.email eq row[Users.email] }
+            .orderBy(Profiles.id, SortOrder.DESC)
+            .limit(1)
+            .singleOrNull()
+
         return UserProfileResponse(
             id = row[Users.id].toString(),
             email = row[Users.email],
@@ -188,6 +195,9 @@ class UserService {
             phoneNumber = row[Users.phoneNumber],
             dateOfBirth = row[Users.dateOfBirth]?.format(dateFormatter),
             location = row[Users.location],
+            typeAbo = profileRow?.get(Profiles.typeAbo),
+            dateDebAbo = profileRow?.get(Profiles.dateDebAbo)?.format(dateFormatter),
+            dateExpAbo = profileRow?.get(Profiles.dateExpAbo)?.format(dateFormatter),
             avatarUrl = row[Users.avatarUrl],
             preferences = row[Users.preferences]
         )

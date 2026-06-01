@@ -11,7 +11,11 @@ import com.pistoncontrol.database.RapportEau as RapportEauTable
 import com.pistoncontrol.database.RapportSol as RapportSolTable
 import com.pistoncontrol.database.TypePlante as TypePlanteTable
 import com.pistoncontrol.database.Vannes as VannesTable
+import com.pistoncontrol.database.Users as UsersTable
+import com.pistoncontrol.database.Profiles as ProfilesTable
 import com.pistoncontrol.database.DatabaseFactory
+import kotlinx.serialization.Serializable
+import mu.KotlinLogging
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.deleteWhere
@@ -20,9 +24,11 @@ import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
 import org.jetbrains.exposed.sql.and
-import kotlinx.serialization.Serializable
 import java.time.Instant
 import java.time.LocalDate
+import java.util.UUID
+
+private val logger = KotlinLogging.logger {}
 
 data class CreateParcelleInput(
     val nomSurface: String,
@@ -164,6 +170,94 @@ data class ParcelleDetails(
 )
 
 class CapteurSolService {
+    suspend fun resolveOrCreateCapteurUserId(authUserId: UUID, authEmail: String? = null): Long? = DatabaseFactory.dbQuery {
+        logger.info { "[resolveUser] START authUserId=$authUserId, authEmail=$authEmail" }
+
+        // Step 1: Look up the auth user in the 'users' table by UUID
+        val authUser = try {
+            UsersTable.select { UsersTable.id eq authUserId }.singleOrNull()
+        } catch (e: Exception) {
+            logger.error(e) { "[resolveUser] FAILED to query users table for authUserId=$authUserId" }
+            null
+        }
+        logger.info { "[resolveUser] users table lookup: found=${authUser != null}" }
+
+        // Step 2: Resolve email — prefer DB value, fall back to JWT claim
+        val email = authUser?.get(UsersTable.email) ?: authEmail
+        logger.info { "[resolveUser] resolved email=$email (fromDB=${authUser?.get(UsersTable.email)}, fromJWT=$authEmail)" }
+
+        if (email.isNullOrBlank()) {
+            logger.warn { "[resolveUser] ABORT: email is null/blank – cannot resolve CapteurSol user" }
+            return@dbQuery null
+        }
+
+        // Step 3: Look up existing profile by email
+        val existingProfile = try {
+            ProfilesTable
+                .slice(ProfilesTable.id)
+                .select { ProfilesTable.email eq email }
+                .singleOrNull()
+        } catch (e: Exception) {
+            logger.error(e) { "[resolveUser] FAILED to query profiles table for email=$email" }
+            null
+        }
+
+        if (existingProfile != null) {
+            val profileId = existingProfile[ProfilesTable.id]
+            logger.info { "[resolveUser] OK: found existing profile id=$profileId for email=$email" }
+            return@dbQuery profileId
+        }
+
+        // Step 4: Create a new profile for this email
+        logger.info { "[resolveUser] no profile found for email=$email – creating new profile" }
+
+        val now = Instant.now()
+        val firstName = authUser?.get(UsersTable.firstName) ?: "User"
+        val lastName = authUser?.get(UsersTable.lastName) ?: ""
+        val role = authUser?.get(UsersTable.role) ?: "user"
+
+        try {
+            val insertedProfileId = ProfilesTable.insert {
+                it[userId] = 0L
+                it[ProfilesTable.firstName] = firstName
+                it[ProfilesTable.lastName] = lastName
+                it[avatarUrl] = null
+                it[createdAt] = now
+                it[updatedAt] = now
+                it[userRole] = role
+                it[phoneNumber] = authUser?.get(UsersTable.phoneNumber)
+                it[location] = authUser?.get(UsersTable.location)
+                it[country] = null
+                it[city] = null
+                it[dateOfBirth] = authUser?.get(UsersTable.dateOfBirth)
+                it[dateDebAbo] = null
+                it[dateExpAbo] = null
+                it[typeAbo] = null
+                it[ProfilesTable.email] = email
+                it[createdBy] = null
+                it[companyName] = null
+                it[companyLogo] = null
+            } get ProfilesTable.id
+
+            ProfilesTable.update({ ProfilesTable.id eq insertedProfileId }) {
+                it[userId] = insertedProfileId
+            }
+
+            logger.info { "[resolveUser] OK: created new profile id=$insertedProfileId for email=$email" }
+            insertedProfileId
+        } catch (e: Exception) {
+            logger.error(e) { "[resolveUser] FAILED to insert profile for email=$email – retrying lookup (race condition?)" }
+            // Retry lookup in case of race condition (another request created the profile)
+            val retryProfile = ProfilesTable
+                .slice(ProfilesTable.id)
+                .select { ProfilesTable.email eq email }
+                .singleOrNull()
+                ?.let { it[ProfilesTable.id] }
+            logger.info { "[resolveUser] retry lookup result: profileId=$retryProfile" }
+            retryProfile
+        }
+    }
+
     suspend fun listParcelles(userId: Long?): List<Parcelle> = DatabaseFactory.dbQuery {
         val query = if (userId != null) {
             ParcelleTable.select { ParcelleTable.fkUser eq userId }
@@ -229,13 +323,12 @@ class CapteurSolService {
         )
     }
 
-    suspend fun updateParcelle(id: Long, input: UpdateParcelleInput): Parcelle? = DatabaseFactory.dbQuery {
+    suspend fun updateParcelle(id: Long, ownerUserId: Long, input: UpdateParcelleInput): Parcelle? = DatabaseFactory.dbQuery {
         val now = Instant.now()
-        val updatedRows = ParcelleTable.update({ ParcelleTable.id eq id }) {
+        val updatedRows = ParcelleTable.update({ (ParcelleTable.id eq id) and (ParcelleTable.fkUser eq ownerUserId) }) {
             input.nomSurface?.let { value -> it[nomSurface] = value }
             input.localisation?.let { value -> it[localisation] = value }
             input.typeSol?.let { value -> it[typeSol] = value }
-            input.fkUser?.let { value -> it[fkUser] = value }
             input.fkSol?.let { value -> it[fkSol] = value }
             input.fkClimat?.let { value -> it[fkClimat] = value }
             input.tailleHa?.let { value -> it[tailleHa] = value }
@@ -243,10 +336,19 @@ class CapteurSolService {
         }
 
         if (updatedRows == 0) return@dbQuery null
-        ParcelleTable.select { ParcelleTable.id eq id }.singleOrNull()?.let(::toParcelle)
+        ParcelleTable.select { (ParcelleTable.id eq id) and (ParcelleTable.fkUser eq ownerUserId) }.singleOrNull()?.let(::toParcelle)
     }
 
-    suspend fun deleteParcelle(id: Long): Boolean = DatabaseFactory.dbQuery {
+    suspend fun deleteParcelle(id: Long, ownerUserId: Long): Boolean = DatabaseFactory.dbQuery {
+        val ownedParcelleExists = ParcelleTable
+            .select { (ParcelleTable.id eq id) and (ParcelleTable.fkUser eq ownerUserId) }
+            .limit(1)
+            .any()
+
+        if (!ownedParcelleExists) {
+            return@dbQuery false
+        }
+
         val linkedPlantIds = ParcellePlantesTable
             .slice(ParcellePlantesTable.planteId)
             .select { ParcellePlantesTable.parcelleId eq id }
@@ -283,7 +385,15 @@ class CapteurSolService {
         query.map(::toVanne)
     }
 
-    suspend fun createVanne(input: CreateVanneInput): Vanne = DatabaseFactory.dbQuery {
+    suspend fun createVanne(input: CreateVanneInput): Vanne? = DatabaseFactory.dbQuery {
+        val ownedParcelleExists = ParcelleTable
+            .select { (ParcelleTable.id eq input.parcelId) and (ParcelleTable.fkUser eq input.userId) }
+            .limit(1)
+            .any()
+        if (!ownedParcelleExists) {
+            return@dbQuery null
+        }
+
         val now = Instant.now()
         val id = VannesTable.insert {
             it[name] = input.name
@@ -306,12 +416,12 @@ class CapteurSolService {
         )
     }
 
-    suspend fun updateVanne(id: Long, input: UpdateVanneInput): Vanne? = DatabaseFactory.dbQuery {
+    suspend fun updateVanne(id: Long, ownerUserId: Long, input: UpdateVanneInput): Vanne? = DatabaseFactory.dbQuery {
         val now = Instant.now()
-        val updatedRows = VannesTable.update({ VannesTable.id eq id }) {
+        val updatedRows = VannesTable.update({ (VannesTable.id eq id) and (VannesTable.userId eq ownerUserId) }) {
             input.name?.let { value -> it[name] = value }
             input.parcelId?.let { value -> it[parcelId] = value }
-            input.userId?.let { value -> it[userId] = value }
+            it[userId] = ownerUserId
             input.debit?.let { value -> it[debit] = value }
             input.isAuto?.let { value -> it[isAuto] = value }
             input.isOpen?.let { value -> it[isOpen] = value }
@@ -324,11 +434,11 @@ class CapteurSolService {
         }
 
         if (updatedRows == 0) return@dbQuery null
-        VannesTable.select { VannesTable.id eq id }.singleOrNull()?.let(::toVanne)
+        VannesTable.select { (VannesTable.id eq id) and (VannesTable.userId eq ownerUserId) }.singleOrNull()?.let(::toVanne)
     }
 
-    suspend fun deleteVanne(id: Long): Boolean = DatabaseFactory.dbQuery {
-        VannesTable.deleteWhere { VannesTable.id eq id } > 0
+    suspend fun deleteVanne(id: Long, ownerUserId: Long): Boolean = DatabaseFactory.dbQuery {
+        VannesTable.deleteWhere { (VannesTable.id eq id) and (VannesTable.userId eq ownerUserId) } > 0
     }
 
     suspend fun listRapportsEau(userId: Long?, parcelId: Long?): List<RapportEau> = DatabaseFactory.dbQuery {

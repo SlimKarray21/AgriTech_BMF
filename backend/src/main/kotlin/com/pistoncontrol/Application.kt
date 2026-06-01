@@ -96,9 +96,9 @@ fun Application.module() {
     val emailService = EmailService(
         smtpHost = System.getenv("SMTP_HOST") ?: "",
         smtpPort = (System.getenv("SMTP_PORT") ?: "587").toInt(),
-        smtpUsername = System.getenv("SMTP_USERNAME") ?: "",
-        smtpPassword = System.getenv("SMTP_PASSWORD") ?: "",
-        fromAddress = System.getenv("SMTP_FROM") ?: "noreply@vannecontrol.com"
+        smtpUsername = System.getenv("SMTP_USERNAME")?.trim() ?: "",
+        smtpPassword = (System.getenv("SMTP_PASSWORD") ?: "").replace(" ", ""),
+        fromAddress = System.getenv("SMTP_FROM")?.trim() ?: "noreply@vannecontrol.com"
     )
     logger.info { "✅ Email Service configured" }
 

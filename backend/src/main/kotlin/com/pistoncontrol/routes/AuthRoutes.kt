@@ -75,13 +75,21 @@ fun Route.authRoutes(jwtSecret: String, jwtIssuer: String, jwtAudience: String, 
                     is AuthService.AuthResult.Success -> {
                         call.respond(
                             HttpStatusCode.Created,
-                            LoginResponse(result.token, result.userId)
+                            RegisterResponse(
+                                result.userId,
+                                "Registration successful. Please verify your email with the code sent to your mailbox.",
+                            )
                         )
                     }
                     is AuthService.AuthResult.VerificationRequired -> {
                         call.respond(
                             HttpStatusCode.Created,
-                            RegisterResponse(result.userId, result.message)
+                            RegisterResponse(
+                                userId = result.userId,
+                                message = result.message,
+                                otpLength = result.otpLength,
+                                expiresInMinutes = result.expiresInMinutes,
+                            )
                         )
                     }
                     is AuthService.AuthResult.Failure -> {
@@ -107,7 +115,7 @@ fun Route.authRoutes(jwtSecret: String, jwtIssuer: String, jwtAudience: String, 
                     is AuthService.AuthResult.Success -> {
                         call.respond(
                             HttpStatusCode.OK,
-                            LoginResponse(result.token, result.userId)
+                            LoginResponse(result.token, result.userId, result.role)
                         )
                     }
                     is AuthService.AuthResult.VerificationRequired -> {
@@ -117,6 +125,8 @@ fun Route.authRoutes(jwtSecret: String, jwtIssuer: String, jwtAudience: String, 
                                 error = result.message,
                                 message = result.message,
                                 userId = result.userId,
+                                otpLength = result.otpLength,
+                                expiresInMinutes = result.expiresInMinutes,
                             )
                         )
                     }
@@ -143,13 +153,18 @@ fun Route.authRoutes(jwtSecret: String, jwtIssuer: String, jwtAudience: String, 
                     is AuthService.AuthResult.Success -> {
                         call.respond(
                             HttpStatusCode.OK,
-                            LoginResponse(result.token, result.userId)
+                            LoginResponse(result.token, result.userId, result.role)
                         )
                     }
                     is AuthService.AuthResult.VerificationRequired -> {
                         call.respond(
                             HttpStatusCode.OK,
-                            RegisterResponse(result.userId, result.message)
+                            RegisterResponse(
+                                userId = result.userId,
+                                message = result.message,
+                                otpLength = result.otpLength,
+                                expiresInMinutes = result.expiresInMinutes,
+                            )
                         )
                     }
                     is AuthService.AuthResult.Failure -> {
@@ -175,13 +190,18 @@ fun Route.authRoutes(jwtSecret: String, jwtIssuer: String, jwtAudience: String, 
                     is AuthService.AuthResult.Success -> {
                         call.respond(
                             HttpStatusCode.OK,
-                            LoginResponse(result.token, result.userId)
+                            LoginResponse(result.token, result.userId, result.role)
                         )
                     }
                     is AuthService.AuthResult.VerificationRequired -> {
                         call.respond(
                             HttpStatusCode.OK,
-                            RegisterResponse(result.userId, result.message)
+                            RegisterResponse(
+                                userId = result.userId,
+                                message = result.message,
+                                otpLength = result.otpLength,
+                                expiresInMinutes = result.expiresInMinutes,
+                            )
                         )
                     }
                     is AuthService.AuthResult.Failure -> {

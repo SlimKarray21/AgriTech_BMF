@@ -3,8 +3,6 @@ package com.CapteurSol.routes
 import com.CapteurSol.services.CapteurSolService
 import com.CapteurSol.services.CreateParcelleWizardInput
 import com.CapteurSol.services.CreateParcelleInput
-import com.CapteurSol.services.CreateRapportEauInput
-import com.CapteurSol.services.CreateRapportSolInput
 import com.CapteurSol.services.CreateVanneInput
 import com.CapteurSol.services.UpdateParcelleInput
 import com.CapteurSol.services.UpdateVanneInput
@@ -13,6 +11,10 @@ import com.CapteurSol.services.WizardVanneInput
 import com.pistoncontrol.routes.ErrorResponse
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
+import io.ktor.server.auth.authenticate
+import io.ktor.server.auth.jwt.JWTPrincipal
+import io.ktor.server.auth.principal
+import io.ktor.server.plugins.ContentTransformationException
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -22,13 +24,21 @@ import io.ktor.server.routing.patch
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import mu.KotlinLogging
+import java.util.UUID
+
+private val logger = KotlinLogging.logger {}
 
 @Serializable
 data class CreateParcelleRequest(
     val nomSurface: String,
     val localisation: String,
     val typeSol: String,
-    val fkUser: Long,
+    val fkUser: Long? = null,
     val fkSol: Long? = null,
     val fkClimat: Long? = null,
     val tailleHa: Double,
@@ -77,382 +87,319 @@ data class UpdateParcelleRequest(
 
 @Serializable
 data class WizardPlantRequest(
-    val name: String,
-    val type: String,
-    val age: Int,
-    val count: Int,
-    val waterNeedPerPlant: Double,
+    val name: String = "",
+    val type: String = "autre",
+    val age: Int = 1,
+    val count: Int = 0,
+    val waterNeedPerPlant: Double = 0.0,
 )
 
 @Serializable
 data class WizardVanneRequest(
-    val name: String,
+    val name: String = "",
     val nbPlants: Int = 0,
     val debit: Double = 0.0,
 )
 
 @Serializable
 data class CreateParcelleWizardRequest(
-    val nomSurface: String,
-    val localisation: String,
-    val typeSol: String,
-    val fkUser: Long,
-    val tailleHa: Double,
-    val plants: List<WizardPlantRequest>,
-    val vannes: List<WizardVanneRequest>,
+    val nomSurface: String = "",
+    val localisation: String = "",
+    val typeSol: String = "standard",
+    val fkUser: Long? = null,
+    val tailleHa: Double = 0.0,
+    val plants: List<WizardPlantRequest> = emptyList(),
+    val vannes: List<WizardVanneRequest> = emptyList(),
 )
 
-@Serializable
-data class CreateRapportEauRequest(
-    val reportName: String,
-    val parcelId: Long,
-    val userId: Long,
-    val analysisDate: String,
-    val ph: Double? = null,
-    val cewDsM: Double? = null,
-    val residuSecMgL: Double? = null,
-    val chloruresMeqL: Double? = null,
-    val sulfatesMeqL: Double? = null,
-    val bicarbonatesMeqL: Double? = null,
-    val sodiumMeqL: Double? = null,
-    val calciumMeqL: Double? = null,
-    val magnesiumMeqL: Double? = null,
-    val sarRatio: Double? = null,
-    val dureteF: Double? = null,
-    val interpretations: String? = null,
-)
+private suspend fun authenticatedCapteurUserId(call: io.ktor.server.application.ApplicationCall, service: CapteurSolService): Long? {
+    val principal = call.principal<JWTPrincipal>()
+    val disableAuth = (System.getenv("DISABLE_AUTH") ?: "false").toBooleanStrictOrNull() == true
+    val authUserId = principal?.payload?.getClaim("userId")?.asString()
+        ?: principal?.payload?.subject
+        ?: if (disableAuth) (System.getenv("TEST_AUTH_USER_ID") ?: "00000000-0000-0000-0000-000000000001") else null
+    val authEmail = principal?.payload?.getClaim("email")?.asString()
+    val authRole = principal?.payload?.getClaim("role")?.asString()
 
-@Serializable
-data class CreateRapportSolRequest(
-    val reportName: String,
-    val parcelId: Long,
-    val userId: Long,
-    val analysisDate: String,
-    val argilePercent: Double? = null,
-    val limonPercent: Double? = null,
-    val sablePercent: Double? = null,
-    val ph: Double? = null,
-    val ceDsM: Double? = null,
-    val calcaireTotalPercent: Double? = null,
-    val calcaireActifPercent: Double? = null,
-    val moPercent: Double? = null,
-    val rapportCn: Double? = null,
-    val p2o5Ppm: Double? = null,
-    val k2oPpm: Double? = null,
-    val mgoPpm: Double? = null,
-    val cecMeq100g: Double? = null,
-    val espPercent: Double? = null,
-    val interpretations: String? = null,
-)
+    logger.info { "[AUTH] JWT claims -> userId=$authUserId, email=$authEmail, role=$authRole, sub=${principal?.payload?.subject}, exp=${principal?.expiresAt}, principalNull=${principal == null}" }
+
+    if (authUserId == null) {
+        logger.warn { "[AUTH] REJECTED: no userId in JWT (principal null: ${principal == null})" }
+        call.respond(HttpStatusCode.Unauthorized, ErrorResponse("Missing authentication token"))
+        return null
+    }
+
+    val authUserUuid = try {
+        UUID.fromString(authUserId)
+    } catch (_: IllegalArgumentException) {
+        logger.warn { "[AUTH] REJECTED: invalid UUID format: $authUserId" }
+        call.respond(HttpStatusCode.Unauthorized, ErrorResponse("Invalid authenticated user id"))
+        return null
+    }
+
+    val capteurUserId = try {
+        service.resolveOrCreateCapteurUserId(authUserUuid, authEmail)
+    } catch (e: Exception) {
+        logger.error(e) { "[AUTH] DB ERROR resolving CapteurSol user for authId=$authUserId email=$authEmail" }
+        call.respond(HttpStatusCode.InternalServerError, ErrorResponse("Database error during user resolution: ${e.message}"))
+        return null
+    }
+
+    if (capteurUserId == null) {
+        logger.warn { "[AUTH] REJECTED: resolveOrCreateCapteurUserId returned null for authId=$authUserId, email=$authEmail — check [resolveUser] logs above for details" }
+        call.respond(HttpStatusCode.Unauthorized, ErrorResponse("Authenticated user not found. No profile could be resolved for email=$authEmail. Check server logs for details."))
+        return null
+    }
+
+    logger.info { "[AUTH] OK: CapteurSol userId=$capteurUserId for authId=$authUserId (email=$authEmail)" }
+    return capteurUserId
+}
 
 fun Route.capteurSolRoutes(service: CapteurSolService = CapteurSolService()) {
-    route("/wizard") {
-        post("/parcelles") {
-            val body = call.receive<CreateParcelleWizardRequest>()
-            val result = service.createParcelleWizard(
-                CreateParcelleWizardInput(
-                    nomSurface = body.nomSurface,
-                    localisation = body.localisation,
-                    typeSol = body.typeSol,
-                    fkUser = body.fkUser,
-                    tailleHa = body.tailleHa,
-                    plants = body.plants.map {
+    authenticate("auth-jwt") {
+        route("/wizard") {
+            post("/parcelles") {
+                val capteurUserId = authenticatedCapteurUserId(call, service) ?: return@post
+                try {
+                    val body = call.receive<JsonObject>()
+                    val nomSurface = body.stringValue("nomSurface")
+                    val localisation = body.stringValue("localisation")
+                    val typeSol = body.stringValue("typeSol", "standard")
+                    val tailleHa = body.doubleValue("tailleHa")
+
+                    val plants = body.arrayValue("plants").map { plantEl ->
+                        val plant = plantEl as? JsonObject ?: JsonObject(emptyMap())
                         WizardPlantInput(
-                            name = it.name,
-                            type = it.type,
-                            age = it.age,
-                            count = it.count,
-                            waterNeedPerPlant = it.waterNeedPerPlant,
+                            name = plant.stringValue("name", "Plante"),
+                            type = plant.stringValue("type", "autre"),
+                            age = plant.intValue("age", 1),
+                            count = plant.intValue("count", 0),
+                            waterNeedPerPlant = plant.doubleValue("waterNeedPerPlant", 0.0),
                         )
-                    },
-                    vannes = body.vannes.map {
+                    }
+
+                    val vannes = body.arrayValue("vannes").mapIndexed { index, vanneEl ->
+                        val vanne = vanneEl as? JsonObject ?: JsonObject(emptyMap())
                         WizardVanneInput(
-                            name = it.name,
-                            nbPlants = it.nbPlants,
-                            debit = it.debit,
+                            name = vanne.stringValue("name", "Vanne ${index + 1}"),
+                            nbPlants = vanne.intValue("nbPlants", 0),
+                            debit = vanne.doubleValue("debit", 0.0),
                         )
-                    },
-                )
-            )
-            call.respond(HttpStatusCode.Created, result)
-        }
-    }
+                    }
 
-    route("/parcelles") {
-        get {
-            val userId = call.request.queryParameters["userId"]?.toLongOrNull()
-            val data = service.listParcelles(userId)
-            call.respond(HttpStatusCode.OK, data)
-        }
-
-        post {
-            val body = call.receive<CreateParcelleRequest>()
-            val created = service.createParcelle(
-                CreateParcelleInput(
-                    nomSurface = body.nomSurface,
-                    localisation = body.localisation,
-                    typeSol = body.typeSol,
-                    fkUser = body.fkUser,
-                    fkSol = body.fkSol,
-                    fkClimat = body.fkClimat,
-                    tailleHa = body.tailleHa,
-                )
-            )
-            call.respond(HttpStatusCode.Created, created)
-        }
-
-        get("/{id}") {
-            val parcelId = call.parameters["id"]?.toLongOrNull()
-                ?: return@get call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid parcelle id"))
-            val userId = call.request.queryParameters["userId"]?.toLongOrNull()
-            val data = service.getParcelleDetails(parcelId, userId)
-            if (data == null) {
-                call.respond(HttpStatusCode.NotFound, ErrorResponse("Parcelle not found"))
-            } else {
-                call.respond(HttpStatusCode.OK, data)
+                    val result = service.createParcelleWizard(
+                        CreateParcelleWizardInput(
+                            nomSurface = nomSurface,
+                            localisation = localisation,
+                            typeSol = typeSol,
+                            fkUser = capteurUserId,
+                            tailleHa = tailleHa,
+                            plants = plants,
+                            vannes = vannes,
+                        )
+                    )
+                    call.respond(HttpStatusCode.Created, result)
+                } catch (e: ContentTransformationException) {
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        ErrorResponse("Invalid wizard payload format. Please verify numeric fields and required properties. ${e.message ?: ""}".trim()),
+                    )
+                } catch (e: IllegalArgumentException) {
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        ErrorResponse(e.message ?: "Invalid wizard payload"),
+                    )
+                }
             }
         }
 
-        patch("/{id}") {
-            val parcelId = call.parameters["id"]?.toLongOrNull()
-                ?: return@patch call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid parcelle id"))
-            val body = call.receive<UpdateParcelleRequest>()
-            val updated = service.updateParcelle(
-                id = parcelId,
-                input = UpdateParcelleInput(
-                    nomSurface = body.nomSurface,
-                    localisation = body.localisation,
-                    typeSol = body.typeSol,
-                    fkUser = body.fkUser,
-                    fkSol = body.fkSol,
-                    fkClimat = body.fkClimat,
-                    tailleHa = body.tailleHa,
-                )
-            )
-            if (updated == null) {
-                call.respond(HttpStatusCode.NotFound, ErrorResponse("Parcelle not found"))
-            } else {
-                call.respond(HttpStatusCode.OK, updated)
-            }
-        }
-
-        delete("/{id}") {
-            val parcelId = call.parameters["id"]?.toLongOrNull()
-                ?: return@delete call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid parcelle id"))
-            val deleted = service.deleteParcelle(parcelId)
-            if (!deleted) {
-                call.respond(HttpStatusCode.NotFound, ErrorResponse("Parcelle not found"))
-            } else {
-                call.respond(HttpStatusCode.OK, mapOf("message" to "Parcelle deleted"))
-            }
-        }
-
-        get("/{id}/vannes") {
-            val parcelId = call.parameters["id"]?.toLongOrNull()
-                ?: return@get call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid parcelle id"))
-            val data = service.listVannes(parcelId = parcelId, userId = null)
-            call.respond(HttpStatusCode.OK, data)
-        }
-
-        get("/{id}/plants") {
-            val parcelId = call.parameters["id"]?.toLongOrNull()
-                ?: return@get call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid parcelle id"))
-            val data = service.listPlantsByParcelleId(parcelId)
-            call.respond(HttpStatusCode.OK, data)
-        }
-    }
-
-    route("/vannes") {
-        get {
-            val parcelId = call.request.queryParameters["parcelId"]?.toLongOrNull()
-            val userId = call.request.queryParameters["userId"]?.toLongOrNull()
-            val data = service.listVannes(parcelId = parcelId, userId = userId)
-            call.respond(HttpStatusCode.OK, data)
-        }
-
-        post {
-            val body = call.receive<CreateVanneRequest>()
-            val created = service.createVanne(
-                CreateVanneInput(
-                    name = body.name,
-                    parcelId = body.parcelId,
-                    userId = body.userId,
-                    debit = body.debit,
-                    isAuto = body.isAuto,
-                    isOpen = body.isOpen,
-                    lastAction = body.lastAction,
-                    nbPlants = body.nbPlants,
-                    scheduleDays = body.scheduleDays,
-                    scheduleStart = body.scheduleStart,
-                    scheduleEnd = body.scheduleEnd,
-                )
-            )
-            call.respond(HttpStatusCode.Created, created)
-        }
-
-        patch("/{id}") {
-            val id = call.parameters["id"]?.toLongOrNull()
-                ?: return@patch call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid vanne id"))
-            val body = call.receive<UpdateVanneRequest>()
-            val updated = service.updateVanne(
-                id = id,
-                input = UpdateVanneInput(
-                    name = body.name,
-                    parcelId = body.parcelId,
-                    userId = body.userId,
-                    debit = body.debit,
-                    isAuto = body.isAuto,
-                    isOpen = body.isOpen,
-                    lastAction = body.lastAction,
-                    nbPlants = body.nbPlants,
-                    scheduleDays = body.scheduleDays,
-                    scheduleStart = body.scheduleStart,
-                    scheduleEnd = body.scheduleEnd,
-                )
-            )
-            if (updated == null) {
-                call.respond(HttpStatusCode.NotFound, ErrorResponse("Vanne not found"))
-            } else {
-                call.respond(HttpStatusCode.OK, updated)
-            }
-        }
-
-        delete("/{id}") {
-            val id = call.parameters["id"]?.toLongOrNull()
-                ?: return@delete call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid vanne id"))
-            val deleted = service.deleteVanne(id)
-            if (!deleted) {
-                call.respond(HttpStatusCode.NotFound, ErrorResponse("Vanne not found"))
-            } else {
-                call.respond(HttpStatusCode.OK, mapOf("message" to "Vanne deleted"))
-            }
-        }
-    }
-
-    route("/rapports") {
-        route("/eau") {
+        route("/parcelles") {
             get {
-                val userId = call.request.queryParameters["userId"]?.toLongOrNull()
-                val parcelId = call.request.queryParameters["parcelId"]?.toLongOrNull()
-                val data = service.listRapportsEau(userId = userId, parcelId = parcelId)
+                val capteurUserId = authenticatedCapteurUserId(call, service) ?: return@get
+                val data = service.listParcelles(capteurUserId)
                 call.respond(HttpStatusCode.OK, data)
             }
 
             post {
-                val body = call.receive<CreateRapportEauRequest>()
-                val created = try {
-                    service.createRapportEau(
-                        CreateRapportEauInput(
-                            reportName = body.reportName,
-                            parcelId = body.parcelId,
-                            userId = body.userId,
-                            analysisDate = body.analysisDate,
-                            ph = body.ph ?: 0.0,
-                            cewDsM = body.cewDsM ?: 0.0,
-                            residuSecMgL = body.residuSecMgL ?: 0.0,
-                            chloruresMeqL = body.chloruresMeqL ?: 0.0,
-                            sulfatesMeqL = body.sulfatesMeqL ?: 0.0,
-                            bicarbonatesMeqL = body.bicarbonatesMeqL ?: 0.0,
-                            sodiumMeqL = body.sodiumMeqL ?: 0.0,
-                            calciumMeqL = body.calciumMeqL ?: 0.0,
-                            magnesiumMeqL = body.magnesiumMeqL ?: 0.0,
-                            sarRatio = body.sarRatio ?: 0.0,
-                            dureteF = body.dureteF ?: 0.0,
-                            interpretations = body.interpretations,
-                        )
+                val capteurUserId = authenticatedCapteurUserId(call, service) ?: return@post
+                val body = call.receive<CreateParcelleRequest>()
+                val created = service.createParcelle(
+                    CreateParcelleInput(
+                        nomSurface = body.nomSurface,
+                        localisation = body.localisation,
+                        typeSol = body.typeSol,
+                        fkUser = capteurUserId,
+                        fkSol = body.fkSol,
+                        fkClimat = body.fkClimat,
+                        tailleHa = body.tailleHa,
                     )
-                } catch (e: IllegalArgumentException) {
-                    return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse(e.message ?: "Invalid rapport eau payload"))
-                }
+                )
                 call.respond(HttpStatusCode.Created, created)
             }
 
             get("/{id}") {
-                val id = call.parameters["id"]?.toLongOrNull()
-                    ?: return@get call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid rapport eau id"))
-                val data = service.getRapportEauById(id)
+                val parcelId = call.parameters["id"]?.toLongOrNull()
+                    ?: return@get call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid parcelle id"))
+                val capteurUserId = authenticatedCapteurUserId(call, service) ?: return@get
+                val data = service.getParcelleDetails(parcelId, capteurUserId)
                 if (data == null) {
-                    call.respond(HttpStatusCode.NotFound, ErrorResponse("Rapport eau not found"))
+                    call.respond(HttpStatusCode.NotFound, ErrorResponse("Parcelle not found"))
                 } else {
                     call.respond(HttpStatusCode.OK, data)
                 }
             }
 
-            delete("/{id}") {
-                val id = call.parameters["id"]?.toLongOrNull()
-                    ?: return@delete call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid rapport eau id"))
-                val deleted = service.deleteRapportEau(id)
-                call.respond(
-                    HttpStatusCode.OK,
-                    mapOf(
-                        "message" to if (deleted) "Rapport eau deleted" else "Rapport eau already deleted"
+            patch("/{id}") {
+                val parcelId = call.parameters["id"]?.toLongOrNull()
+                    ?: return@patch call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid parcelle id"))
+                val capteurUserId = authenticatedCapteurUserId(call, service) ?: return@patch
+                val body = call.receive<UpdateParcelleRequest>()
+                val updated = service.updateParcelle(
+                    id = parcelId,
+                    ownerUserId = capteurUserId,
+                    input = UpdateParcelleInput(
+                        nomSurface = body.nomSurface,
+                        localisation = body.localisation,
+                        typeSol = body.typeSol,
+                        fkUser = null,
+                        fkSol = body.fkSol,
+                        fkClimat = body.fkClimat,
+                        tailleHa = body.tailleHa,
                     )
                 )
+                if (updated == null) {
+                    call.respond(HttpStatusCode.NotFound, ErrorResponse("Parcelle not found"))
+                } else {
+                    call.respond(HttpStatusCode.OK, updated)
+                }
+            }
+
+            delete("/{id}") {
+                val parcelId = call.parameters["id"]?.toLongOrNull()
+                    ?: return@delete call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid parcelle id"))
+                val capteurUserId = authenticatedCapteurUserId(call, service) ?: return@delete
+                val deleted = service.deleteParcelle(parcelId, capteurUserId)
+                if (!deleted) {
+                    call.respond(HttpStatusCode.NotFound, ErrorResponse("Parcelle not found"))
+                } else {
+                    call.respond(HttpStatusCode.OK, mapOf("message" to "Parcelle deleted"))
+                }
+            }
+
+            get("/{id}/vannes") {
+                val parcelId = call.parameters["id"]?.toLongOrNull()
+                    ?: return@get call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid parcelle id"))
+                val capteurUserId = authenticatedCapteurUserId(call, service) ?: return@get
+                val data = service.listVannes(parcelId = parcelId, userId = capteurUserId)
+                call.respond(HttpStatusCode.OK, data)
+            }
+
+            get("/{id}/plants") {
+                val parcelId = call.parameters["id"]?.toLongOrNull()
+                    ?: return@get call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid parcelle id"))
+                val capteurUserId = authenticatedCapteurUserId(call, service) ?: return@get
+                val ownedParcelle = service.getParcelleDetails(parcelId, capteurUserId)
+                if (ownedParcelle == null) {
+                    call.respond(HttpStatusCode.NotFound, ErrorResponse("Parcelle not found"))
+                } else {
+                    val data = service.listPlantsByParcelleId(parcelId)
+                    call.respond(HttpStatusCode.OK, data)
+                }
             }
         }
 
-        route("/sol") {
+        route("/vannes") {
             get {
-                val userId = call.request.queryParameters["userId"]?.toLongOrNull()
+                val capteurUserId = authenticatedCapteurUserId(call, service) ?: return@get
                 val parcelId = call.request.queryParameters["parcelId"]?.toLongOrNull()
-                val data = service.listRapportsSol(userId = userId, parcelId = parcelId)
+                val data = service.listVannes(parcelId = parcelId, userId = capteurUserId)
                 call.respond(HttpStatusCode.OK, data)
             }
 
             post {
-                val body = call.receive<CreateRapportSolRequest>()
-                val created = try {
-                    service.createRapportSol(
-                        CreateRapportSolInput(
-                            reportName = body.reportName,
-                            parcelId = body.parcelId,
-                            userId = body.userId,
-                            analysisDate = body.analysisDate,
-                            argilePercent = body.argilePercent ?: 0.0,
-                            limonPercent = body.limonPercent ?: 0.0,
-                            sablePercent = body.sablePercent ?: 0.0,
-                            ph = body.ph ?: 0.0,
-                            ceDsM = body.ceDsM ?: 0.0,
-                            calcaireTotalPercent = body.calcaireTotalPercent ?: 0.0,
-                            calcaireActifPercent = body.calcaireActifPercent ?: 0.0,
-                            moPercent = body.moPercent ?: 0.0,
-                            rapportCn = body.rapportCn ?: 0.0,
-                            p2o5Ppm = body.p2o5Ppm ?: 0.0,
-                            k2oPpm = body.k2oPpm ?: 0.0,
-                            mgoPpm = body.mgoPpm ?: 0.0,
-                            cecMeq100g = body.cecMeq100g ?: 0.0,
-                            espPercent = body.espPercent ?: 0.0,
-                            interpretations = body.interpretations,
-                        )
+                val capteurUserId = authenticatedCapteurUserId(call, service) ?: return@post
+                val body = call.receive<CreateVanneRequest>()
+                val created = service.createVanne(
+                    CreateVanneInput(
+                        name = body.name,
+                        parcelId = body.parcelId,
+                        userId = capteurUserId,
+                        debit = body.debit,
+                        isAuto = body.isAuto,
+                        isOpen = body.isOpen,
+                        lastAction = body.lastAction,
+                        nbPlants = body.nbPlants,
+                        scheduleDays = body.scheduleDays,
+                        scheduleStart = body.scheduleStart,
+                        scheduleEnd = body.scheduleEnd,
                     )
-                } catch (e: IllegalArgumentException) {
-                    return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse(e.message ?: "Invalid rapport sol payload"))
+                )
+                if (created == null) {
+                    return@post call.respond(HttpStatusCode.Forbidden, ErrorResponse("Parcelle not found for this user"))
                 }
                 call.respond(HttpStatusCode.Created, created)
             }
 
-            get("/{id}") {
+            patch("/{id}") {
                 val id = call.parameters["id"]?.toLongOrNull()
-                    ?: return@get call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid rapport sol id"))
-                val data = service.getRapportSolById(id)
-                if (data == null) {
-                    call.respond(HttpStatusCode.NotFound, ErrorResponse("Rapport sol not found"))
+                    ?: return@patch call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid vanne id"))
+                val capteurUserId = authenticatedCapteurUserId(call, service) ?: return@patch
+                val body = call.receive<UpdateVanneRequest>()
+                val updated = service.updateVanne(
+                    id = id,
+                    ownerUserId = capteurUserId,
+                    input = UpdateVanneInput(
+                        name = body.name,
+                        parcelId = body.parcelId,
+                        userId = capteurUserId,
+                        debit = body.debit,
+                        isAuto = body.isAuto,
+                        isOpen = body.isOpen,
+                        lastAction = body.lastAction,
+                        nbPlants = body.nbPlants,
+                        scheduleDays = body.scheduleDays,
+                        scheduleStart = body.scheduleStart,
+                        scheduleEnd = body.scheduleEnd,
+                    )
+                )
+                if (updated == null) {
+                    call.respond(HttpStatusCode.NotFound, ErrorResponse("Vanne not found"))
                 } else {
-                    call.respond(HttpStatusCode.OK, data)
+                    call.respond(HttpStatusCode.OK, updated)
                 }
             }
 
             delete("/{id}") {
                 val id = call.parameters["id"]?.toLongOrNull()
-                    ?: return@delete call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid rapport sol id"))
-                val deleted = service.deleteRapportSol(id)
-                call.respond(
-                    HttpStatusCode.OK,
-                    mapOf(
-                        "message" to if (deleted) "Rapport sol deleted" else "Rapport sol already deleted"
-                    )
-                )
+                    ?: return@delete call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid vanne id"))
+                val capteurUserId = authenticatedCapteurUserId(call, service) ?: return@delete
+                val deleted = service.deleteVanne(id, capteurUserId)
+                if (!deleted) {
+                    call.respond(HttpStatusCode.NotFound, ErrorResponse("Vanne not found"))
+                } else {
+                    call.respond(HttpStatusCode.OK, mapOf("message" to "Vanne deleted"))
+                }
             }
         }
     }
+}
+
+private fun JsonObject.stringValue(key: String, default: String = ""): String {
+    val value = this[key] as? JsonPrimitive ?: return default
+    return value.content.trim().ifEmpty { default }
+}
+
+private fun JsonObject.intValue(key: String, default: Int = 0): Int {
+    val value = this[key] as? JsonPrimitive ?: return default
+    return value.content.toIntOrNull() ?: default
+}
+
+private fun JsonObject.doubleValue(key: String, default: Double = 0.0): Double {
+    val value = this[key] as? JsonPrimitive ?: return default
+    return value.content.replace(',', '.').toDoubleOrNull() ?: default
+}
+
+private fun JsonObject.arrayValue(key: String): JsonArray {
+    val value = this[key]
+    return if (value is JsonArray) value else JsonArray(emptyList())
 }
