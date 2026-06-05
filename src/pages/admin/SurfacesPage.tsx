@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getSurfaces, createSurface, updateSurface, deleteSurface, getProfiles } from "@/services/data-service";
-import { useFilteredProfiles } from "@/hooks/useRoleFilter";
+import { useFilteredProfiles, useFilteredSurfaces } from "@/hooks/useRoleFilter";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -29,7 +29,7 @@ export default function SurfacesPage() {
   const { data: allProfiles = [] } = useQuery({ queryKey: ["profiles"], queryFn: getProfiles });
   const profilesList = useFilteredProfiles(allProfiles.filter(p => p.user_role === "CLIENT"));
   const visibleIds = useMemo(() => new Set(profilesList.map(p => p.id)), [profilesList]);
-  const items = useMemo(() => allSurfaces.filter(s => !s.fkUser || visibleIds.has(s.fkUser)), [allSurfaces, visibleIds]);
+  const items = useFilteredSurfaces(allSurfaces, visibleIds);
 
   const createMut = useMutation({
     mutationFn: createSurface,

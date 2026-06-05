@@ -7,7 +7,6 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import AdminLayout from "@/components/AdminLayout";
 import DashboardPage from "@/pages/admin/DashboardPage";
-import TravailPage from "@/pages/admin/TravailPage";
 import SurfacesPage from "@/pages/admin/SurfacesPage";
 import DonneesDetailleesPage from "@/pages/admin/DonneesDetailleesPage";
 import CapteurPage from "@/pages/admin/CapteurPage";
@@ -48,7 +47,6 @@ const App = () => (
               <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
               <Route path="/admin" element={<AdminLayout />}>
                 <Route path="dashboard" element={<DashboardPage />} />
-                <Route path="travail" element={<TravailPage />} />
                 <Route path="surfaces" element={<SurfacesPage />} />
                 <Route path="donnees-detaillees" element={<DonneesDetailleesPage />} />
                 <Route path="capteurs" element={<CapteurPage />} />

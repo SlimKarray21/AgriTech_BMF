@@ -1,8 +1,22 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { getProfiles } from "@/services/data-service";
+import {
+  getProfiles,
+  getSubscriptionPlans,
+  createSubscriptionPlan,
+  updateSubscriptionPlan,
+  deleteSubscriptionPlan,
+  getSubscriptionPayments,
+  createSubscriptionPayment,
+  updateSubscriptionPayment,
+  getClientSales,
+  createClientSale,
+  getMaterialReservations,
+  updateMaterialReservation,
+  createSupportNotification,
+  updateProfile,
+} from "@/services/data-service";
 import { useFilteredProfiles } from "@/hooks/useRoleFilter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -18,40 +32,116 @@ import { toast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, CheckCircle2, XCircle, CreditCard, Package, ShieldCheck, Users } from "lucide-react";
 import SecurityConfirmDialog from "@/components/SecurityConfirmDialog";
 
-type Plan = { id: string; name: string; price_dt: number; duration_days: number; features: string[]; active: boolean; };
-type SubPay = { id: string; profile_id: string; plan_id: string; amount_dt: number; payment_method: string; status: string; date_start: string | null; date_exp: string | null; created_at: string; };
-type Reservation = { id: string; profile_id: string | null; subscription_plan_id: string | null; total_devices_price_dt: number; status: string; created_at: string };
+// ── Types ──────────────────────────────────────────────────────────────────────
+
+type Plan = {
+  id: string;
+  name: string;
+  price_dt: number;
+  duration_days: number;
+  features: string[];
+  active: boolean;
+};
+
+type SubPay = {
+  id: string;
+  profile_id: string;
+  plan_id: string;
+  amount_dt: number;
+  payment_method: string;
+  status: string;
+  date_start: string | null;
+  date_exp: string | null;
+  created_at: string;
+};
+
+type Reservation = {
+  id: string;
+  profile_id: string | null;
+  subscription_plan_id: string | null;
+  total_devices_price_dt: number;
+  status: string;
+  created_at: string;
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 const DT = (n: number) => `${Number(n ?? 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} DT`;
-const METHODS = ["carte", "virement", "electronique", "main_a_main"];
-const METHOD_LABEL: Record<string, string> = { carte: "Carte bancaire", virement: "Virement", electronique: "Paiement électronique", main_a_main: "Main à main", especes: "Espèces", mobile: "Paiement mobile" };
+
+const METHOD_LABEL: Record<string, string> = {
+  carte: "Carte bancaire",
+  virement: "Virement",
+  electronique: "Paiement électronique",
+  main_a_main: "Main à main",
+  especes: "Espèces",
+  mobile: "Paiement mobile",
+  cash: "Espèces",
+};
+
+function parseFeatures(raw: any): string[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed;
+  } catch {}
+  if (typeof raw === "string" && raw.trim() && raw !== "{}") {
+    return raw.split(",").map((s) => s.trim()).filter(Boolean);
+  }
+  return [];
+}
+
+function normalizePlan(raw: any): Plan {
+  return {
+    id: String(raw.id),
+    name: raw.name ?? "",
+    price_dt: Number(raw.price_dt ?? 0),
+    duration_days: Number(raw.duration_days ?? 30),
+    features: parseFeatures(raw.features),
+    active: raw.active ?? true,
+  };
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function FinancePage() {
-  const qc = useQueryClient();
   const { profile } = useAuth();
   const isAdmin = profile?.user_role === "ADMIN" || profile?.user_role === "SOUS_ADMIN";
 
-  useEffect(() => {
-    const ch = supabase.channel("finance-rt")
-      .on("postgres_changes", { event: "*", schema: "public", table: "subscription_plans" }, () => qc.invalidateQueries({ queryKey: ["plans"] }))
-      .on("postgres_changes", { event: "*", schema: "public", table: "subscription_payments" }, () => qc.invalidateQueries({ queryKey: ["subpays"] }))
-      .on("postgres_changes", { event: "*", schema: "public", table: "material_reservations" }, () => qc.invalidateQueries({ queryKey: ["finance-reservations"] }))
-      .on("postgres_changes", { event: "*", schema: "public", table: "client_sales" }, () => qc.invalidateQueries({ queryKey: ["client-sales"] }))
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [qc]);
+  const { data: rawPlans = [] } = useQuery({
+    queryKey: ["plans"],
+    queryFn: getSubscriptionPlans,
+  });
+  const plans: Plan[] = useMemo(() => rawPlans.map(normalizePlan), [rawPlans]);
 
-  const { data: plans = [] } = useQuery<Plan[]>({ queryKey: ["plans"], queryFn: async () => (await supabase.from("subscription_plans").select("*").order("price_dt")).data as any || [] });
-  const { data: subpays = [] } = useQuery<SubPay[]>({ queryKey: ["subpays"], queryFn: async () => (await supabase.from("subscription_payments").select("*").order("created_at", { ascending: false })).data as any || [] });
+  const { data: rawSubpays = [] } = useQuery({
+    queryKey: ["subpays"],
+    queryFn: getSubscriptionPayments,
+  });
+  const subpays: SubPay[] = useMemo(() =>
+    rawSubpays.map((s: any) => ({
+      id: String(s.id),
+      profile_id: String(s.profile_id),
+      plan_id: String(s.plan_id),
+      amount_dt: Number(s.amount_dt ?? 0),
+      payment_method: s.payment_method ?? "cash",
+      status: s.status ?? "en_attente",
+      date_start: s.date_start ?? null,
+      date_exp: s.date_exp ?? null,
+      created_at: s.created_at ?? "",
+    })), [rawSubpays]);
+
   const { data: allProfiles = [] } = useQuery({ queryKey: ["profiles"], queryFn: getProfiles });
   const profiles = useFilteredProfiles(allProfiles);
-  const profById = useMemo(() => Object.fromEntries(profiles.map(p => [p.id, p])), [profiles]);
-  const planById = useMemo(() => Object.fromEntries(plans.map(p => [p.id, p])), [plans]);
+  const profById = useMemo(() => Object.fromEntries(profiles.map((p) => [p.id, p])), [profiles]);
+  const planById = useMemo(() => Object.fromEntries(plans.map((p) => [p.id, p])), [plans]);
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-foreground flex items-center gap-2"><CreditCard className="h-6 w-6 text-primary" /> Finance</h2>
+        <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
+          <CreditCard className="h-6 w-6 text-primary" /> Finance
+        </h2>
         <p className="text-sm text-muted-foreground">Abonnements, paiements et clients</p>
       </div>
 
@@ -62,43 +152,218 @@ export default function FinancePage() {
           <TabsTrigger value="subpays"><ShieldCheck className="h-4 w-4 mr-1.5" />Paiements abos</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="clients" className="mt-4"><ClientsTab profById={profById} planById={planById} plans={plans} isAdmin={isAdmin} /></TabsContent>
-        <TabsContent value="plans" className="mt-4"><PlansTab plans={plans} isAdmin={isAdmin} /></TabsContent>
-        <TabsContent value="subpays" className="mt-4"><SubPaysTab subpays={subpays} planById={planById} profById={profById} isAdmin={isAdmin} userId={profile?.id} /></TabsContent>
+        <TabsContent value="clients" className="mt-4">
+          <ClientsTab profById={profById} planById={planById} plans={plans} isAdmin={isAdmin} />
+        </TabsContent>
+        <TabsContent value="plans" className="mt-4">
+          <PlansTab plans={plans} isAdmin={isAdmin} />
+        </TabsContent>
+        <TabsContent value="subpays" className="mt-4">
+          <SubPaysTab subpays={subpays} planById={planById} profById={profById} isAdmin={isAdmin} userId={profile?.id} />
+        </TabsContent>
       </Tabs>
     </div>
   );
 }
 
-/* ============== CLIENTS (réservations -> ventes) ============== */
-function ClientsTab({ profById, planById, plans, isAdmin }: { profById: Record<string, any>; planById: Record<string, Plan>; plans: Plan[]; isAdmin: boolean }) {
+// ── Plans Tab ─────────────────────────────────────────────────────────────────
+
+function PlansTab({ plans, isAdmin }: { plans: Plan[]; isAdmin: boolean }) {
+  const qc = useQueryClient();
+  const [edit, setEdit] = useState<(Partial<Plan> & { featuresStr?: string }) | null>(null);
+
+  const save = useMutation({
+    mutationFn: async (p: Partial<Plan> & { featuresStr?: string }) => {
+      const featuresArr = (p.featuresStr ?? "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const payload = {
+        name: p.name,
+        price_dt: p.price_dt,
+        duration_days: p.duration_days,
+        features: featuresArr,   // array → Kotlin .toString() donne ["f1","f2"]
+        active: p.active ?? true,
+      };
+      if (p.id) {
+        await updateSubscriptionPlan(p.id, payload);
+      } else {
+        await createSubscriptionPlan(payload);
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["plans"] });
+      setEdit(null);
+      toast({ title: "Plan enregistré" });
+    },
+    onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+  });
+
+  const del = useMutation({
+    mutationFn: (id: string) => deleteSubscriptionPlan(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["plans"] });
+      toast({ title: "Plan supprimé" });
+    },
+    onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+  });
+
+  const openNew = () => setEdit({ name: "", price_dt: 0, duration_days: 30, featuresStr: "", active: true });
+  const openEdit = (p: Plan) => setEdit({ ...p, featuresStr: p.features.join(", ") });
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="text-base">Plans d'abonnement</CardTitle>
+        {isAdmin && (
+          <Button size="sm" onClick={openNew}>
+            <Plus className="h-4 w-4 mr-1" />Nouveau plan
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {plans.map((p) => (
+            <Card key={p.id} className="border-2 hover:border-primary/40 transition">
+              <CardContent className="p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold">{p.name}</h3>
+                  {p.active
+                    ? <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-300" variant="outline">Actif</Badge>
+                    : <Badge variant="outline">Inactif</Badge>}
+                </div>
+                <div>
+                  <span className="text-3xl font-bold text-primary">{DT(p.price_dt)}</span>
+                  <span className="text-sm text-muted-foreground"> / {p.duration_days}j</span>
+                </div>
+                <ul className="text-sm space-y-1">
+                  {p.features.map((f, i) => <li key={i}>✓ {f}</li>)}
+                </ul>
+                {isAdmin && (
+                  <div className="flex gap-2 pt-2">
+                    <Button size="sm" variant="outline" className="flex-1" onClick={() => openEdit(p)}>
+                      <Pencil className="h-3 w-3 mr-1" />Modifier
+                    </Button>
+                    <Button
+                      size="sm" variant="ghost" className="text-destructive"
+                      onClick={() => { if (confirm(`Supprimer "${p.name}" ?`)) del.mutate(p.id); }}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+          {plans.length === 0 && (
+            <p className="text-muted-foreground text-center col-span-3 py-8">Aucun plan. Créez-en un.</p>
+          )}
+        </div>
+
+        <Dialog open={!!edit} onOpenChange={(o) => !o && setEdit(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{edit?.id ? "Modifier plan" : "Nouveau plan"}</DialogTitle>
+            </DialogHeader>
+            {edit && (
+              <form onSubmit={(e) => { e.preventDefault(); save.mutate(edit); }} className="space-y-3">
+                <div>
+                  <Label>Nom *</Label>
+                  <Input value={edit.name ?? ""} onChange={(e) => setEdit({ ...edit, name: e.target.value })} required />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Prix (DT) *</Label>
+                    <Input type="number" step="0.01" min="0" value={edit.price_dt ?? 0}
+                      onChange={(e) => setEdit({ ...edit, price_dt: +e.target.value })} required />
+                  </div>
+                  <div>
+                    <Label>Durée (jours) *</Label>
+                    <Input type="number" min="1" value={edit.duration_days ?? 30}
+                      onChange={(e) => setEdit({ ...edit, duration_days: +e.target.value })} required />
+                  </div>
+                </div>
+                <div>
+                  <Label>Fonctionnalités <span className="text-muted-foreground text-xs">(séparées par virgule)</span></Label>
+                  <Input
+                    value={edit.featuresStr ?? ""}
+                    onChange={(e) => setEdit({ ...edit, featuresStr: e.target.value })}
+                    placeholder="Capteur sol, Électrovanne, Rapports..."
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch checked={edit.active ?? true} onCheckedChange={(v) => setEdit({ ...edit, active: v })} />
+                  <Label>Actif</Label>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="outline" onClick={() => setEdit(null)}>Annuler</Button>
+                  <Button type="submit" disabled={save.isPending}>
+                    {save.isPending ? "Enregistrement..." : "Enregistrer"}
+                  </Button>
+                </div>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Clients Tab ───────────────────────────────────────────────────────────────
+
+function ClientsTab({
+  profById, planById, plans, isAdmin,
+}: {
+  profById: Record<string, any>;
+  planById: Record<string, Plan>;
+  plans: Plan[];
+  isAdmin: boolean;
+}) {
   const qc = useQueryClient();
   const [securityOpen, setSecurityOpen] = useState(false);
   const [pendingSale, setPendingSale] = useState<{ res: Reservation; method: string } | null>(null);
   const [methodChoice, setMethodChoice] = useState<Record<string, string>>({});
 
-  const { data: reservations = [] } = useQuery<Reservation[]>({
+  const { data: rawReservations = [] } = useQuery({
     queryKey: ["finance-reservations"],
-    queryFn: async () => (await supabase.from("material_reservations").select("*").in("status", ["reserve", "confirme"]).order("created_at", { ascending: false })).data as any || [],
+    queryFn: getMaterialReservations,
   });
+  const reservations: Reservation[] = useMemo(() =>
+    rawReservations
+      .filter((r: any) => r.status === "reserve" || r.status === "confirme")
+      .map((r: any) => ({
+        id: String(r.id),
+        profile_id: r.profile_id != null ? String(r.profile_id) : null,
+        subscription_plan_id: r.subscription_plan_id != null ? String(r.subscription_plan_id) : null,
+        total_devices_price_dt: Number(r.total_devices_price_dt ?? 0),
+        status: r.status,
+        created_at: r.created_at ?? "",
+      })),
+    [rawReservations]);
 
-  const { data: sales = [] } = useQuery({
+  const { data: rawSales = [] } = useQuery({
     queryKey: ["client-sales"],
-    queryFn: async () => (await supabase.from("client_sales").select("reservation_id").not("reservation_id", "is", null)).data as any || [],
+    queryFn: getClientSales,
   });
-  const salesByRes = useMemo(() => new Set(sales.map((s: any) => s.reservation_id)), [sales]);
+  const salesByRes = useMemo(
+    () => new Set(rawSales.filter((s: any) => s.reservation_id != null).map((s: any) => String(s.reservation_id))),
+    [rawSales]
+  );
 
-  const updatePlan = useMutation({
-    mutationFn: async ({ id, planId }: { id: string; planId: string }) => {
-      const { error } = await supabase.from("material_reservations").update({ subscription_plan_id: planId }).eq("id", id);
-      if (error) throw error;
-    },
+  const updatePlanMut = useMutation({
+    mutationFn: ({ id, planId }: { id: string; planId: string }) =>
+      updateMaterialReservation(id, { subscription_plan_id: Number(planId) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["finance-reservations"] }),
+    onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
 
-  const deleteRes = useMutation({
-    mutationFn: async (id: string) => { const { error } = await supabase.from("material_reservations").delete().eq("id", id); if (error) throw error; },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["finance-reservations"] }); toast({ title: "Supprimé" }); },
+  const deleteResMut = useMutation({
+    mutationFn: async (id: string) => {
+      // soft-delete via status "annule"
+      await updateMaterialReservation(id, { status: "annule" });
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["finance-reservations"] }); toast({ title: "Réservation annulée" }); },
     onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
 
@@ -109,28 +374,32 @@ function ClientsTab({ profById, planById, plans, isAdmin }: { profById: Record<s
     const subPrice = plan?.price_dt ?? 0;
     const total = subPrice + (res.total_devices_price_dt ?? 0);
 
-    const { error } = await supabase.from("client_sales").insert({
-      profile_id: res.profile_id,
-      reservation_id: res.id,
-      subscription_plan_id: res.subscription_plan_id,
-      subscription_price_dt: subPrice,
-      equipment_price_dt: res.total_devices_price_dt,
-      total_dt: total,
-      payment_method: method,
-      status: "confirme",
-      confirmed_at: new Date().toISOString(),
-    });
-    if (error) { toast({ title: "Erreur", description: error.message, variant: "destructive" }); return; }
-
-    await supabase.from("material_reservations").update({ status: "installe" }).eq("id", res.id);
-    await supabase.from("support_notifications").insert({
-      notif_type: "sale_confirmed", title: "Vente confirmée",
-      message: `Vente de ${DT(total)} confirmée`, link: "/admin/ventes", created_for_role: "ADMIN",
-    });
-    qc.invalidateQueries({ queryKey: ["finance-reservations"] });
-    qc.invalidateQueries({ queryKey: ["ventes"] });
-    toast({ title: "Vente confirmée ✓", description: "Transférée vers la section Ventes" });
-    setPendingSale(null);
+    try {
+      await createClientSale({
+        profile_id: Number(res.profile_id),
+        reservation_id: Number(res.id),
+        subscription_plan_id: res.subscription_plan_id ? Number(res.subscription_plan_id) : null,
+        subscription_price_dt: subPrice,
+        equipment_price_dt: res.total_devices_price_dt,
+        total_dt: total,
+        payment_method: method,
+        status: "confirme",
+      });
+      await updateMaterialReservation(res.id, { status: "installe" });
+      await createSupportNotification({
+        notif_type: "sale_confirmed",
+        title: "Vente confirmée",
+        message: `Vente de ${DT(total)} confirmée`,
+        link: "/admin/ventes",
+        created_for_role: "ADMIN",
+      });
+      qc.invalidateQueries({ queryKey: ["finance-reservations"] });
+      qc.invalidateQueries({ queryKey: ["client-sales"] });
+      toast({ title: "Vente confirmée ✓", description: "Transférée vers la section Ventes" });
+      setPendingSale(null);
+    } catch (e: any) {
+      toast({ title: "Erreur", description: e.message, variant: "destructive" });
+    }
   };
 
   return (
@@ -138,33 +407,51 @@ function ClientsTab({ profById, planById, plans, isAdmin }: { profById: Record<s
       <CardHeader><CardTitle className="text-base">Clients prêts à la confirmation</CardTitle></CardHeader>
       <CardContent className="p-0">
         <Table>
-          <TableHeader><TableRow>
-            <TableHead>Client</TableHead><TableHead>Abonnement</TableHead><TableHead>Prix Abo</TableHead>
-            <TableHead>Prix Appareillage</TableHead><TableHead>Prix Total</TableHead>
-            <TableHead>Méthode</TableHead><TableHead className="w-44">Actions</TableHead>
-          </TableRow></TableHeader>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Client</TableHead>
+              <TableHead>Abonnement</TableHead>
+              <TableHead>Prix Abo</TableHead>
+              <TableHead>Prix Matériel</TableHead>
+              <TableHead>Total</TableHead>
+              <TableHead>Méthode</TableHead>
+              <TableHead className="w-44">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
           <TableBody>
-            {reservations.map(r => {
+            {reservations.map((r) => {
               const client = profById[r.profile_id ?? ""];
               const plan = r.subscription_plan_id ? planById[r.subscription_plan_id] : null;
               const subPrice = plan?.price_dt ?? 0;
               const total = subPrice + (r.total_devices_price_dt ?? 0);
               const sold = salesByRes.has(r.id);
-              const method = methodChoice[r.id] ?? "carte";
+              const method = methodChoice[r.id] ?? "especes";
               return (
                 <TableRow key={r.id}>
-                  <TableCell className="font-medium">{client ? `${client.first_name ?? ""} ${client.last_name ?? ""}`.trim() || client.email : "—"}</TableCell>
+                  <TableCell className="font-medium">
+                    {client ? `${client.first_name ?? ""} ${client.last_name ?? ""}`.trim() || client.email : "—"}
+                  </TableCell>
                   <TableCell>
-                    <Select value={r.subscription_plan_id ?? ""} onValueChange={(v) => updatePlan.mutate({ id: r.id, planId: v })} disabled={sold}>
+                    <Select
+                      value={r.subscription_plan_id ?? ""}
+                      onValueChange={(v) => updatePlanMut.mutate({ id: r.id, planId: v })}
+                      disabled={sold}
+                    >
                       <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Choisir..." /></SelectTrigger>
-                      <SelectContent>{plans.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
+                      <SelectContent>
+                        {plans.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                      </SelectContent>
                     </Select>
                   </TableCell>
                   <TableCell>{DT(subPrice)}</TableCell>
                   <TableCell>{DT(r.total_devices_price_dt)}</TableCell>
                   <TableCell className="font-bold text-primary">{DT(total)}</TableCell>
                   <TableCell>
-                    <Select value={method} onValueChange={v => setMethodChoice({ ...methodChoice, [r.id]: v })} disabled={sold}>
+                    <Select
+                      value={method}
+                      onValueChange={(v) => setMethodChoice({ ...methodChoice, [r.id]: v })}
+                      disabled={sold}
+                    >
                       <SelectTrigger className="h-8 text-xs w-32"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="especes">Espèces</SelectItem>
@@ -179,19 +466,34 @@ function ClientsTab({ profById, planById, plans, isAdmin }: { profById: Record<s
                       {sold ? (
                         <Badge variant="outline" className="bg-emerald-500/15 text-emerald-700 border-emerald-300">✓ Vendu</Badge>
                       ) : (
-                        <Button size="sm" disabled={!r.subscription_plan_id} onClick={() => { setPendingSale({ res: r, method }); setSecurityOpen(true); }}>
+                        <Button
+                          size="sm"
+                          disabled={!r.subscription_plan_id}
+                          onClick={() => { setPendingSale({ res: r, method }); setSecurityOpen(true); }}
+                        >
                           <CheckCircle2 className="h-3 w-3 mr-1" />Confirmer
                         </Button>
                       )}
                       {isAdmin && !sold && (
-                        <Button size="sm" variant="ghost" className="text-destructive" onClick={() => { if (confirm("Supprimer cette réservation ?")) deleteRes.mutate(r.id); }}><Trash2 className="h-3 w-3" /></Button>
+                        <Button
+                          size="sm" variant="ghost" className="text-destructive"
+                          onClick={() => { if (confirm("Annuler cette réservation ?")) deleteResMut.mutate(r.id); }}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
                       )}
                     </div>
                   </TableCell>
                 </TableRow>
               );
             })}
-            {reservations.length === 0 && <TableRow><TableCell colSpan={7} className="text-center py-12 text-muted-foreground">Aucun client en attente. Réservez du matériel dans la section "Réservation Matériel".</TableCell></TableRow>}
+            {reservations.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                  Aucun client en attente. Réservez du matériel dans "Réservation Matériel".
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </CardContent>
@@ -201,112 +503,215 @@ function ClientsTab({ profById, planById, plans, isAdmin }: { profById: Record<s
         onClose={() => { setSecurityOpen(false); setPendingSale(null); }}
         onSuccess={() => { setSecurityOpen(false); confirmSale(); }}
         title="Confirmer la vente"
-        description="Authentifiez-vous (ADMIN ou SOUS_ADMIN) pour valider cette vente."
+        description="Authentifiez-vous pour valider cette vente."
       />
     </Card>
   );
 }
 
-/* ============== PLANS ============== */
-function PlansTab({ plans, isAdmin }: { plans: Plan[]; isAdmin: boolean }) {
+// ── SubPays Tab ───────────────────────────────────────────────────────────────
+
+function SubPaysTab({
+  subpays, planById, profById, isAdmin, userId,
+}: {
+  subpays: SubPay[];
+  planById: Record<string, Plan>;
+  profById: Record<string, any>;
+  isAdmin: boolean;
+  userId?: string;
+}) {
   const qc = useQueryClient();
-  const [edit, setEdit] = useState<Partial<Plan> | null>(null);
+  const [creating, setCreating] = useState(false);
+  const profiles = Object.values(profById);
+  const plans = Object.values(planById);
 
-  const save = useMutation({
-    mutationFn: async (p: Partial<Plan>) => {
-      const payload: any = { ...p };
-      if (typeof payload.features === "string") payload.features = (payload.features as string).split(",").map((s: string) => s.trim()).filter(Boolean);
-      if (p.id) { const { error } = await supabase.from("subscription_plans").update(payload).eq("id", p.id); if (error) throw error; }
-      else { const { error } = await supabase.from("subscription_plans").insert(payload); if (error) throw error; }
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["plans"] }); setEdit(null); toast({ title: "Plan enregistré" }); },
-    onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
-  });
-  const del = useMutation({ mutationFn: async (id: string) => { const { error } = await supabase.from("subscription_plans").delete().eq("id", id); if (error) throw error; }, onSuccess: () => qc.invalidateQueries({ queryKey: ["plans"] }) });
-
-  return (
-    <Card><CardHeader className="flex flex-row items-center justify-between">
-      <CardTitle className="text-base">Plans d'abonnement</CardTitle>
-      {isAdmin && <Button size="sm" onClick={() => setEdit({ name: "", price_dt: 0, duration_days: 30, features: [], active: true })}><Plus className="h-4 w-4 mr-1" />Nouveau plan</Button>}
-    </CardHeader><CardContent>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {plans.map(p => (
-          <Card key={p.id} className="border-2 hover:border-primary/40 transition">
-            <CardContent className="p-5 space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold">{p.name}</h3>
-                {p.active ? <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-300" variant="outline">Actif</Badge> : <Badge variant="outline">Inactif</Badge>}
-              </div>
-              <div><span className="text-3xl font-bold text-primary">{DT(p.price_dt)}</span><span className="text-sm text-muted-foreground"> / {p.duration_days}j</span></div>
-              <ul className="text-sm space-y-1">{(p.features || []).map((f, i) => <li key={i}>✓ {f}</li>)}</ul>
-              {isAdmin && <div className="flex gap-2 pt-2">
-                <Button size="sm" variant="outline" className="flex-1" onClick={() => setEdit({ ...p, features: (p.features || []).join(", ") as any })}><Pencil className="h-3 w-3 mr-1" />Modifier</Button>
-                <Button size="sm" variant="ghost" className="text-destructive" onClick={() => del.mutate(p.id)}><Trash2 className="h-3 w-3" /></Button>
-              </div>}
-            </CardContent>
-          </Card>
-        ))}
-        {plans.length === 0 && <p className="text-muted-foreground text-center col-span-3 py-8">Aucun plan</p>}
-      </div>
-
-      <Dialog open={!!edit} onOpenChange={(o) => !o && setEdit(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>{edit?.id ? "Modifier plan" : "Nouveau plan"}</DialogTitle></DialogHeader>
-          {edit && <form onSubmit={(e) => { e.preventDefault(); save.mutate(edit); }} className="space-y-3">
-            <div><Label>Nom</Label><Input value={edit.name ?? ""} onChange={e => setEdit({ ...edit, name: e.target.value })} required /></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label>Prix (DT)</Label><Input type="number" step="0.01" value={edit.price_dt ?? 0} onChange={e => setEdit({ ...edit, price_dt: +e.target.value })} required /></div>
-              <div><Label>Durée (jours)</Label><Input type="number" value={edit.duration_days ?? 30} onChange={e => setEdit({ ...edit, duration_days: +e.target.value })} required /></div>
-            </div>
-            <div><Label>Fonctionnalités (séparées par virgule)</Label><Input value={(edit.features as any) ?? ""} onChange={e => setEdit({ ...edit, features: e.target.value as any })} /></div>
-            <div className="flex items-center gap-2"><Switch checked={edit.active ?? true} onCheckedChange={v => setEdit({ ...edit, active: v })} /><Label>Actif</Label></div>
-            <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setEdit(null)}>Annuler</Button><Button type="submit">Enregistrer</Button></div>
-          </form>}
-        </DialogContent>
-      </Dialog>
-    </CardContent></Card>
-  );
-}
-
-/* ============== SUB PAYMENTS ============== */
-function SubPaysTab({ subpays, planById, profById, isAdmin, userId }: { subpays: SubPay[]; planById: Record<string, Plan>; profById: Record<string, any>; isAdmin: boolean; userId?: string }) {
-  const qc = useQueryClient();
   const validate = useMutation({
     mutationFn: async ({ s, status }: { s: SubPay; status: string }) => {
-      const { error } = await supabase.from("subscription_payments").update({ status, validated_by: userId, validated_at: new Date().toISOString() }).eq("id", s.id);
-      if (error) throw error;
-      if (status === "valide") {
-        await supabase.from("profiles").update({ date_deb_abo: s.date_start, date_exp_abo: s.date_exp }).eq("id", s.profile_id);
+      await updateSubscriptionPayment(s.id, {
+        status,
+        validated_by: userId ? Number(userId) : undefined,
+        validated_at: new Date().toISOString(),
+      });
+      if (status === "valide" && s.profile_id) {
+        await updateProfile(s.profile_id, {
+          date_deb_abo: s.date_start ?? undefined,
+          date_exp_abo: s.date_exp ?? undefined,
+        });
       }
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["subpays"] }); qc.invalidateQueries({ queryKey: ["profiles"] }); toast({ title: "Mise à jour" }); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["subpays"] });
+      qc.invalidateQueries({ queryKey: ["profiles"] });
+      toast({ title: "Mise à jour" });
+    },
+    onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
+
+  const createMut = useMutation({
+    mutationFn: async (payload: any) => {
+      await createSubscriptionPayment({
+        profile_id: Number(payload.profile_id),
+        plan_id: Number(payload.plan_id),
+        amount_dt: Number(payload.amount_dt),
+        payment_method: payload.payment_method,
+        status: "en_attente",
+        date_start: payload.date_start || null,
+        date_exp: payload.date_exp || null,
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["subpays"] });
+      setCreating(false);
+      toast({ title: "Paiement créé" });
+    },
+    onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+  });
+
   return (
-    <Card><CardHeader><CardTitle className="text-base">Paiements d'abonnement</CardTitle></CardHeader><CardContent className="p-0">
-      <Table>
-        <TableHeader><TableRow>
-          <TableHead>Date</TableHead><TableHead>Utilisateur</TableHead><TableHead>Plan</TableHead><TableHead>Montant</TableHead><TableHead>Méthode</TableHead><TableHead>Expire</TableHead><TableHead>Statut</TableHead>{isAdmin && <TableHead>Actions</TableHead>}
-        </TableRow></TableHeader>
-        <TableBody>
-          {subpays.map(s => {
-            const u = profById[s.profile_id]; const p = planById[s.plan_id];
-            return <TableRow key={s.id}>
-              <TableCell className="text-xs">{new Date(s.created_at).toLocaleDateString("fr-FR")}</TableCell>
-              <TableCell>{u ? `${u.first_name} ${u.last_name}` : "—"}</TableCell>
-              <TableCell>{p?.name ?? "—"}</TableCell>
-              <TableCell className="font-semibold">{DT(s.amount_dt)}</TableCell>
-              <TableCell className="text-xs">{METHOD_LABEL[s.payment_method] ?? s.payment_method}</TableCell>
-              <TableCell className="text-xs">{s.date_exp ?? "—"}</TableCell>
-              <TableCell><Badge variant="outline" className={s.status === "valide" ? "bg-emerald-500/15 text-emerald-700 border-emerald-300" : s.status === "refuse" ? "bg-red-500/15 text-red-700 border-red-300" : "bg-orange-500/15 text-orange-700 border-orange-300"}>{s.status}</Badge></TableCell>
-              {isAdmin && <TableCell>{s.status === "en_attente" && <div className="flex gap-1">
-                <Button size="sm" variant="ghost" className="text-emerald-600" onClick={() => validate.mutate({ s, status: "valide" })}><CheckCircle2 className="h-4 w-4" /></Button>
-                <Button size="sm" variant="ghost" className="text-destructive" onClick={() => validate.mutate({ s, status: "refuse" })}><XCircle className="h-4 w-4" /></Button>
-              </div>}</TableCell>}
-            </TableRow>;
-          })}
-          {subpays.length === 0 && <TableRow><TableCell colSpan={isAdmin ? 8 : 7} className="text-center text-muted-foreground py-8">Aucun paiement</TableCell></TableRow>}
-        </TableBody>
-      </Table>
-    </CardContent></Card>
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="text-base">Paiements d'abonnement</CardTitle>
+        {isAdmin && (
+          <Button size="sm" onClick={() => setCreating(true)}>
+            <Plus className="h-4 w-4 mr-1" />Nouveau paiement
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Date</TableHead>
+              <TableHead>Utilisateur</TableHead>
+              <TableHead>Plan</TableHead>
+              <TableHead>Montant</TableHead>
+              <TableHead>Méthode</TableHead>
+              <TableHead>Expire</TableHead>
+              <TableHead>Statut</TableHead>
+              {isAdmin && <TableHead>Actions</TableHead>}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {subpays.map((s) => {
+              const u = profById[s.profile_id];
+              const p = planById[s.plan_id];
+              return (
+                <TableRow key={s.id}>
+                  <TableCell className="text-xs">{new Date(s.created_at).toLocaleDateString("fr-FR")}</TableCell>
+                  <TableCell>{u ? `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim() || u.email : s.profile_id}</TableCell>
+                  <TableCell>{p?.name ?? "—"}</TableCell>
+                  <TableCell className="font-semibold">{DT(s.amount_dt)}</TableCell>
+                  <TableCell className="text-xs">{METHOD_LABEL[s.payment_method] ?? s.payment_method}</TableCell>
+                  <TableCell className="text-xs">{s.date_exp ?? "—"}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant="outline"
+                      className={
+                        s.status === "valide"
+                          ? "bg-emerald-500/15 text-emerald-700 border-emerald-300"
+                          : s.status === "refuse"
+                          ? "bg-red-500/15 text-red-700 border-red-300"
+                          : "bg-orange-500/15 text-orange-700 border-orange-300"
+                      }
+                    >
+                      {s.status}
+                    </Badge>
+                  </TableCell>
+                  {isAdmin && (
+                    <TableCell>
+                      {s.status === "en_attente" && (
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="ghost" className="text-emerald-600" onClick={() => validate.mutate({ s, status: "valide" })}>
+                            <CheckCircle2 className="h-4 w-4" />
+                          </Button>
+                          <Button size="sm" variant="ghost" className="text-destructive" onClick={() => validate.mutate({ s, status: "refuse" })}>
+                            <XCircle className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </TableCell>
+                  )}
+                </TableRow>
+              );
+            })}
+            {subpays.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={isAdmin ? 8 : 7} className="text-center text-muted-foreground py-8">
+                  Aucun paiement
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+
+      {/* Create payment dialog */}
+      <Dialog open={creating} onOpenChange={setCreating}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Nouveau paiement d'abonnement</DialogTitle></DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const fd = new FormData(e.currentTarget);
+              createMut.mutate({
+                profile_id: fd.get("profile_id"),
+                plan_id: fd.get("plan_id"),
+                amount_dt: fd.get("amount_dt"),
+                payment_method: fd.get("payment_method"),
+                date_start: fd.get("date_start"),
+                date_exp: fd.get("date_exp"),
+              });
+            }}
+            className="space-y-3"
+          >
+            <div>
+              <Label>Client *</Label>
+              <select name="profile_id" required className="w-full border rounded-md px-3 py-2 text-sm bg-background">
+                <option value="">Sélectionner...</option>
+                {profiles.map((p: any) => (
+                  <option key={p.id} value={p.id}>
+                    {p.first_name} {p.last_name} — {p.email}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label>Plan *</Label>
+              <select name="plan_id" required className="w-full border rounded-md px-3 py-2 text-sm bg-background">
+                <option value="">Sélectionner...</option>
+                {plans.map((p: any) => (
+                  <option key={p.id} value={p.id}>{p.name} — {DT(p.price_dt)}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Montant (DT) *</Label>
+                <Input name="amount_dt" type="number" step="0.01" min="0" required />
+              </div>
+              <div>
+                <Label>Méthode *</Label>
+                <select name="payment_method" required className="w-full border rounded-md px-3 py-2 text-sm bg-background">
+                  <option value="especes">Espèces</option>
+                  <option value="carte">Carte</option>
+                  <option value="virement">Virement</option>
+                  <option value="mobile">Mobile</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label>Date début</Label><Input name="date_start" type="date" /></div>
+              <div><Label>Date expiration</Label><Input name="date_exp" type="date" /></div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setCreating(false)}>Annuler</Button>
+              <Button type="submit" disabled={createMut.isPending}>
+                {createMut.isPending ? "Création..." : "Créer"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </Card>
   );
 }

@@ -13,7 +13,7 @@ export interface Profile {
   date_of_birth?: string;
   date_deb_abo?: string;
   date_exp_abo?: string;
-  type_abo?: "op1" | "op1_op2" | "full";
+  type_abo?: string;
   created_by?: string;
   company_name?: string;
   company_logo?: string;

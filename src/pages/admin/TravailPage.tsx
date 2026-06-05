@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getProfiles, getSurfaces, getVannes, getTypesPlante, updateProfile, updateSurface, createSurface, createPlante, createVanne } from "@/services/data-service";
-import { supabase } from "@/integrations/supabase/client";
+import { getProfiles, getSurfaces, getVannes, getTypesPlante, updateProfile, updateSurface, createWizardParcelle } from "@/services/data-service";
 import { Switch } from "@/components/ui/switch";
 import { useFilteredProfiles } from "@/hooks/useRoleFilter";
 import { useAuth } from "@/hooks/useAuth";
@@ -13,8 +12,10 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Wifi, WifiOff, Droplets, MapPin, Leaf, SlidersHorizontal, X, Pencil, CreditCard, ArrowRight, ArrowLeft, Save, Trash2 } from "lucide-react";
+import { Plus, Search, Wifi, WifiOff, Droplets, MapPin, Leaf, SlidersHorizontal, X, Pencil, CreditCard, ArrowRight, ArrowLeft, Save, Trash2, ChevronsUpDown, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { Profile, Surface } from "@/types/models";
@@ -54,21 +55,11 @@ export default function TravailPage() {
   const [editingSurface, setEditingSurface] = useState<Surface | null>(null);
   const [showWizard, setShowWizard] = useState(false);
 
-  // Realtime sync for travail page
-  useEffect(() => {
-    const ch = supabase
-      .channel("travail-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "surfaces" }, () => qc.invalidateQueries({ queryKey: ["surfaces"] }))
-      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => qc.invalidateQueries({ queryKey: ["profiles"] }))
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [qc]);
-
   const { data: allProfiles = [] } = useQuery({ queryKey: ["profiles"], queryFn: getProfiles });
   const { data: surfaces = [] } = useQuery({ queryKey: ["surfaces"], queryFn: getSurfaces });
   const { data: vannes = [] } = useQuery({ queryKey: ["vannes"], queryFn: getVannes });
   const { data: typesList = [] } = useQuery({ queryKey: ["types-plante"], queryFn: getTypesPlante });
-  
+
   const profiles = useFilteredProfiles(allProfiles.filter(p => p.user_role === "CLIENT"));
 
   const updateProfileMut = useMutation({
@@ -211,7 +202,7 @@ export default function TravailPage() {
 
       <EditProfileDialog profile={editingProfile} onClose={() => setEditingProfile(null)} onSave={(id, data) => updateProfileMut.mutate({ id, data })} />
       <EditSurfaceDialog surface={editingSurface} profiles={profiles} onClose={() => setEditingSurface(null)} onSave={(id, data) => updateSurfaceMut.mutate({ id, data })} />
-      <NewProjectDialog open={showWizard} onClose={() => setShowWizard(false)} profiles={profiles} typesList={typesList} qc={qc} t={t} />
+      <NewProjectDialog open={showWizard} onClose={() => setShowWizard(false)} profiles={allProfiles} typesList={typesList} qc={qc} t={t} />
     </div>
   );
 }
@@ -323,177 +314,299 @@ function EditSurfaceDialog({ surface, profiles, onClose, onSave }: { surface: Su
   );
 }
 
-interface PlantEntry { nomPlante: string; age: number; fkTypePlante: string; }
+function ClientCombobox({ profiles, value, onChange, open, onOpenChange }: {
+  profiles: Profile[];
+  value: string;
+  onChange: (id: string) => void;
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+}) {
+  const selected = profiles.find(p => p.id === value);
+  return (
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between font-normal h-auto min-h-10"
+        >
+          {selected ? (
+            <span className="flex items-center gap-2 truncate">
+              <span className="font-medium">{selected.first_name} {selected.last_name}</span>
+              <span className="text-muted-foreground text-xs truncate">{selected.email}</span>
+            </span>
+          ) : (
+            <span className="text-muted-foreground">Rechercher un utilisateur...</span>
+          )}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="p-0" align="start" style={{ minWidth: 400 }}>
+        <Command>
+          <CommandInput placeholder="Nom, prénom ou email..." />
+          <CommandList>
+            <CommandEmpty>Aucun utilisateur trouvé.</CommandEmpty>
+            <CommandGroup heading={`${profiles.length} utilisateur(s)`}>
+              {profiles.map((p) => (
+                <CommandItem
+                  key={p.id}
+                  value={`${p.first_name} ${p.last_name} ${p.email}`}
+                  onSelect={() => { onChange(p.id); onOpenChange(false); }}
+                  className="flex items-center gap-3 cursor-pointer py-2"
+                >
+                  <Check className={`h-4 w-4 shrink-0 ${value === p.id ? "opacity-100 text-primary" : "opacity-0"}`} />
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className="font-medium truncate">{p.first_name} {p.last_name}</span>
+                    <span className="text-xs text-muted-foreground truncate">{p.email}</span>
+                  </div>
+                  <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${p.user_role === "ADMIN" ? "bg-red-100 text-red-600" : "bg-secondary text-secondary-foreground"}`}>
+                    {p.user_role === "ADMIN" ? "Admin" : "Client"}
+                  </span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+interface PlantEntry { name: string; type: string; age: number; count: number; }
 
 function NewProjectDialog({ open, onClose, profiles, typesList, qc, t }: { open: boolean; onClose: () => void; profiles: Profile[]; typesList: any[]; qc: any; t: (k: string) => string }) {
   const [step, setStep] = useState(0);
-  const [samePlants, setSamePlants] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
+  const [clientOpen, setClientOpen] = useState(false);
 
+  // Étape 1 — Parcelle + Plantes
   const [nomSurface, setNomSurface] = useState("");
   const [localisation, setLocalisation] = useState("");
   const [fkUser, setFkUser] = useState("");
   const [tailleHa, setTailleHa] = useState<number | undefined>(undefined);
-  const [nbPlanteTotal, setNbPlanteTotal] = useState(0);
+  const [plantEntries, setPlantEntries] = useState<PlantEntry[]>([{ name: "", type: "", age: 1, count: 100 }]);
 
-  const [nomPlante, setNomPlante] = useState("");
-  const [agePlante, setAgePlante] = useState(0);
-  const [fkTypePlante, setFkTypePlante] = useState("");
+  // Étape 2 — Vannes
+  const [vannesData, setVannesData] = useState<VanneData[]>([{ nomVanne: "Vanne 1", nbPlantParVanne: 100, debitEauParVanne: 2 }]);
 
-  const [plantEntries, setPlantEntries] = useState<PlantEntry[]>([{ nomPlante: "", age: 0, fkTypePlante: "" }]);
-
-  const [nbVanne, setNbVanne] = useState(1);
-  const [vannesData, setVannesData] = useState<VanneData[]>([{ nomVanne: "Vanne 1", nbPlantParVanne: 0, debitEauParVanne: 0 }]);
-
-  const updateNbVanne = (n: number) => {
-    setNbVanne(n);
-    const arr = [...vannesData];
-    while (arr.length < n) arr.push({ nomVanne: `Vanne ${arr.length + 1}`, nbPlantParVanne: 0, debitEauParVanne: 0 });
-    setVannesData(arr.slice(0, n));
+  const reset = () => {
+    setStep(0);
+    setNomSurface(""); setLocalisation(""); setFkUser(""); setTailleHa(undefined);
+    setClientOpen(false);
+    setPlantEntries([{ name: "", type: "", age: 1, count: 100 }]);
+    setVannesData([{ nomVanne: "Vanne 1", nbPlantParVanne: 100, debitEauParVanne: 2 }]);
   };
 
-  const addPlantEntry = () => setPlantEntries([...plantEntries, { nomPlante: "", age: 0, fkTypePlante: "" }]);
-  const removePlantEntry = (idx: number) => setPlantEntries(plantEntries.filter((_, i) => i !== idx));
-  const updatePlantEntry = (idx: number, field: keyof PlantEntry, value: string | number) => {
+  const addPlant = () => setPlantEntries([...plantEntries, { name: "", type: "", age: 1, count: 50 }]);
+  const removePlant = (i: number) => setPlantEntries(plantEntries.filter((_, idx) => idx !== i));
+  const updatePlant = (i: number, field: keyof PlantEntry, val: string | number) => {
     const arr = [...plantEntries];
-    arr[idx] = { ...arr[idx], [field]: value };
+    arr[i] = { ...arr[i], [field]: val };
     setPlantEntries(arr);
   };
 
-  const canStep1 = nomSurface && localisation && fkUser && nbVanne > 0 && (
-    samePlants
-      ? (nomPlante && fkTypePlante)
-      : plantEntries.every(p => p.nomPlante && p.fkTypePlante)
-  );
+  const updateNbVannes = (n: number) => {
+    const arr = [...vannesData];
+    while (arr.length < n) arr.push({ nomVanne: `Vanne ${arr.length + 1}`, nbPlantParVanne: 50, debitEauParVanne: 2 });
+    setVannesData(arr.slice(0, n));
+  };
+  const updateVanne = (i: number, field: keyof VanneData, val: string | number) => {
+    const arr = [...vannesData];
+    arr[i] = { ...arr[i], [field]: val };
+    setVannesData(arr);
+  };
+
+  const canStep1 = !!(nomSurface && localisation && fkUser && plantEntries.every(p => p.name && p.type));
   const canStep2 = vannesData.every(v => v.nomVanne && v.debitEauParVanne > 0);
+
+  // Cherche le besoin en eau d'un type de plante par son nom
+  const getWaterNeed = (typeName: string) => {
+    const found = typesList.find((tp: any) => tp.nomPlante === typeName);
+    return found?.besoinEauParPlante ?? 2;
+  };
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      const surface = await createSurface({ nomSurface, localisation, fkUser, tailleHa });
-
-      if (samePlants) {
-        await createPlante({ nomPlante, age: agePlante, fkTypePlante, fkSurface: surface.id });
-      } else {
-        for (const p of plantEntries) {
-          await createPlante({ nomPlante: p.nomPlante, age: p.age, fkTypePlante: p.fkTypePlante, fkSurface: surface.id });
-        }
-      }
-
-      for (const v of vannesData) {
-        await createVanne({ nomVanne: v.nomVanne, nbPlantParVanne: v.nbPlantParVanne, debitEauParVanne: v.debitEauParVanne, fkSurface: surface.id });
-      }
+      await createWizardParcelle({
+        nomSurface,
+        localisation,
+        fkUser,
+        tailleHa,
+        plants: plantEntries.map(p => ({
+          name: p.name,
+          type: p.type,
+          age: p.age,
+          count: p.count,
+          waterNeedPerPlant: getWaterNeed(p.type),
+        })),
+        vannes: vannesData.map(v => ({
+          name: v.nomVanne,
+          nbPlants: v.nbPlantParVanne,
+          debit: v.debitEauParVanne,
+        })),
+      });
 
       qc.invalidateQueries({ queryKey: ["surfaces"] });
-      qc.invalidateQueries({ queryKey: ["plantes"] });
       qc.invalidateQueries({ queryKey: ["vannes"] });
       toast({ title: t("wizard.success") });
-      setStep(0); setSamePlants(null); setNomSurface(""); setLocalisation(""); setFkUser(""); setNomPlante(""); setAgePlante(0); setFkTypePlante(""); setNbVanne(1); setNbPlanteTotal(0); setTailleHa(undefined);
-      setVannesData([{ nomVanne: "Vanne 1", nbPlantParVanne: 0, debitEauParVanne: 0 }]);
-      setPlantEntries([{ nomPlante: "", age: 0, fkTypePlante: "" }]);
+      reset();
       onClose();
-    } catch { toast({ title: "Erreur", variant: "destructive" }); } finally { setSaving(false); }
+    } catch {
+      toast({ title: "Erreur lors de la création", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const stepLabels = [t("wizard.step0"), t("wizard.step1"), t("wizard.step2")];
+  const stepLabels = [t("wizard.step2"), t("wizard.step3")];
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) { reset(); onClose(); } }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{t("travail.newProject")}</DialogTitle>
           <DialogDescription>{stepLabels[step]}</DialogDescription>
         </DialogHeader>
 
+        {/* Indicateur d'étapes */}
         <div className="flex items-center gap-2 mb-4">
           {stepLabels.map((label, i) => (
             <div key={i} className="flex items-center gap-2">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${i === step ? "bg-primary text-primary-foreground" : i < step ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"}`}>{i + 1}</div>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                i === step ? "bg-primary text-primary-foreground" : i < step ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
+              }`}>{i < step ? "✓" : i + 1}</div>
               <span className={`text-sm hidden sm:inline ${i === step ? "font-semibold text-foreground" : "text-muted-foreground"}`}>{label}</span>
-              {i < 2 && <div className="w-8 h-px bg-border" />}
+              {i < stepLabels.length - 1 && <div className="w-8 h-px bg-border" />}
             </div>
           ))}
         </div>
 
+        {/* ── Étape 1 : Parcelle + Plantes ── */}
         {step === 0 && (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">{t("wizard.samePlantsQuestion")}</p>
-            <div className="flex gap-3">
-              <Button variant={samePlants === true ? "default" : "outline"} onClick={() => { setSamePlants(true); setStep(1); }}>{t("common.yes")}</Button>
-              <Button variant={samePlants === false ? "default" : "outline"} onClick={() => { setSamePlants(false); setStep(1); }}>{t("common.no")}</Button>
-            </div>
-          </div>
-        )}
-
-        {step === 1 && (
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div><Label>{t("wizard.surfaceName")}</Label><Input value={nomSurface} onChange={(e) => setNomSurface(e.target.value)} /></div>
-              <div><Label>{t("parcelle.taille")}</Label><Input type="number" step="0.01" min="0" value={tailleHa ?? ""} onChange={(e) => setTailleHa(e.target.value ? parseFloat(e.target.value) : undefined)} /></div>
               <div>
+                <Label>{t("wizard.surfaceName")}</Label>
+                <Input value={nomSurface} onChange={(e) => setNomSurface(e.target.value)} placeholder="ex: Parcelle Nord" />
+              </div>
+              <div>
+                <Label>{t("parcelle.taille")} (ha)</Label>
+                <Input type="number" step="0.01" min="0" value={tailleHa ?? ""} onChange={(e) => setTailleHa(e.target.value ? parseFloat(e.target.value) : undefined)} placeholder="ex: 2.5" />
+              </div>
+              <div className="md:col-span-2">
                 <Label>{t("wizard.user")}</Label>
-                <Select value={fkUser} onValueChange={setFkUser}>
-                  <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
-                  <SelectContent>{profiles.map((p) => <SelectItem key={p.id} value={p.id}>{p.email || `${p.first_name} ${p.last_name}`}</SelectItem>)}</SelectContent>
-                </Select>
+                <ClientCombobox
+                  profiles={profiles}
+                  value={fkUser}
+                  onChange={setFkUser}
+                  open={clientOpen}
+                  onOpenChange={setClientOpen}
+                />
               </div>
             </div>
-            <LocationSelector value={localisation} onChange={setLocalisation} />
-            <div><Label>{t("wizard.nbVannes")}</Label><Input type="number" min="1" value={nbVanne} onChange={(e) => updateNbVanne(Math.max(1, parseInt(e.target.value) || 1))} /></div>
 
-            {samePlants ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div><Label>{t("wizard.plantName")}</Label><Input value={nomPlante} onChange={(e) => setNomPlante(e.target.value)} /></div>
-                <div><Label>{t("wizard.plantAge")}</Label><Input type="number" min="0" value={agePlante} onChange={(e) => setAgePlante(parseInt(e.target.value) || 0)} /></div>
-                <div>
-                  <Label>{t("wizard.plantType")}</Label>
-                  <Select value={fkTypePlante} onValueChange={setFkTypePlante}>
-                    <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
-                    <SelectContent>{typesList.map((tp: any) => <SelectItem key={tp.id} value={tp.id}>{tp.nomPlante}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
+            <LocationSelector value={localisation} onChange={setLocalisation} />
+
+            {/* Plantes */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-base font-semibold">🌱 Plantes ({plantEntries.length})</Label>
+                <Button variant="outline" size="sm" onClick={addPlant}><Plus className="mr-1 h-3 w-3" /> Ajouter</Button>
               </div>
-            ) : (
               <div className="space-y-3">
                 {plantEntries.map((pe, idx) => (
-                  <div key={idx} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end border p-3 rounded-lg">
-                    <div><Label>{t("wizard.plantName")}</Label><Input value={pe.nomPlante} onChange={(e) => updatePlantEntry(idx, "nomPlante", e.target.value)} /></div>
-                    <div><Label>{t("wizard.plantAge")}</Label><Input type="number" min="0" value={pe.age} onChange={(e) => updatePlantEntry(idx, "age", parseInt(e.target.value) || 0)} /></div>
-                    <div>
-                      <Label>{t("wizard.plantType")}</Label>
-                      <Select value={pe.fkTypePlante} onValueChange={(v) => updatePlantEntry(idx, "fkTypePlante", v)}>
-                        <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
-                        <SelectContent>{typesList.map((tp: any) => <SelectItem key={tp.id} value={tp.id}>{tp.nomPlante}</SelectItem>)}</SelectContent>
-                      </Select>
+                  <div key={idx} className="border rounded-lg p-3 space-y-3 bg-muted/20">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-muted-foreground">Plante {idx + 1}</span>
+                      {plantEntries.length > 1 && (
+                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => removePlant(idx)}>
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </Button>
+                      )}
                     </div>
-                    {plantEntries.length > 1 && <Button variant="ghost" size="sm" onClick={() => removePlantEntry(idx)}><Trash2 className="h-4 w-4" /></Button>}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div>
+                        <Label className="text-xs">{t("wizard.plantName")}</Label>
+                        <Input value={pe.name} onChange={(e) => updatePlant(idx, "name", e.target.value)} placeholder="Nom" className="h-8 text-sm" />
+                      </div>
+                      <div>
+                        <Label className="text-xs">{t("wizard.plantType")}</Label>
+                        <Select value={pe.type} onValueChange={(v) => updatePlant(idx, "type", v)}>
+                          <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Type" /></SelectTrigger>
+                          <SelectContent>
+                            {typesList.map((tp: any) => <SelectItem key={tp.id} value={tp.nomPlante}>{tp.nomPlante}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="text-xs">{t("wizard.plantAge")} (ans)</Label>
+                        <Input type="number" min="0" value={pe.age} onChange={(e) => updatePlant(idx, "age", parseInt(e.target.value) || 0)} className="h-8 text-sm" />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Nombre</Label>
+                        <Input type="number" min="1" value={pe.count} onChange={(e) => updatePlant(idx, "count", parseInt(e.target.value) || 1)} className="h-8 text-sm" />
+                      </div>
+                    </div>
                   </div>
                 ))}
-                <Button variant="outline" size="sm" onClick={addPlantEntry}><Plus className="mr-1 h-3 w-3" /> {t("wizard.addPlant")}</Button>
               </div>
-            )}
+            </div>
 
             <div className="flex justify-end">
-              <Button onClick={() => setStep(2)} disabled={!canStep1}>{t("common.next")} <ArrowRight className="ml-2 h-4 w-4" /></Button>
+              <Button onClick={() => setStep(1)} disabled={!canStep1}>
+                {t("common.next")} <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
             </div>
           </div>
         )}
 
-        {step === 2 && (
+        {/* ── Étape 2 : Vannes ── */}
+        {step === 1 && (
           <div className="space-y-4">
-            {vannesData.map((v, i) => (
-              <div key={i} className="border rounded-lg p-4 space-y-3">
-                <h4 className="font-semibold">Vanne {i + 1}</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div><Label>{t("wizard.vanneName")}</Label><Input value={v.nomVanne} onChange={(e) => { const arr = [...vannesData]; arr[i] = { ...arr[i], nomVanne: e.target.value }; setVannesData(arr); }} /></div>
-                  <div><Label>{t("wizard.vanneNbPlant")}</Label><Input type="number" min="0" value={v.nbPlantParVanne} onChange={(e) => { const arr = [...vannesData]; arr[i] = { ...arr[i], nbPlantParVanne: parseInt(e.target.value) || 0 }; setVannesData(arr); }} /></div>
-                  <div><Label>{t("wizard.vanneDebit")}</Label><Input type="number" step="0.1" min="0" value={v.debitEauParVanne} onChange={(e) => { const arr = [...vannesData]; arr[i] = { ...arr[i], debitEauParVanne: parseFloat(e.target.value) || 0 }; setVannesData(arr); }} /></div>
-                </div>
+            <div className="flex items-center justify-between">
+              <Label className="text-base font-semibold">🚰 Vannes ({vannesData.length})</Label>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" disabled={vannesData.length <= 1}
+                  onClick={() => updateNbVannes(vannesData.length - 1)}>−</Button>
+                <span className="text-sm font-bold w-6 text-center">{vannesData.length}</span>
+                <Button variant="outline" size="sm" onClick={() => updateNbVannes(vannesData.length + 1)}>+</Button>
               </div>
-            ))}
-            <div className="flex justify-between">
-              <Button variant="outline" onClick={() => setStep(1)}><ArrowLeft className="mr-2 h-4 w-4" /> {t("common.previous")}</Button>
-              <Button onClick={handleSave} disabled={saving || !canStep2}><Save className="mr-2 h-4 w-4" /> {saving ? "..." : t("common.save")}</Button>
+            </div>
+
+            <div className="space-y-3">
+              {vannesData.map((v, i) => (
+                <div key={i} className="border rounded-lg p-4 space-y-3 bg-muted/20">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🚰</span>
+                    <span className="font-semibold text-sm">Vanne {i + 1}</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                      <Label className="text-xs">{t("wizard.vanneName")}</Label>
+                      <Input value={v.nomVanne} onChange={(e) => updateVanne(i, "nomVanne", e.target.value)} className="h-8 text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">{t("wizard.vanneNbPlant")}</Label>
+                      <Input type="number" min="0" value={v.nbPlantParVanne} onChange={(e) => updateVanne(i, "nbPlantParVanne", parseInt(e.target.value) || 0)} className="h-8 text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">{t("wizard.vanneDebit")} (L/min)</Label>
+                      <Input type="number" step="0.1" min="0" value={v.debitEauParVanne} onChange={(e) => updateVanne(i, "debitEauParVanne", parseFloat(e.target.value) || 0)} className="h-8 text-sm" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-between pt-2">
+              <Button variant="outline" onClick={() => setStep(0)}>
+                <ArrowLeft className="mr-2 h-4 w-4" /> {t("common.previous")}
+              </Button>
+              <Button onClick={handleSave} disabled={saving || !canStep2}>
+                <Save className="mr-2 h-4 w-4" /> {saving ? "Enregistrement..." : t("common.save")}
+              </Button>
             </div>
           </div>
         )}
