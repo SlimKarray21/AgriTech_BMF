@@ -7,101 +7,99 @@ class BottomNavBar extends ConsumerWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
 
-  const BottomNavBar({
-    super.key,
-    required this.currentIndex,
-    required this.onTap,
-  });
+  const BottomNavBar({super.key, required this.currentIndex, required this.onTap});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final langState = ref.watch(languageProvider);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     final tabs = [
-      _Tab(Icons.home_rounded, 'Accueil'),
-      _Tab(Icons.terrain_outlined, 'Parcelles'),
-      _Tab(Icons.monitor_heart_outlined, langState.t('nav.health')),
-      _Tab(Icons.water_drop_outlined, langState.t('nav.valves')),
-      _Tab(Icons.cloud_outlined, langState.t('nav.weather')),
-      _Tab(Icons.person_outline_rounded, langState.t('nav.profile')),
+      _Tab(Icons.home_rounded,              Icons.home_outlined,             'Accueil'),
+      _Tab(Icons.terrain_rounded,           Icons.terrain_outlined,          'Parcelles'),
+      _Tab(Icons.monitor_heart_rounded,     Icons.monitor_heart_outlined,    langState.t('nav.health')),
+      _Tab(Icons.water_drop_rounded,        Icons.water_drop_outlined,       langState.t('nav.valves')),
+      _Tab(Icons.cloud_rounded,             Icons.cloud_outlined,            langState.t('nav.weather')),
+      _Tab(Icons.person_rounded,            Icons.person_outline_rounded,    langState.t('nav.profile')),
     ];
 
     return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        border: Border(
-          top: BorderSide(
-            color: Theme.of(context).colorScheme.outline,
-            width: 0.5,
-          ),
+        color: isDark ? AppColors.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: AppColors.navShadow,
+        border: Border.all(
+          color: isDark ? AppColors.darkBorder : AppColors.lightBorder.withValues(alpha: 0.5),
+          width: 0.8,
         ),
       ),
       child: SafeArea(
         top: false,
-        child: SizedBox(
-          height: 64,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: List.generate(tabs.length, (i) {
-              final isActive = i == currentIndex;
-              return Expanded(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => onTap(i),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AnimatedScale(
-                          scale: isActive ? 1.1 : 1.0,
-                          duration: const Duration(milliseconds: 200),
-                          child: Icon(
-                            tabs[i].icon,
-                            size: 22,
-                            color: isActive
-                                ? AppColors.farmLeaf
-                                : Theme.of(context)
-                                    .colorScheme
-                                    .onSurface
-                                    .withValues(alpha: 0.4),
-                          ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: List.generate(tabs.length, (i) {
+            final isActive = i == currentIndex;
+            return Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => onTap(i),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOutCubic,
+                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Icon pill
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeOutCubic,
+                        width: isActive ? 44 : 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: isActive
+                              ? AppColors.farmLeaf
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: isActive ? AppColors.greenShadow : null,
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          tabs[i].label,
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight:
-                                isActive ? FontWeight.w700 : FontWeight.w600,
-                            color: isActive
-                                ? AppColors.farmLeaf
-                                : Theme.of(context)
-                                    .colorScheme
-                                    .onSurface
-                                    .withValues(alpha: 0.4),
-                          ),
-                        ),
-                        if (isActive)
-                          Container(
-                            margin: const EdgeInsets.only(top: 3),
-                            width: 4,
-                            height: 4,
-                            decoration: const BoxDecoration(
-                              color: AppColors.farmLeaf,
-                              shape: BoxShape.circle,
+                        child: Center(
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 200),
+                            child: Icon(
+                              isActive ? tabs[i].activeIcon : tabs[i].icon,
+                              key: ValueKey('${i}_$isActive'),
+                              size: isActive ? 20 : 20,
+                              color: isActive
+                                  ? Colors.white
+                                  : (isDark ? AppColors.darkMutedForeground : AppColors.neutral400),
                             ),
-                          )
-                        else
-                          const SizedBox(height: 7),
-                      ],
-                    ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      // Label
+                      AnimatedDefaultTextStyle(
+                        duration: const Duration(milliseconds: 200),
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
+                          color: isActive
+                              ? AppColors.farmLeaf
+                              : (isDark ? AppColors.darkMutedForeground : AppColors.neutral400),
+                          letterSpacing: isActive ? 0.2 : 0,
+                        ),
+                        child: Text(tabs[i].label, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      ),
+                    ],
                   ),
                 ),
-              );
-            }),
-          ),
+              ),
+            );
+          }),
         ),
       ),
     );
@@ -109,7 +107,8 @@ class BottomNavBar extends ConsumerWidget {
 }
 
 class _Tab {
+  final IconData activeIcon;
   final IconData icon;
   final String label;
-  const _Tab(this.icon, this.label);
+  const _Tab(this.activeIcon, this.icon, this.label);
 }

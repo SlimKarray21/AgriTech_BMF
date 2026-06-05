@@ -3,8 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:uiearth_flutter/presentation/widgets/layout/app_header.dart';
 import 'package:uiearth_flutter/presentation/widgets/layout/bottom_nav_bar.dart';
 
-/// Shell widget containing header + content + bottom nav.
-/// Used by GoRouter ShellRoute to wrap tabbed pages.
+/// Shell with floating bottom nav. Accueil (index 0) manages its own header.
 class AppShell extends StatelessWidget {
   final Widget child;
   const AppShell({super.key, required this.child});
@@ -14,7 +13,7 @@ class AppShell extends StatelessWidget {
   int _currentIndex(BuildContext context) {
     final location = GoRouterState.of(context).uri.toString();
     for (int i = _paths.length - 1; i >= 0; i--) {
-      if (location.startsWith(_paths[i]) && _paths[i] != '/' || location == _paths[i]) {
+      if ((_paths[i] != '/' && location.startsWith(_paths[i])) || location == _paths[i]) {
         return i;
       }
     }
@@ -24,21 +23,24 @@ class AppShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final index = _currentIndex(context);
+    final isAccueil = index == 0;
 
     return Scaffold(
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
-            const AppHeader(),
+            // Masquer le header sur Accueil (il a son propre hero)
+            if (!isAccueil) const AppHeader(),
             Expanded(child: child),
-            BottomNavBar(
-              currentIndex: index,
-              onTap: (i) => context.go(_paths[i]),
-            ),
           ],
         ),
       ),
+      bottomNavigationBar: BottomNavBar(
+        currentIndex: index,
+        onTap: (i) => context.go(_paths[i]),
+      ),
+      extendBody: true,
     );
   }
 }

@@ -92,7 +92,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         .toStringAsFixed(1);
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
       children: [
         // Title + Add button
         Row(
@@ -501,20 +501,26 @@ class _ParcelleCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.only(bottom: 14),
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: theme.colorScheme.outline),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.6)),
+          boxShadow: AppColors.cardShadow,
         ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: IntrinsicHeight(
+            child: Row(
+              children: [
+                // Accent strip gauche
+                Container(
+                  width: 4,
+                  color: parcelle.isConnected ? AppColors.farmLeaf : AppColors.farmDanger,
+                ),
+                Expanded(
+        child: Padding(
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -690,8 +696,14 @@ class _ParcelleCard extends StatelessWidget {
             ]),
           ],
         ),
-      ),
-    );
+        ),  // Padding
+        ),  // Expanded
+      ],
+      ),  // Row
+      ),  // IntrinsicHeight
+      ),  // ClipRRect
+      ),  // Container child
+    );   // GestureDetector
   }
 }
 
