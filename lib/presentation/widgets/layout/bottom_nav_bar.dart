@@ -18,7 +18,8 @@ class BottomNavBar extends ConsumerWidget {
     final langState = ref.watch(languageProvider);
 
     final tabs = [
-      _Tab(Icons.home_rounded, langState.t('nav.home')),
+      _Tab(Icons.home_rounded, 'Accueil'),
+      _Tab(Icons.terrain_outlined, 'Parcelles'),
       _Tab(Icons.monitor_heart_outlined, langState.t('nav.health')),
       _Tab(Icons.water_drop_outlined, langState.t('nav.valves')),
       _Tab(Icons.cloud_outlined, langState.t('nav.weather')),

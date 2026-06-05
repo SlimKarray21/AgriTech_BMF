@@ -9,7 +9,7 @@ class AppShell extends StatelessWidget {
   final Widget child;
   const AppShell({super.key, required this.child});
 
-  static const _paths = ['/', '/sante', '/vannes', '/meteo', '/profil'];
+  static const _paths = ['/', '/parcelles', '/sante', '/vannes', '/meteo', '/profil'];
 
   int _currentIndex(BuildContext context) {
     final location = GoRouterState.of(context).uri.toString();

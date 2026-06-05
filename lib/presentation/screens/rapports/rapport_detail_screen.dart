@@ -6,6 +6,7 @@ import 'package:uiearth_flutter/core/theme/app_colors.dart';
 import 'package:uiearth_flutter/data/api/api_exception.dart';
 import 'package:uiearth_flutter/data/models/rapport.dart';
 import 'package:uiearth_flutter/domain/providers/api_providers.dart';
+import 'package:uiearth_flutter/core/l10n/app_localizations.dart';
 import 'package:uiearth_flutter/domain/providers/rapport_provider.dart';
 
 /// /rapports/eau/:id ou /rapports/sol/:id — Détail d'un rapport.
@@ -213,6 +214,8 @@ class _RapportDetailScreenState extends ConsumerState<RapportDetailScreen> {
     final color = rapport.color;
     final icon = rapport.icon;
     final typePath = isEau ? 'eau' : 'sol';
+    final langState = ref.watch(languageProvider);
+    final t = langState.t;
 
     // Group data by category
     final categories = <String, List<_CategoryItem>>{};
@@ -265,7 +268,7 @@ class _RapportDetailScreenState extends ConsumerState<RapportDetailScreen> {
                   ),
                 ),
                 GestureDetector(
-                  onTap: _deleting ? null : () => _deleteReport(context, rapport),
+                  onTap: _deleting ? null : () => _confirmDelete(context, rapport),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
@@ -277,7 +280,7 @@ class _RapportDetailScreenState extends ConsumerState<RapportDetailScreen> {
                       children: [
                         Icon(Icons.delete_outline, size: 14, color: AppColors.farmDanger),
                         const SizedBox(width: 6),
-                        Text(_deleting ? 'Suppression...' : 'Supprimer',
+                        Text(_deleting ? t('rapports.deleting') : t('rapports.delete'),
                             style: TextStyle(fontSize: 12, color: AppColors.farmDanger)),
                       ],
                     ),
@@ -323,7 +326,7 @@ class _RapportDetailScreenState extends ConsumerState<RapportDetailScreen> {
                               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800,
                                   color: theme.colorScheme.onSurface)),
                           const SizedBox(height: 2),
-                          Text('${rapport.date} • Rapport ${isEau ? "Eau" : "Sol"}',
+                          Text('${rapport.date} • ${isEau ? t('rapports.type_eau') : t('rapports.type_sol')}',
                               style: theme.textTheme.bodySmall),
                         ],
                       ),
@@ -412,7 +415,7 @@ class _RapportDetailScreenState extends ConsumerState<RapportDetailScreen> {
 
             // Composite interpretations
             if (compositeInterpretations.isNotEmpty) ...[
-              Text('Diagnostics composites',
+              Text(t('rapports.composite'),
                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
                       color: theme.colorScheme.onSurface)),
               const SizedBox(height: 8),
@@ -453,6 +456,31 @@ class _RapportDetailScreenState extends ConsumerState<RapportDetailScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _confirmDelete(BuildContext context, Rapport rapport) async {
+    final t = ref.read(languageProvider).t;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t('rapports.delete_confirm')),
+        content: Text('${t('rapports.delete_confirm_text')} "${rapport.name}" ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(t('rapports.cancel')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.farmDanger),
+            child: Text(t('rapports.delete')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && context.mounted) {
+      _deleteReport(context, rapport);
+    }
   }
 
   Future<void> _deleteReport(BuildContext context, Rapport rapport) async {

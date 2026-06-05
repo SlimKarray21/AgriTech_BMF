@@ -31,11 +31,11 @@ class ValvesScreen extends ConsumerWidget {
 
           // Stats
           Row(children: [
-            _StatMini('Total', '${allVannes.length}', Icons.radio_button_checked, AppColors.farmLeaf, theme),
+            _StatMini(langState.t('vannes.total'), '${allVannes.length}', Icons.radio_button_checked, AppColors.farmLeaf, theme),
             const SizedBox(width: 12),
             _StatMini(langState.t('vannes.open'), '$openCount', Icons.power_settings_new, AppColors.farmWater, theme),
             const SizedBox(width: 12),
-            _StatMini('Auto', '$autoCount', Icons.flash_on, AppColors.farmSun, theme),
+            _StatMini(langState.t('vannes.auto'), '$autoCount', Icons.flash_on, AppColors.farmSun, theme),
           ]),
           const SizedBox(height: 16),
 
@@ -90,7 +90,6 @@ class ValvesScreen extends ConsumerWidget {
 
           // Valve cards
           ...allVannes.map((v) {
-            final waterPerPlant = _waterPerPlant(v.nbPlants, v.debit);
             return GestureDetector(
               onTap: () => _showValveDetail(context, ref, v.id, langState),
               child: Container(
@@ -140,31 +139,7 @@ class ValvesScreen extends ConsumerWidget {
                     ]),
                     const SizedBox(height: 12),
                     Row(children: [
-                      Expanded(child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(langState.t('vannes.flow'), style: theme.textTheme.labelSmall),
-                              Text('${v.debit} L/min', style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface)),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(2),
-                            child: LinearProgressIndicator(
-                              value: (v.debit / 5).clamp(0, 1),
-                              minHeight: 4,
-                              backgroundColor: theme.colorScheme.secondary,
-                            ),
-                          ),
-                          if (v.isOpen) ...[
-                            const SizedBox(height: 4),
-                            Text('$waterPerPlant L/plante/h', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.farmLeaf)),
-                          ],
-                        ],
-                      )),
+                      Expanded(child: _DebitBar(vanne: v, theme: theme, t: langState.t)),
                       const SizedBox(width: 12),
                       Switch(
                         value: v.isOpen,
@@ -300,7 +275,7 @@ class ValvesScreen extends ConsumerWidget {
                               child: _buildTimeField(
                                 context: sheetCtx,
                                 theme: theme,
-                                label: 'Démarrage',
+                                label: langState.t('vannes.start'),
                                 time: startTime,
                                 onTap: () async {
                                   final selected = await _pickTime(sheetCtx, startTime);
@@ -314,7 +289,7 @@ class ValvesScreen extends ConsumerWidget {
                               child: _buildTimeField(
                                 context: sheetCtx,
                                 theme: theme,
-                                label: 'Fermeture',
+                                label: langState.t('vannes.stop'),
                                 time: endTime,
                                 onTap: () async {
                                   final selected = await _pickTime(sheetCtx, endTime);
@@ -335,13 +310,13 @@ class ValvesScreen extends ConsumerWidget {
                           spacing: 8,
                           runSpacing: 8,
                           children: [
-                            _buildDayChip(theme, 'Lun', activeDays.contains(1), () async => _toggleScheduleDay(context, ref, currentVanne, 1)),
-                            _buildDayChip(theme, 'Mar', activeDays.contains(2), () async => _toggleScheduleDay(context, ref, currentVanne, 2)),
-                            _buildDayChip(theme, 'Mer', activeDays.contains(3), () async => _toggleScheduleDay(context, ref, currentVanne, 3)),
-                            _buildDayChip(theme, 'Jeu', activeDays.contains(4), () async => _toggleScheduleDay(context, ref, currentVanne, 4)),
-                            _buildDayChip(theme, 'Ven', activeDays.contains(5), () async => _toggleScheduleDay(context, ref, currentVanne, 5)),
-                            _buildDayChip(theme, 'Sam', activeDays.contains(6), () async => _toggleScheduleDay(context, ref, currentVanne, 6)),
-                            _buildDayChip(theme, 'Dim', activeDays.contains(7), () async => _toggleScheduleDay(context, ref, currentVanne, 7)),
+                            _buildDayChip(theme, langState.t('vannes.days.mon'), activeDays.contains(1), () async => _toggleScheduleDay(context, ref, currentVanne, 1)),
+                            _buildDayChip(theme, langState.t('vannes.days.tue'), activeDays.contains(2), () async => _toggleScheduleDay(context, ref, currentVanne, 2)),
+                            _buildDayChip(theme, langState.t('vannes.days.wed'), activeDays.contains(3), () async => _toggleScheduleDay(context, ref, currentVanne, 3)),
+                            _buildDayChip(theme, langState.t('vannes.days.thu'), activeDays.contains(4), () async => _toggleScheduleDay(context, ref, currentVanne, 4)),
+                            _buildDayChip(theme, langState.t('vannes.days.fri'), activeDays.contains(5), () async => _toggleScheduleDay(context, ref, currentVanne, 5)),
+                            _buildDayChip(theme, langState.t('vannes.days.sat'), activeDays.contains(6), () async => _toggleScheduleDay(context, ref, currentVanne, 6)),
+                            _buildDayChip(theme, langState.t('vannes.days.sun'), activeDays.contains(7), () async => _toggleScheduleDay(context, ref, currentVanne, 7)),
                           ],
                         ),
                       ],
@@ -351,12 +326,17 @@ class ValvesScreen extends ConsumerWidget {
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Text(
-                      'Programmation masquée: ouvrez la vanne pour la configurer.',
+                      langState.t('vannes.schedule_hidden'),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
                       ),
                     ),
                   ),
+
+                // ── Débit capteur + consommation par plante ──────────────────
+                const SizedBox(height: 12),
+                _DebitDetailCard(vanne: currentVanne, theme: theme, t: langState.t),
+
                 const SizedBox(height: 14),
                 Row(
                   children: [
@@ -381,6 +361,33 @@ class ValvesScreen extends ConsumerWidget {
   Future<void> _toggleValve(BuildContext context, WidgetRef ref, ValveModel valve) async {
     final valveProvider = p.Provider.of<ValveProvider>(context, listen: false);
     final nextOpen = !valve.isOpen;
+
+    // ── SÉCURITÉ : au moins 1 vanne ouverte par parcelle ────────────────────
+    if (!nextOpen) {
+      final parcelleValves = valveProvider.byParcelle(valve.parcelleId);
+      final openInParcelle = parcelleValves.where((v) => v.isOpen).length;
+      if (openInParcelle <= 1) {
+        if (context.mounted) {
+          final langS = ref.read(languageProvider);
+          await showDialog<void>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              icon: const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 40),
+              title: Text(langS.t('vannes.security_title'), textAlign: TextAlign.center),
+              content: Text(langS.t('vannes.security_msg'), textAlign: TextAlign.center),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: Text(langS.t('vannes.understood')),
+                ),
+              ],
+            ),
+          );
+        }
+        return;
+      }
+    }
+    // ────────────────────────────────────────────────────────────────────────
 
     if (valve.backendId != null) {
       try {
@@ -511,12 +518,6 @@ class ValvesScreen extends ConsumerWidget {
       }
       return false;
     }
-  }
-
-  double _waterPerPlant(int plantCount, double debit, {int durationMinutes = 60}) {
-    if (plantCount <= 0) return 0;
-    final totalWater = debit * durationMinutes;
-    return (totalWater / plantCount * 10).roundToDouble() / 10;
   }
 
   Widget _buildControlTile({
@@ -664,6 +665,220 @@ class ValvesScreen extends ConsumerWidget {
     final hh = picked.hour.toString().padLeft(2, '0');
     final mm = picked.minute.toString().padLeft(2, '0');
     return '$hh:$mm';
+  }
+}
+
+// ── Barre débit capteur ───────────────────────────────────────────────────────
+
+class _DebitBar extends StatelessWidget {
+  final ValveModel vanne;
+  final ThemeData theme;
+  final String Function(String) t;
+
+  const _DebitBar({required this.vanne, required this.theme, required this.t});
+
+  static const double _maxDebit = 10.0; // L/min référence capteur
+
+  Color get _barColor {
+    if (!vanne.isOpen || vanne.debit <= 0) return Colors.grey.shade300;
+    if (vanne.debit >= 3.0) return AppColors.farmLeaf;
+    if (vanne.debit >= 1.0) return Colors.orange;
+    return Colors.red;
+  }
+
+  String get _debitLabel {
+    if (!vanne.isOpen || vanne.debit <= 0) return '0.0 L/min';
+    return '${vanne.debit.toStringAsFixed(1)} L/min';
+  }
+
+  double _waterPerPlantPerHour() {
+    if (vanne.nbPlants <= 0 || vanne.debit <= 0) return 0;
+    return (vanne.debit * 60) / vanne.nbPlants;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ratio = (vanne.debit / _maxDebit).clamp(0.0, 1.0);
+    final wph = _waterPerPlantPerHour();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(children: [
+              Icon(Icons.sensors, size: 12, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+              const SizedBox(width: 4),
+              Text(t('vannes.flow_sensor'), style: theme.textTheme.labelSmall),
+            ]),
+            Text(
+              _debitLabel,
+              style: theme.textTheme.labelSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: _barColor,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 5),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: ratio,
+            minHeight: 6,
+            backgroundColor: theme.colorScheme.secondary,
+            valueColor: AlwaysStoppedAnimation<Color>(_barColor),
+          ),
+        ),
+        if (vanne.isOpen && wph > 0) ...[
+          const SizedBox(height: 4),
+          Row(children: [
+            Icon(Icons.water_drop, size: 11, color: AppColors.farmWater),
+            const SizedBox(width: 3),
+            Text(
+              '${wph.toStringAsFixed(1)} L/plante/h',
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.farmWater),
+            ),
+          ]),
+        ],
+      ],
+    );
+  }
+}
+
+// ── Carte détail débit + consommation (dans le bottom sheet) ──────────────────
+
+class _DebitDetailCard extends StatelessWidget {
+  final ValveModel vanne;
+  final ThemeData theme;
+  final String Function(String) t;
+
+  const _DebitDetailCard({required this.vanne, required this.theme, required this.t});
+
+  static const double _maxDebit = 10.0;
+
+  // Durée de la programmation en minutes
+  int _durationMinutes() {
+    try {
+      final sp = vanne.startTime.split(':');
+      final ep = vanne.endTime.split(':');
+      final startMin = int.parse(sp[0]) * 60 + int.parse(sp[1]);
+      final endMin   = int.parse(ep[0]) * 60 + int.parse(ep[1]);
+      final diff = endMin - startMin;
+      return diff > 0 ? diff : diff + 1440; // +24h si fin < début
+    } catch (_) {
+      return 60;
+    }
+  }
+
+  Color get _barColor {
+    if (!vanne.isOpen || vanne.debit <= 0) return Colors.grey.shade400;
+    if (vanne.debit >= 3.0) return AppColors.farmLeaf;
+    if (vanne.debit >= 1.0) return Colors.orange;
+    return Colors.red;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ratio = (vanne.debit / _maxDebit).clamp(0.0, 1.0);
+    final durationMin = _durationMinutes();
+    final totalLiters = vanne.debit * durationMin;
+    final lPerPlantSession = vanne.nbPlants > 0 ? totalLiters / vanne.nbPlants : 0.0;
+    final lPerPlantHour = vanne.nbPlants > 0 ? (vanne.debit * 60) / vanne.nbPlants : 0.0;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.farmWater.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.farmWater.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Titre
+          Row(children: [
+            Icon(Icons.sensors_rounded, size: 18, color: AppColors.farmWater),
+            const SizedBox(width: 8),
+            Text(t('vannes.flow_detail'), style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+          ]),
+          const SizedBox(height: 12),
+
+          // Barre débit capteur
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Débit capteur', style: theme.textTheme.bodySmall),
+              Text(
+                '${vanne.debit.toStringAsFixed(1)} / ${_maxDebit.toStringAsFixed(0)} L/min',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _barColor),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: ratio,
+              minHeight: 10,
+              backgroundColor: theme.colorScheme.secondary,
+              valueColor: AlwaysStoppedAnimation<Color>(_barColor),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Stats consommation
+          if (vanne.isOpen && vanne.debit > 0) ...[
+            _StatRow(icon: Icons.timer_outlined,       label: t('vannes.duration'),           value: '${durationMin}min (${vanne.startTime} → ${vanne.endTime})', color: AppColors.farmLeaf,  theme: theme),
+            const SizedBox(height: 6),
+            _StatRow(icon: Icons.water_drop_outlined,  label: t('vannes.total_volume'),       value: '${totalLiters.toStringAsFixed(0)} L',                       color: AppColors.farmWater, theme: theme),
+            const SizedBox(height: 6),
+            _StatRow(icon: Icons.eco_outlined,         label: t('vannes.per_plant_session'),  value: vanne.nbPlants > 0 ? '${lPerPlantSession.toStringAsFixed(1)} L' : '—', color: AppColors.farmEarth, theme: theme),
+            const SizedBox(height: 6),
+            _StatRow(icon: Icons.schedule,             label: t('vannes.per_plant_hour'),     value: vanne.nbPlants > 0 ? '${lPerPlantHour.toStringAsFixed(1)} L/h' : '—', color: AppColors.farmSun, theme: theme),
+          ] else
+            Text(
+              t('vannes.open_water'),
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  final ThemeData theme;
+
+  const _StatRow({required this.icon, required this.label, required this.value, required this.color, required this.theme});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 28, height: 28,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 15, color: color),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(label, style: theme.textTheme.bodySmall),
+        ),
+        Text(
+          value,
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color),
+        ),
+      ],
+    );
   }
 }
 

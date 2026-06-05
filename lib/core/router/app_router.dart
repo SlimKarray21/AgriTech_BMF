@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uiearth_flutter/core/router/rapports_routes.dart';
+import 'package:uiearth_flutter/presentation/screens/accueil/accueil_screen.dart';
 import 'package:uiearth_flutter/presentation/screens/home/home_screen.dart';
-import 'package:uiearth_flutter/presentation/screens/health/plant_health_screen.dart';
 import 'package:uiearth_flutter/presentation/screens/valves/valves_screen.dart';
 import 'package:uiearth_flutter/presentation/screens/weather_screen.dart';
 import 'package:uiearth_flutter/presentation/screens/profile/profile_screen.dart';
 import 'package:uiearth_flutter/presentation/screens/formulaire/formulaire_screen.dart';
 import 'package:uiearth_flutter/presentation/screens/history/history_screen.dart';
 import 'package:uiearth_flutter/presentation/screens/home/qr_scanner_screen.dart';
+import 'package:uiearth_flutter/presentation/screens/travail/travail_screen.dart';
+import 'package:uiearth_flutter/presentation/screens/health/plant_health_screen.dart';
 import 'package:uiearth_flutter/presentation/widgets/layout/app_shell.dart';
 
 /// Clé de navigation globale pour le shell.
@@ -27,7 +29,14 @@ final GoRouter appRouter = GoRouter(
       routes: [
         GoRoute(
           path: '/',
-          name: 'home',
+          name: 'accueil',
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: AccueilScreen(),
+          ),
+        ),
+        GoRoute(
+          path: '/parcelles',
+          name: 'parcelles',
           pageBuilder: (context, state) => const NoTransitionPage(
             child: HomeScreen(),
           ),
@@ -66,6 +75,11 @@ final GoRouter appRouter = GoRouter(
     // ─── Routes plein écran (en dehors du shell) ───
     ...rapportsRoutes,
 
+    GoRoute(
+      path: '/travail',
+      name: 'travail',
+      builder: (context, state) => const TravailScreen(),
+    ),
     GoRoute(
       path: '/formulaire',
       name: 'formulaire',

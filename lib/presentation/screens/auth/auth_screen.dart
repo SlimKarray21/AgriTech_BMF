@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uiearth_flutter/core/theme/app_colors.dart';
 import 'package:uiearth_flutter/data/api/api_exception.dart';
 import 'package:uiearth_flutter/data/api/auth_token_util.dart';
+import 'package:uiearth_flutter/core/l10n/app_localizations.dart';
 import 'package:uiearth_flutter/domain/providers/api_providers.dart';
 
 class AuthScreen extends ConsumerStatefulWidget {
@@ -287,6 +288,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final langState = ref.watch(languageProvider);
+    final t = langState.t;
     return Scaffold(
       body: Center(
         child: ConstrainedBox(
@@ -311,26 +314,17 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   },
                   child: Column(
                     children: [
-                      Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: const Icon(Icons.eco, size: 32, color: Colors.white),
+                      Image.asset(
+                        'assets/images/tesla_logo.png',
+                        height: 90,
+                        fit: BoxFit.contain,
                       ),
-                      const SizedBox(height: 16),
-                      const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        Icon(Icons.eco, size: 24, color: Colors.white),
-                        SizedBox(width: 8),
-                        Text('Agritech', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Colors.white)),
-                      ]),
                     ],
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text('Agriculture intelligente', style: TextStyle(fontSize: 14, color: Colors.white.withValues(alpha: 0.7))),
+                const SizedBox(height: 8),
+                Text(t('profile.partner'), style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.75))),
               ]),
             ),
 
@@ -352,24 +346,17 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     ),
                   if (_mode == 'forgot' || _mode == 'verify') const SizedBox(height: 16),
                   Text(
-                    _mode == 'login'
-                        ? 'Connexion'
-                        : _mode == 'signup'
-                            ? 'Créer un compte'
-                            : _mode == 'verify'
-                                ? 'Vérification e-mail'
-                                : 'Mot de passe oublié',
+                    _mode == 'login'  ? t('auth.login')  :
+                    _mode == 'signup' ? t('auth.signup') :
+                    _mode == 'verify' ? t('auth.verify') : t('auth.forgot'),
                     style: theme.textTheme.headlineSmall,
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    _mode == 'login'
-                        ? 'Accédez à votre exploitation'
-                        : _mode == 'signup'
-                            ? 'Rejoignez la plateforme Smart Farm'
-                            : _mode == 'verify'
-                                ? 'Saisissez le code OTP ($_otpLength chiffres) - expiration: $_otpExpiresInMinutes min'
-                                : 'Entrez votre email pour recevoir un lien',
+                    _mode == 'login'  ? t('auth.login_desc')  :
+                    _mode == 'signup' ? t('auth.signup_desc') :
+                    _mode == 'verify' ? '${t('auth.verify_desc')} ($_otpLength chiffres) - expiration: $_otpExpiresInMinutes min' :
+                                        t('auth.forgot_desc'),
                     style: theme.textTheme.bodySmall,
                   ),
                   const SizedBox(height: 24),
@@ -399,7 +386,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     ),
                   ] else ...[
                     if (_mode == 'signup') ...[
-                      Text('Nom', style: theme.textTheme.labelMedium),
+                      Text(t('auth.last_name'), style: theme.textTheme.labelMedium),
                       const SizedBox(height: 4),
                       TextField(
                         controller: _lastNameC,
@@ -407,7 +394,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         decoration: const InputDecoration(),
                       ),
                       const SizedBox(height: 16),
-                      Text('Prénom', style: theme.textTheme.labelMedium),
+                      Text(t('auth.first_name'), style: theme.textTheme.labelMedium),
                       const SizedBox(height: 4),
                       TextField(
                         controller: _firstNameC,
@@ -416,12 +403,12 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       ),
                       const SizedBox(height: 16),
                     ],
-                    Text('Email', style: theme.textTheme.labelMedium),
+                    Text(t('auth.email'), style: theme.textTheme.labelMedium),
                     const SizedBox(height: 4),
                     TextField(controller: _emailC, decoration: const InputDecoration(), keyboardType: TextInputType.emailAddress),
                     if (_mode == 'signup') ...[
                       const SizedBox(height: 16),
-                      Text('Date Naissance', style: theme.textTheme.labelMedium),
+                      Text(t('auth.birthdate'), style: theme.textTheme.labelMedium),
                       const SizedBox(height: 4),
                       TextField(
                         controller: _birthDateC,
@@ -432,7 +419,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      Text('Phone (+216)', style: theme.textTheme.labelMedium),
+                      Text(t('auth.phone'), style: theme.textTheme.labelMedium),
                       const SizedBox(height: 4),
                       TextField(
                         controller: _phoneC,
@@ -443,7 +430,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     ],
                     if (_mode != 'forgot') ...[
                       const SizedBox(height: 16),
-                      Text('Mot de passe', style: theme.textTheme.labelMedium),
+                      Text(t('auth.password'), style: theme.textTheme.labelMedium),
                       const SizedBox(height: 4),
                       TextField(
                         controller: _passwordC,
@@ -457,7 +444,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       ),
                       if (_mode == 'signup') ...[
                         const SizedBox(height: 16),
-                        Text('Vérifier mot de passe', style: theme.textTheme.labelMedium),
+                        Text(t('auth.confirm_password'), style: theme.textTheme.labelMedium),
                         const SizedBox(height: 4),
                         TextField(
                           controller: _confirmPasswordC,
@@ -474,7 +461,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: Text(
-                            'Min. 8 caractères, 1 majuscule, 1 minuscule, 1 chiffre.',
+                            t('auth.password_hint'),
                             style: theme.textTheme.labelSmall?.copyWith(color: Colors.grey),
                           ),
                         ),
@@ -484,7 +471,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     const SizedBox(height: 8),
                     GestureDetector(
                       onTap: () => setState(() => _mode = 'forgot'),
-                      child: Text('Mot de passe oublié ?', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.farmLeaf)),
+                      child: Text('${t('auth.forgot')} ?', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.farmLeaf)),
                     ),
                   ],
                   const SizedBox(height: 24),
@@ -495,15 +482,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                           ? null
                           : (_mode == 'verify' ? _verifySubmit : _submit),
                       child: Text(
-                        _loading
-                            ? 'Chargement...'
-                            : _mode == 'verify'
-                                ? 'Verifier'
-                                : _mode == 'login'
-                                    ? 'Se connecter'
-                                    : _mode == 'signup'
-                                        ? "S'inscrire"
-                                        : 'Envoyer le lien',
+                        _loading           ? t('auth.loading')       :
+                        _mode == 'verify'  ? t('auth.submit_verify') :
+                        _mode == 'login'   ? t('auth.submit_login')  :
+                        _mode == 'signup'  ? t('auth.submit_signup') :
+                                             t('auth.submit_forgot'),
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                       ),
                     ),
@@ -529,14 +512,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                           runSpacing: 4,
                           children: [
                             Text(
-                              _mode == 'login' ? 'Pas encore de compte ?' : 'Déjà un compte ?',
+                              _mode == 'login' ? t('auth.no_account') : t('auth.has_account'),
                               style: theme.textTheme.bodySmall,
                               textAlign: TextAlign.center,
                             ),
                             GestureDetector(
                               onTap: () => setState(() => _mode = _mode == 'login' ? 'signup' : 'login'),
                               child: Text(
-                                _mode == 'login' ? "S'inscrire" : 'Se connecter',
+                                _mode == 'login' ? t('auth.submit_signup') : t('auth.submit_login'),
                                 style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.farmLeaf),
                               ),
                             ),

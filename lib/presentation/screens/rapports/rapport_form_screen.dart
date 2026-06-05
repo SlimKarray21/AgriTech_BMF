@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:uiearth_flutter/core/l10n/app_localizations.dart';
 import 'package:uiearth_flutter/data/api/api_exception.dart';
 import 'package:uiearth_flutter/core/theme/app_colors.dart';
 import 'package:uiearth_flutter/data/models/rapport.dart';
@@ -24,11 +25,15 @@ class _RapportFormScreenState extends ConsumerState<RapportFormScreen> {
   final Map<String, String> _values = {};
   bool _isSaving = false;
 
+  List<Map<String, dynamic>> _parcelles = [];
+  int? _selectedParcelId;
+  bool _loadingParcelles = true;
+
   bool get isEau => widget.type == RapportType.eau;
   List<FormSection> get sections => isEau ? eauFormSections : solFormSections;
   Color get accentColor => isEau ? AppColors.farmWater : AppColors.farmEarth;
   IconData get typeIcon => isEau ? Icons.water_drop : Icons.terrain;
-  String get formTitle => isEau ? 'Nouveau Rapport Eau' : 'Nouveau Rapport Sol';
+  String get formTitle => isEau ? 'Rapport Eau' : 'Rapport Sol'; // traduit via langState dans build
   String get typePath => isEau ? 'eau' : 'sol';
 
   Map<String, double> get numericValues {
@@ -42,6 +47,35 @@ class _RapportFormScreenState extends ConsumerState<RapportFormScreen> {
 
   Map<String, Interpretation> get interpretations =>
       isEau ? interpretEau(numericValues) : interpretSol(numericValues);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadParcelles());
+  }
+
+  Future<void> _loadParcelles() async {
+    try {
+      final api = ref.read(uiEarthApiProvider).capteurSol;
+      final raw = await api.listParcelles();
+      if (raw is List) {
+        final list = raw.whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+        if (mounted) {
+          setState(() {
+            _parcelles = list;
+            _selectedParcelId = list.isNotEmpty
+                ? (list.first['id'] as num?)?.toInt()
+                : null;
+            _loadingParcelles = false;
+          });
+        }
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingParcelles = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -61,6 +95,13 @@ class _RapportFormScreenState extends ConsumerState<RapportFormScreen> {
       ));
       return;
     }
+    if (_selectedParcelId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Veuillez sélectionner une parcelle'),
+        backgroundColor: AppColors.farmDanger,
+      ));
+      return;
+    }
 
     setState(() => _isSaving = true);
 
@@ -69,19 +110,18 @@ class _RapportFormScreenState extends ConsumerState<RapportFormScreen> {
     final analysisDate = DateFormat('yyyy-MM-dd').format(now);
     final data = numericValues;
 
+    Map<String, dynamic>? backendResponse;
     try {
       final api = ref.read(uiEarthApiProvider).capteurSol;
       final payloadBase = <String, dynamic>{
         'reportName': _nameCtrl.text.trim(),
-        // TODO: replace with selected parcelle and authenticated user mapping.
-        'parcelId': 1,
-        'userId': 1,
+        'parcelId': _selectedParcelId,
         'analysisDate': analysisDate,
         'interpretations': _serializeInterpretations(interpretations),
       };
 
       if (isEau) {
-        await api.createRapportEau({
+        backendResponse = await api.createRapportEau({
           ...payloadBase,
           'ph': data['ph'] ?? 0.0,
           'cewDsM': data['ce'] ?? 0.0,
@@ -97,7 +137,7 @@ class _RapportFormScreenState extends ConsumerState<RapportFormScreen> {
         });
       } else {
         final calcaire = data['calcaire'] ?? 0.0;
-        await api.createRapportSol({
+        backendResponse = await api.createRapportSol({
           ...payloadBase,
           'argilePercent': data['argile'] ?? 0.0,
           'limonPercent': data['limon'] ?? 0.0,
@@ -118,7 +158,7 @@ class _RapportFormScreenState extends ConsumerState<RapportFormScreen> {
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Sauvegarde backend échouée: ${e.message}'),
+        content: Text('Sauvegarde échouée: ${e.message}'),
         backgroundColor: AppColors.farmDanger,
       ));
       setState(() => _isSaving = false);
@@ -126,16 +166,20 @@ class _RapportFormScreenState extends ConsumerState<RapportFormScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Erreur backend rapport: $e'),
+        content: Text('Erreur réseau: $e'),
         backgroundColor: AppColors.farmDanger,
       ));
       setState(() => _isSaving = false);
       return;
     }
 
-    final id = DateTime.now().millisecondsSinceEpoch.toString();
+    // Utilise le vrai ID retourné par le backend (pas un timestamp local)
+    final realId = backendResponse != null
+        ? (backendResponse['id'] ?? '').toString()
+        : DateTime.now().millisecondsSinceEpoch.toString();
+
     final rapport = Rapport(
-      id: id,
+      id: realId,
       type: widget.type,
       name: _nameCtrl.text.trim(),
       date: displayDate,
@@ -147,10 +191,9 @@ class _RapportFormScreenState extends ConsumerState<RapportFormScreen> {
 
     if (!mounted) return;
 
+    final langState = ref.read(languageProvider);
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(isEau
-          ? 'Le rapport eau a été sauvegardé.'
-          : 'Le rapport sol a été sauvegardé.'),
+      content: Text(isEau ? langState.t('rapports.water_saved') : langState.t('rapports.soil_saved')),
       backgroundColor: AppColors.farmLeaf,
     ));
     if (mounted) {
@@ -186,6 +229,9 @@ class _RapportFormScreenState extends ConsumerState<RapportFormScreen> {
     final theme = Theme.of(context);
     final interps = interpretations;
 
+    final langState = ref.watch(languageProvider);
+    final t = langState.t;
+
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -220,21 +266,19 @@ class _RapportFormScreenState extends ConsumerState<RapportFormScreen> {
                       child: Icon(typeIcon, size: 20, color: accentColor),
                     ),
                     const SizedBox(width: 8),
-                    Text(formTitle, style: theme.textTheme.headlineMedium),
+                    Text(isEau ? t('rapports.new_eau') : t('rapports.new_sol'), style: theme.textTheme.headlineMedium),
                   ]),
                   const SizedBox(height: 20),
 
                   // Report name
-                  Text('Nom du rapport',
+                  Text(t('rapports.report_name'),
                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
                           color: theme.textTheme.bodySmall?.color)),
                   const SizedBox(height: 4),
                   TextField(
                     controller: _nameCtrl,
                     decoration: InputDecoration(
-                      hintText: isEau
-                          ? 'ex: Puits principal - Mars 2026'
-                          : 'ex: Parcelle Nord - Mars 2026',
+                      hintText: isEau ? t('rapports.example_eau') : t('rapports.example_sol'),
                       hintStyle: TextStyle(fontSize: 14,
                           color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.5)),
                       filled: true,
@@ -247,6 +291,50 @@ class _RapportFormScreenState extends ConsumerState<RapportFormScreen> {
                     ),
                     style: const TextStyle(fontSize: 14),
                   ),
+                  const SizedBox(height: 20),
+
+                  // Parcel selector
+                  Text(t('rapports.parcelle_label'),
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
+                          color: theme.textTheme.bodySmall?.color)),
+                  const SizedBox(height: 4),
+                  _loadingParcelles
+                      ? const SizedBox(
+                          height: 44,
+                          child: Center(child: CircularProgressIndicator(strokeWidth: 2)))
+                      : _parcelles.isEmpty
+                          ? Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppColors.farmDanger.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppColors.farmDanger.withValues(alpha: 0.3)),
+                              ),
+                              child: Text(
+                                'Aucune parcelle. Créez-en une d\'abord.',
+                                style: TextStyle(fontSize: 12, color: AppColors.farmDanger),
+                              ),
+                            )
+                          : Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.secondary,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<int>(
+                                  value: _selectedParcelId,
+                                  isExpanded: true,
+                                  style: TextStyle(fontSize: 14, color: theme.colorScheme.onSurface),
+                                  items: _parcelles.map((p) {
+                                    final id = (p['id'] as num?)?.toInt() ?? 0;
+                                    final name = p['nomSurface']?.toString() ?? p['nom_surface']?.toString() ?? 'Parcelle $id';
+                                    return DropdownMenuItem<int>(value: id, child: Text(name));
+                                  }).toList(),
+                                  onChanged: (v) => setState(() => _selectedParcelId = v),
+                                ),
+                              ),
+                            ),
                   const SizedBox(height: 20),
 
                   // Sections
@@ -275,7 +363,7 @@ class _RapportFormScreenState extends ConsumerState<RapportFormScreen> {
                         )
                       : const Icon(Icons.save, size: 16),
                   label: Text(
-                    _isSaving ? 'Enregistrement...' : 'Enregistrer le rapport',
+                    _isSaving ? t('rapports.saving') : t('rapports.save_btn'),
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                   style: ElevatedButton.styleFrom(

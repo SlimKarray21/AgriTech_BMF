@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart' as p;
+import 'package:uiearth_flutter/core/l10n/app_localizations.dart';
 import 'package:uiearth_flutter/core/theme/app_colors.dart';
 import 'package:uiearth_flutter/domain/providers/api_providers.dart';
 import 'package:uiearth_flutter/domain/providers/parcelle_provider.dart';
@@ -15,9 +16,9 @@ class ProfileScreen extends ConsumerStatefulWidget {
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   String? _subPage;
-  String _farmName = 'Ferme Soleil';
+  String _farmName     = 'Ferme Soleil';
   String _farmLocation = 'Tunis';
-  String _ownerName = 'Ahmed Fermier';
+  String _ownerName    = 'Ahmed Fermier';
   bool _loadingProfile = false;
   String? _aboType;
   DateTime? _aboStart;
@@ -36,80 +37,118 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       if (!mounted || profile == null) return;
 
       final firstName = profile['firstName']?.toString().trim();
-      final lastName = profile['lastName']?.toString().trim();
-      final location = profile['location']?.toString().trim();
-      final fullName = [firstName, lastName]
+      final lastName  = profile['lastName']?.toString().trim();
+      final location  = profile['location']?.toString().trim();
+      final fullName  = [firstName, lastName]
           .where((e) => e != null && e.isNotEmpty)
           .join(' ')
           .trim();
 
-      DateTime? parseDate(String? raw) {
-        if (raw == null || raw.trim().isEmpty) return null;
-        return DateTime.tryParse(raw);
-      }
+      DateTime? parseDate(String? raw) =>
+          (raw == null || raw.trim().isEmpty) ? null : DateTime.tryParse(raw);
 
       setState(() {
         if (fullName.isNotEmpty) _ownerName = fullName;
         if (location != null && location.isNotEmpty) _farmLocation = location;
-        _aboType = profile['typeAbo']?.toString();
+        _aboType  = profile['typeAbo']?.toString();
         _aboStart = parseDate(profile['dateDebAbo']?.toString());
-        _aboEnd = parseDate(profile['dateExpAbo']?.toString());
+        _aboEnd   = parseDate(profile['dateExpAbo']?.toString());
       });
     } catch (_) {
-      // Keep local fallback values when profile endpoint is unavailable.
+      // Garde les valeurs locales si le backend est inaccessible.
     } finally {
       if (mounted) setState(() => _loadingProfile = false);
     }
   }
 
+  // ── Build principal ───────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
+    final langState = ref.watch(languageProvider);
+    final t     = langState.t;
+    final isRtl = langState.lang == Lang.ar;
     final theme = Theme.of(context);
     final parcelles = ref.watch(parcellesProvider);
-    final totalHa = parcelles.fold<double>(0, (s, p) => s + double.tryParse(p.area.replaceAll(' ha', ''))!).toStringAsFixed(1);
+    final totalHa = parcelles
+        .fold<double>(0, (s, prc) => s + (double.tryParse(prc.area.replaceAll(' ha', '')) ?? 0))
+        .toStringAsFixed(1);
 
-    if (_subPage == 'parametres') return _settings(theme);
-    if (_subPage == 'aide') return _help(theme);
-    if (_subPage == 'abonnement') return _subscription(theme);
+    Widget body;
+    if (_subPage == 'parametres') {
+      body = _settings(theme, t, isRtl);
+    } else if (_subPage == 'aide') {
+      body = _help(theme, t);
+    } else if (_subPage == 'abonnement') {
+      body = _subscription(theme, t);
+    } else {
+      body = _home(theme, t, parcelles.length, totalHa, isRtl);
+    }
 
+    return Directionality(
+      textDirection: langState.direction,
+      child: body,
+    );
+  }
+
+  // ── Page d'accueil du profil ──────────────────────────────────────────────
+
+  Widget _home(ThemeData theme, String Function(String) t, int parcelCount, String totalHa, bool isRtl) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
       children: [
+        // Avatar + nom
         Row(children: [
-          ClipRRect(borderRadius: BorderRadius.circular(16), child: Image.asset('assets/images/agritech_logo.png', width: 64, height: 64, fit: BoxFit.cover)),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Image.asset('assets/images/agritech_logo.png', width: 64, height: 64, fit: BoxFit.cover),
+          ),
           const SizedBox(width: 16),
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(_ownerName, style: theme.textTheme.headlineSmall),
-            Text('$_farmName • $_farmLocation', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500)),
-          ]),
+            Text('$_farmName • $_farmLocation',
+                style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500)),
+          ])),
         ]),
         const SizedBox(height: 16),
+
+        // Stats
         Row(children: [
-          _Stat('${parcelles.length}', 'Parcelles', theme),
+          _StatCard('$parcelCount', t('profile.parcelles'), theme),
           const SizedBox(width: 12),
-          _Stat(totalHa, 'Hectares', theme),
+          _StatCard(totalHa, t('profile.hectares'), theme),
           const SizedBox(width: 12),
-          _Stat('0', 'Alertes', theme),
+          _StatCard('0', t('profile.alerts'), theme),
         ]),
         const SizedBox(height: 16),
+
+        // Bandeau partenaire Tesla
         Container(
           padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(color: theme.colorScheme.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: theme.colorScheme.outline)),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: theme.colorScheme.outline),
+          ),
           child: Row(children: [
             Image.asset('assets/images/tesla_logo.png', height: 32),
             const SizedBox(width: 12),
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Partenaire Tesla Energie', style: theme.textTheme.titleSmall?.copyWith(fontSize: 12)),
-              Text("Système d'irrigation intelligent", style: theme.textTheme.labelSmall),
-            ]),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(t('profile.partner'),      style: theme.textTheme.titleSmall?.copyWith(fontSize: 12)),
+              Text(t('profile.smart_irrig'), style: theme.textTheme.labelSmall),
+            ])),
           ]),
         ),
         const Divider(height: 32),
-        _Menu(Icons.settings_outlined, 'Paramètres', () => setState(() => _subPage = 'parametres'), theme),
-        _Menu(Icons.shield_outlined, 'Confidentialité', () {}, theme),
-        _Menu(Icons.workspace_premium_outlined, 'Abonnement', () => setState(() => _subPage = 'abonnement'), theme),
-        _Menu(Icons.help_outline, 'Aide & Support', () => setState(() => _subPage = 'aide'), theme),
+
+        // Menu
+        _MenuItem(Icons.settings_outlined,           t('profile.settings'),      () => setState(() => _subPage = 'parametres'), theme),
+        _MenuItem(Icons.shield_outlined,             t('profile.privacy'),       () {},                                         theme),
+        _MenuItem(Icons.workspace_premium_outlined,  t('profile.subscription'),  () => setState(() => _subPage = 'abonnement'), theme),
+        _MenuItem(Icons.help_outline,                t('profile.help'),          () => setState(() => _subPage = 'aide'),       theme),
         const Divider(height: 32),
+
+        // Déconnexion
         GestureDetector(
           onTap: () => ref.read(userJwtProvider.notifier).setToken(null),
           child: Padding(
@@ -117,7 +156,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             child: Row(children: [
               const Icon(Icons.logout, size: 20, color: AppColors.farmDanger),
               const SizedBox(width: 12),
-              Text('Déconnexion', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.farmDanger)),
+              Text(t('profile.logout'),
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.farmDanger)),
             ]),
           ),
         ),
@@ -125,81 +165,100 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  Widget _header(String title, ThemeData theme) => Padding(
-    padding: const EdgeInsets.only(bottom: 20),
-    child: Row(children: [
-      GestureDetector(onTap: () => setState(() => _subPage = null), child: const Icon(Icons.arrow_back, size: 20)),
-      const SizedBox(width: 12),
-      Text(title, style: theme.textTheme.headlineSmall),
-    ]),
-  );
+  // ── Paramètres ────────────────────────────────────────────────────────────
 
-  Widget _settings(ThemeData theme) => ListView(
-    padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
-    children: [
-      _header('Paramètres', theme),
-      _Toggle(
-        Icons.dark_mode,
-        'Mode sombre',
-        p.Provider.of<ThemeProvider>(context).isDarkMode,
-        (v) => p.Provider.of<ThemeProvider>(context, listen: false).setDarkMode(v),
-        theme,
-      ),
-      const SizedBox(height: 16),
-      Text('INFORMATIONS', style: theme.textTheme.labelSmall?.copyWith(letterSpacing: 1)),
-      const SizedBox(height: 12),
-      _Field('Propriétaire', _ownerName, (v) => setState(() => _ownerName = v)),
-      const SizedBox(height: 8),
-      _Field('Ferme', _farmName, (v) => setState(() => _farmName = v)),
-      const SizedBox(height: 8),
-      _Field('Localisation', _farmLocation, (v) => setState(() => _farmLocation = v)),
-      const SizedBox(height: 16),
-      SizedBox(width: double.infinity, height: 44, child: ElevatedButton(onPressed: () => setState(() => _subPage = null), child: const Text('Sauvegarder'))),
-    ],
-  );
+  Widget _settings(ThemeData theme, String Function(String) t, bool isRtl) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+      children: [
+        _backHeader(t('profile.settings'), theme),
 
-  Widget _help(ThemeData theme) => ListView(
-    padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
-    children: [
-      _header('Aide & Support', theme),
-      _Menu(Icons.chat_bubble_outline, 'Nous contacter', () {}, theme),
-      _Menu(Icons.description_outlined, 'FAQ', () {}, theme),
-      _Menu(Icons.info_outline, 'À propos', () {}, theme),
-      const SizedBox(height: 24),
-      Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Image.asset('assets/images/agritech_logo.png', height: 48),
-        const SizedBox(width: 24),
-        Image.asset('assets/images/tesla_logo.png', height: 48),
-      ]),
-      const SizedBox(height: 16),
-      Text('AgriTech — Agriculture Intelligente', textAlign: TextAlign.center, style: theme.textTheme.bodySmall),
-      Text('Version 1.0.0 • © 2026', textAlign: TextAlign.center, style: theme.textTheme.labelSmall),
-    ],
-  );
+        // Mode sombre
+        _ToggleRow(
+          Icons.dark_mode,
+          t('profile.dark_mode'),
+          p.Provider.of<ThemeProvider>(context).isDarkMode,
+          (v) => p.Provider.of<ThemeProvider>(context, listen: false).setDarkMode(v),
+          theme,
+        ),
+        const SizedBox(height: 16),
 
-  Widget _subscription(ThemeData theme) {
-    String formatDate(DateTime? d) {
-      if (d == null) return '—';
-      return DateFormat('dd/MM/yyyy').format(d);
-    }
+        // Sélecteur de langue
+        _LangSelector(theme: theme, t: t),
+        const SizedBox(height: 16),
+
+        // Section informations
+        Text(t('profile.info'),
+            style: theme.textTheme.labelSmall?.copyWith(letterSpacing: 1)),
+        const SizedBox(height: 12),
+        _FieldRow(t('profile.owner'),    _ownerName,    (v) => setState(() => _ownerName    = v)),
+        const SizedBox(height: 8),
+        _FieldRow(t('profile.farm'),     _farmName,     (v) => setState(() => _farmName     = v)),
+        const SizedBox(height: 8),
+        _FieldRow(t('profile.location'), _farmLocation, (v) => setState(() => _farmLocation = v)),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          height: 44,
+          child: ElevatedButton(
+            onPressed: () => setState(() => _subPage = null),
+            child: Text(t('profile.save')),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Aide & Support ────────────────────────────────────────────────────────
+
+  Widget _help(ThemeData theme, String Function(String) t) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+      children: [
+        _backHeader(t('profile.help'), theme),
+        _MenuItem(Icons.chat_bubble_outline,   t('profile.contact'), () {}, theme),
+        _MenuItem(Icons.description_outlined,  t('profile.faq'),     () {}, theme),
+        _MenuItem(Icons.info_outline,          t('profile.about'),   () {}, theme),
+        const SizedBox(height: 24),
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Image.asset('assets/images/agritech_logo.png', height: 48),
+          const SizedBox(width: 24),
+          Image.asset('assets/images/tesla_logo.png', height: 48),
+        ]),
+        const SizedBox(height: 16),
+        Text(t('profile.agritech_slogan'),
+            textAlign: TextAlign.center, style: theme.textTheme.bodySmall),
+        Text(t('profile.version'),
+            textAlign: TextAlign.center, style: theme.textTheme.labelSmall),
+      ],
+    );
+  }
+
+  // ── Abonnement ────────────────────────────────────────────────────────────
+
+  Widget _subscription(ThemeData theme, String Function(String) t) {
+    String formatDate(DateTime? d) =>
+        d == null ? '—' : DateFormat('dd/MM/yyyy').format(d);
 
     String remainingText() {
-      if (_aboEnd == null) return 'Aucun abonnement actif';
+      if (_aboEnd == null) return t('profile.no_sub');
       final today = DateTime.now();
-      final end = DateTime(_aboEnd!.year, _aboEnd!.month, _aboEnd!.day);
-      final now = DateTime(today.year, today.month, today.day);
-      final days = end.difference(now).inDays;
-      if (days < 0) return 'Expiré';
-      if (days == 0) return 'Expire aujourd\'hui';
-      return '$days jours restants';
+      final end   = DateTime(_aboEnd!.year, _aboEnd!.month, _aboEnd!.day);
+      final now   = DateTime(today.year, today.month, today.day);
+      final days  = end.difference(now).inDays;
+      if (days < 0) return t('profile.expired');
+      if (days == 0) return t('profile.expires_today_short');
+      return '$days ${t('profile.days_left')}';
     }
 
-    final typeAbo = (_aboType == null || _aboType!.trim().isEmpty) ? 'Non abonné' : _aboType!;
+    final typeAbo = (_aboType == null || _aboType!.trim().isEmpty)
+        ? t('profile.not_subscribed')
+        : _aboType!;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
       children: [
-        _header('Abonnement', theme),
+        _backHeader(t('profile.subscription'), theme),
         if (_loadingProfile)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 24),
@@ -216,17 +275,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.workspace_premium, color: AppColors.farmLeaf),
-                    const SizedBox(width: 8),
-                    Text('Type: $typeAbo', style: theme.textTheme.titleSmall),
-                  ],
-                ),
+                Row(children: [
+                  const Icon(Icons.workspace_premium, color: AppColors.farmLeaf),
+                  const SizedBox(width: 8),
+                  Text('${t('profile.type_label')}: $typeAbo',
+                      style: theme.textTheme.titleSmall),
+                ]),
                 const SizedBox(height: 12),
-                Text('Date début: ${formatDate(_aboStart)}', style: theme.textTheme.bodyMedium),
+                Text('${t('profile.sub_start')}: ${formatDate(_aboStart)}',
+                    style: theme.textTheme.bodyMedium),
                 const SizedBox(height: 6),
-                Text('Date fin: ${formatDate(_aboEnd)}', style: theme.textTheme.bodyMedium),
+                Text('${t('profile.sub_end')}: ${formatDate(_aboEnd)}',
+                    style: theme.textTheme.bodyMedium),
                 const SizedBox(height: 10),
                 Container(
                   width: double.infinity,
@@ -236,7 +296,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
-                    'Temps restant: ${remainingText()}',
+                    '${t('profile.remaining')}: ${remainingText()}',
                     style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
                   ),
                 ),
@@ -246,56 +306,165 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ],
     );
   }
-}
 
-class _Stat extends StatelessWidget {
-  final String v, l; final ThemeData t;
-  const _Stat(this.v, this.l, this.t);
-  @override
-  Widget build(BuildContext context) => Expanded(child: Container(
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(color: t.colorScheme.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: t.colorScheme.outline)),
-    child: Column(children: [Text(v, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: t.colorScheme.onSurface)), Text(l, style: t.textTheme.labelSmall)]),
-  ));
-}
+  // ── Header avec retour ────────────────────────────────────────────────────
 
-class _Menu extends StatelessWidget {
-  final IconData i; final String t; final VoidCallback f; final ThemeData th;
-  const _Menu(this.i, this.t, this.f, this.th);
-  @override
-  Widget build(BuildContext context) => GestureDetector(onTap: f, child: Padding(
-    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+  Widget _backHeader(String title, ThemeData theme) => Padding(
+    padding: const EdgeInsets.only(bottom: 20),
     child: Row(children: [
-      Icon(i, size: 20, color: th.colorScheme.onSurface.withValues(alpha: 0.5)),
+      GestureDetector(
+        onTap: () => setState(() => _subPage = null),
+        child: const Icon(Icons.arrow_back, size: 20),
+      ),
       const SizedBox(width: 12),
-      Expanded(child: Text(t, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: th.colorScheme.onSurface))),
-      Icon(Icons.chevron_right, size: 18, color: th.colorScheme.onSurface.withValues(alpha: 0.3)),
-    ]),
-  ));
-}
-
-class _Toggle extends StatelessWidget {
-  final IconData i; final String t; final bool v; final ValueChanged<bool> c; final ThemeData th;
-  const _Toggle(this.i, this.t, this.v, this.c, this.th);
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(color: th.colorScheme.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: th.colorScheme.outline)),
-    child: Row(children: [
-      Icon(i, size: 18), const SizedBox(width: 12),
-      Expanded(child: Text(t, style: th.textTheme.titleSmall)),
-      Switch(value: v, onChanged: c),
+      Text(title, style: theme.textTheme.headlineSmall),
     ]),
   );
 }
 
-class _Field extends StatelessWidget {
-  final String l, v; final ValueChanged<String> c;
-  const _Field(this.l, this.v, this.c);
+// ── Widgets réutilisables ────────────────────────────────────────────────────
+
+class _StatCard extends StatelessWidget {
+  final String value, label;
+  final ThemeData theme;
+  const _StatCard(this.value, this.label, this.theme);
+
   @override
-  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    Text(l, style: Theme.of(context).textTheme.labelMedium),
-    const SizedBox(height: 4),
-    TextFormField(initialValue: v, onChanged: c),
-  ]);
+  Widget build(BuildContext context) => Expanded(
+    child: Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.outline),
+      ),
+      child: Column(children: [
+        Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: theme.colorScheme.onSurface)),
+        Text(label, style: theme.textTheme.labelSmall, textAlign: TextAlign.center),
+      ]),
+    ),
+  );
+}
+
+class _MenuItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final ThemeData theme;
+  const _MenuItem(this.icon, this.label, this.onTap, this.theme);
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+      child: Row(children: [
+        Icon(icon, size: 20, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+        const SizedBox(width: 12),
+        Expanded(child: Text(label,
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface))),
+        Icon(Icons.chevron_right, size: 18, color: theme.colorScheme.onSurface.withValues(alpha: 0.3)),
+      ]),
+    ),
+  );
+}
+
+class _ToggleRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  final ThemeData theme;
+  const _ToggleRow(this.icon, this.label, this.value, this.onChanged, this.theme);
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: theme.colorScheme.surface,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: theme.colorScheme.outline),
+    ),
+    child: Row(children: [
+      Icon(icon, size: 18),
+      const SizedBox(width: 12),
+      Expanded(child: Text(label, style: theme.textTheme.titleSmall)),
+      Switch(value: value, onChanged: onChanged),
+    ]),
+  );
+}
+
+class _FieldRow extends StatelessWidget {
+  final String label, value;
+  final ValueChanged<String> onChanged;
+  const _FieldRow(this.label, this.value, this.onChanged);
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(label, style: Theme.of(context).textTheme.labelMedium),
+      const SizedBox(height: 4),
+      TextFormField(initialValue: value, onChanged: onChanged),
+    ],
+  );
+}
+
+// ── Sélecteur de langue ───────────────────────────────────────────────────────
+
+class _LangSelector extends ConsumerWidget {
+  final ThemeData theme;
+  final String Function(String) t;
+  const _LangSelector({required this.theme, required this.t});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final current = ref.watch(languageProvider).lang;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.colorScheme.outline),
+      ),
+      child: Row(children: [
+        const Icon(Icons.language, size: 18),
+        const SizedBox(width: 12),
+        Expanded(child: Text(t('profile.language'), style: theme.textTheme.titleSmall)),
+        Row(children: [
+          _LangBtn(label: t('profile.lang_fr'), active: current == Lang.fr,
+              onTap: () => ref.read(languageProvider.notifier).setLang(Lang.fr), theme: theme),
+          const SizedBox(width: 8),
+          _LangBtn(label: t('profile.lang_ar'), active: current == Lang.ar,
+              onTap: () => ref.read(languageProvider.notifier).setLang(Lang.ar), theme: theme),
+        ]),
+      ]),
+    );
+  }
+}
+
+class _LangBtn extends StatelessWidget {
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+  final ThemeData theme;
+  const _LangBtn({required this.label, required this.active, required this.onTap, required this.theme});
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: active ? AppColors.farmLeaf : theme.colorScheme.secondary,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: active ? Colors.white : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+          )),
+    ),
+  );
 }

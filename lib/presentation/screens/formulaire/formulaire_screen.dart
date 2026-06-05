@@ -94,6 +94,8 @@ class _FormulaireScreenState extends ConsumerState<FormulaireScreen> {
       'count': TextEditingController(text: '100'),
     },
   ];
+  // Unité d'âge par plante : 'Jours' | 'Mois' | 'Ans'
+  final List<String> _ageUnits = ['Ans'];
 
   int _nbVannes = 1;
   final List<Map<String, TextEditingController>> _vannes = [
@@ -115,14 +117,25 @@ class _FormulaireScreenState extends ConsumerState<FormulaireScreen> {
           'age': TextEditingController(text: '1'),
           'count': TextEditingController(text: '50'),
         });
+        _ageUnits.add('Ans');
       }
       while (_plants.length > count) {
         final removed = _plants.removeLast();
         for (final c in removed.values) {
           c.dispose();
         }
+        if (_ageUnits.length > count) _ageUnits.removeLast();
       }
     });
+  }
+
+  /// Convertit la valeur saisie + unité → années (pour getWaterNeed)
+  int _toYears(int value, String unit) {
+    switch (unit) {
+      case 'Jours': return (value / 365).round().clamp(0, 999);
+      case 'Mois':  return (value / 12).round().clamp(0, 999);
+      default:      return value; // Ans
+    }
   }
 
   void _updateVanneCount(int count) {
@@ -179,14 +192,20 @@ class _FormulaireScreenState extends ConsumerState<FormulaireScreen> {
       return;
     }
 
-    final plants = _plants.map((p) => PlantInfo(
-          name: p['name']!.text.isEmpty ? 'Plante' : p['name']!.text,
-          type: p['type']!.text.isEmpty ? 'autre' : p['type']!.text,
-          age: int.tryParse(p['age']!.text) ?? 1,
-          count: int.tryParse(p['count']!.text) ?? 100,
-          waterNeedPerPlant:
-              getWaterNeed(int.tryParse(p['age']!.text) ?? 1).toDouble(),
-        )).toList();
+    final plants = _plants.asMap().entries.map((entry) {
+      final i = entry.key;
+      final p = entry.value;
+      final rawAge  = int.tryParse(p['age']!.text) ?? 1;
+      final unit    = i < _ageUnits.length ? _ageUnits[i] : 'Ans';
+      final ageYears = _toYears(rawAge, unit);
+      return PlantInfo(
+        name: p['name']!.text.isEmpty ? 'Plante' : p['name']!.text,
+        type: p['type']!.text.isEmpty ? 'autre' : p['type']!.text,
+        age: ageYears,
+        count: int.tryParse(p['count']!.text) ?? 100,
+        waterNeedPerPlant: getWaterNeed(ageYears).toDouble(),
+      );
+    }).toList();
 
     final vannes = _vannes.map((v) => Vanne(
           name: v['name']!.text,
@@ -600,10 +619,69 @@ class _FormulaireScreenState extends ConsumerState<FormulaireScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
+                // ── Âge + unité ──────────────────────────────────
                 Expanded(
-                    child: _FormField(
-                        langState.t('wizard.plant_age'), p['age']!,
-                        keyboardType: TextInputType.number)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        langState.t('wizard.plant_age'),
+                        style: Theme.of(context).textTheme.labelMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      Row(children: [
+                        Expanded(
+                          flex: 2,
+                          child: TextField(
+                            controller: p['age']!,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide(color: Theme.of(context).colorScheme.outline),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide(color: Theme.of(context).colorScheme.outline),
+                              ),
+                            ),
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          flex: 3,
+                          child: DropdownButtonFormField<String>(
+                            value: i < _ageUnits.length ? _ageUnits[i] : 'Ans',
+                            items: [
+                              DropdownMenuItem(value: 'Jours', child: Text(langState.t('wizard.plant_age_days'),   style: const TextStyle(fontSize: 12))),
+                              DropdownMenuItem(value: 'Mois',  child: Text(langState.t('wizard.plant_age_months'), style: const TextStyle(fontSize: 12))),
+                              DropdownMenuItem(value: 'Ans',   child: Text(langState.t('wizard.plant_age_years'),  style: const TextStyle(fontSize: 12))),
+                            ],
+                            onChanged: (unit) {
+                              setState(() {
+                                while (_ageUnits.length <= i) _ageUnits.add('Ans');
+                                _ageUnits[i] = unit ?? 'Ans';
+                              });
+                            },
+                            decoration: InputDecoration(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide(color: Theme.of(context).colorScheme.outline),
+                              ),
+                            ),
+                            style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface),
+                            isExpanded: true,
+                            isDense: true,
+                          ),
+                        ),
+                      ]),
+                    ],
+                  ),
+                ),
               ]),
               const SizedBox(height: 8),
               _FormField(langState.t('wizard.plant_count'), p['count']!,

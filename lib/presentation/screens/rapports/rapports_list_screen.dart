@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uiearth_flutter/core/theme/app_colors.dart';
+import 'package:uiearth_flutter/core/l10n/app_localizations.dart';
 import 'package:uiearth_flutter/data/api/api_exception.dart';
 import 'package:uiearth_flutter/data/models/rapport.dart';
 import 'package:uiearth_flutter/domain/providers/api_providers.dart';
@@ -34,8 +35,8 @@ class _RapportsListScreenState extends ConsumerState<RapportsListScreen> {
     try {
       final api = ref.read(uiEarthApiProvider).capteurSol;
       final raw = widget.type == RapportType.eau
-          ? await api.listRapportsEau(userId: 1)
-          : await api.listRapportsSol(userId: 1);
+          ? await api.listRapportsEau()
+          : await api.listRapportsSol();
 
       if (raw is List) {
         final reports = raw
@@ -159,11 +160,13 @@ class _RapportsListScreenState extends ConsumerState<RapportsListScreen> {
         .where((r) => r.type == widget.type)
         .toList(growable: false);
     final theme = Theme.of(context);
+    final langState = ref.watch(languageProvider);
+    final t = langState.t;
     final typePath = widget.type == RapportType.eau ? 'eau' : 'sol';
     final isEau = widget.type == RapportType.eau;
     final color = isEau ? AppColors.farmWater : AppColors.farmEarth;
     final icon = isEau ? Icons.water_drop : Icons.terrain;
-    final title = isEau ? 'Rapports Eau' : 'Rapports Sol';
+    final title = isEau ? t('rapports.type_eau') : t('rapports.type_sol');
 
     return Scaffold(
       body: SafeArea(
@@ -183,7 +186,7 @@ class _RapportsListScreenState extends ConsumerState<RapportsListScreen> {
                     Icon(Icons.arrow_back_ios, size: 16,
                         color: theme.textTheme.bodySmall?.color),
                     const SizedBox(width: 4),
-                    Text('Retour', style: theme.textTheme.bodySmall),
+                    Text(t('rapports.back'), style: theme.textTheme.bodySmall),
                   ],
                 ),
               ),
@@ -203,13 +206,13 @@ class _RapportsListScreenState extends ConsumerState<RapportsListScreen> {
                         color: AppColors.farmLeaf,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.add, size: 14, color: Colors.white),
-                          SizedBox(width: 6),
-                          Text('Nouveau',
-                              style: TextStyle(
+                          const Icon(Icons.add, size: 14, color: Colors.white),
+                          const SizedBox(width: 6),
+                          Text(t('rapport.new'),
+                              style: const TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                   color: Colors.white)),
@@ -235,7 +238,7 @@ class _RapportsListScreenState extends ConsumerState<RapportsListScreen> {
                                 color: theme.textTheme.bodySmall?.color
                                     ?.withValues(alpha: 0.4)),
                             const SizedBox(height: 12),
-                            Text('Aucun rapport enregistré',
+                            Text(t('rapports.no_rapport'),
                                 style: theme.textTheme.bodySmall),
                           ],
                         ),
