@@ -1,10 +1,10 @@
 package com.pistoncontrol
 
-import com.pistoncontrol.database.DatabaseFactory
-import com.pistoncontrol.mqtt.MqttManager
-import com.pistoncontrol.services.DeviceMessageHandler
-import com.pistoncontrol.services.EmailService
-import com.pistoncontrol.plugins.*
+import com.pistoncontrol.infrastructure.persistence.DatabaseFactory
+import com.pistoncontrol.infrastructure.messaging.mqtt.MqttManager
+import com.pistoncontrol.application.service.DeviceMessageHandler
+import com.pistoncontrol.application.service.EmailService
+import com.pistoncontrol.infrastructure.configuration.*
 import io.ktor.server.application.*
 import io.ktor.server.netty.*
 import kotlinx.coroutines.GlobalScope
@@ -79,8 +79,8 @@ fun Application.module() {
     // ════════════════════════════════════════════════════════════════
     // STEP 3.5: Initialize Schedule Executor with Quartz
     // ════════════════════════════════════════════════════════════════
-    val scheduleService = com.pistoncontrol.services.ScheduleService()
-    val scheduleExecutor = com.pistoncontrol.services.ScheduleExecutor(scheduleService, mqttManager)
+    val scheduleService = com.pistoncontrol.application.service.ScheduleService()
+    val scheduleExecutor = com.pistoncontrol.application.service.ScheduleExecutor(scheduleService, mqttManager)
 
     try {
         scheduleExecutor.setMqttManager(mqttManager)
@@ -130,6 +130,9 @@ fun Application.module() {
     
     configureMonitoring()
     logger.info { "✅ Request monitoring configured" }
+
+    configureApiExceptionHandling()
+    logger.info { "✅ Centralized API exception handling configured" }
 
     configureRouting(mqttManager, messageHandler, scheduleService, scheduleExecutor, emailService)
     logger.info { "✅ REST API routes configured" }

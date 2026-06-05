@@ -148,6 +148,312 @@ CREATE TRIGGER update_schedules_updated_at BEFORE UPDATE ON schedules
 -- Then manually update the role in the database:
 -- UPDATE users SET role = 'admin' WHERE email = 'your-admin-email@example.com';
 
+-- ─────────────────────────────────────────────────────────────────────────────
+-- AgriTech tables (profiles, parcelles, vannes, commerce, stock, support…)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS profiles (
+    id              BIGSERIAL PRIMARY KEY,
+    user_id         BIGINT    NOT NULL,
+    first_name      TEXT      NOT NULL,
+    last_name       TEXT      NOT NULL,
+    avatar_url      TEXT,
+    created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    user_role       TEXT      NOT NULL DEFAULT 'CLIENT',
+    phone_number    TEXT,
+    location        TEXT,
+    country         TEXT,
+    city            TEXT,
+    date_of_birth   DATE,
+    date_deb_abo    DATE,
+    date_exp_abo    DATE,
+    type_abo        TEXT,
+    email           TEXT      NOT NULL,
+    created_by      BIGINT,
+    company_name    TEXT,
+    company_logo    TEXT,
+    abo_capteur_sol  BOOLEAN   NOT NULL DEFAULT TRUE,
+    abo_electrovanne BOOLEAN   NOT NULL DEFAULT FALSE,
+    abo_sante_plante BOOLEAN   NOT NULL DEFAULT FALSE
+);
+
+CREATE TABLE IF NOT EXISTS type_plante (
+    id                   BIGSERIAL PRIMARY KEY,
+    nom_plante           TEXT             NOT NULL,
+    type_plante          TEXT             NOT NULL,
+    besoin_eau_par_plante DOUBLE PRECISION NOT NULL,
+    created_at           TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS sol_expo (
+    id          BIGSERIAL PRIMARY KEY,
+    nature      TEXT             NOT NULL,
+    humidite    DOUBLE PRECISION NOT NULL,
+    salinite    DOUBLE PRECISION NOT NULL,
+    ph          DOUBLE PRECISION NOT NULL,
+    temperature DOUBLE PRECISION NOT NULL,
+    date_mesure TIMESTAMP        NOT NULL,
+    created_at  TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS climats_expo (
+    id                      BIGSERIAL PRIMARY KEY,
+    temperature_c           DOUBLE PRECISION NOT NULL,
+    humidite_c              DOUBLE PRECISION NOT NULL,
+    vitesse_vent            DOUBLE PRECISION NOT NULL,
+    puissance_ensoleillement DOUBLE PRECISION NOT NULL,
+    created_at              TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS parcelle (
+    id           BIGSERIAL PRIMARY KEY,
+    nom_surface  TEXT             NOT NULL,
+    localisation TEXT             NOT NULL,
+    type_sol     TEXT             NOT NULL,
+    fk_user      BIGINT           NOT NULL,
+    fk_sol       BIGINT,
+    fk_climat    BIGINT,
+    created_at   TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at   TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    taille_ha    DOUBLE PRECISION NOT NULL DEFAULT 0.0
+);
+
+CREATE TABLE IF NOT EXISTS plantes (
+    id                  BIGSERIAL PRIMARY KEY,
+    name                TEXT             NOT NULL,
+    type                TEXT             NOT NULL,
+    age                 INTEGER          NOT NULL DEFAULT 1,
+    count               INTEGER          NOT NULL DEFAULT 0,
+    water_need_per_plant DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    created_at          TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS parcelle_plantes (
+    id          BIGSERIAL PRIMARY KEY,
+    parcelle_id BIGINT NOT NULL REFERENCES parcelle(id) ON DELETE CASCADE,
+    plante_id   BIGINT NOT NULL REFERENCES plantes(id)  ON DELETE CASCADE,
+    UNIQUE (parcelle_id, plante_id)
+);
+
+CREATE TABLE IF NOT EXISTS vannes (
+    id             BIGSERIAL PRIMARY KEY,
+    name           TEXT             NOT NULL,
+    debit          DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    is_auto        BOOLEAN          NOT NULL DEFAULT FALSE,
+    is_open        BOOLEAN          NOT NULL DEFAULT FALSE,
+    last_action    TEXT,
+    nb_plants      INTEGER          NOT NULL DEFAULT 0,
+    parcel_id      BIGINT           NOT NULL REFERENCES parcelle(id) ON DELETE CASCADE,
+    schedule_days  TEXT,
+    schedule_start TEXT,
+    schedule_end   TEXT,
+    user_id        BIGINT           NOT NULL,
+    created_at     TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at     TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS rapport_sol (
+    id                      BIGSERIAL PRIMARY KEY,
+    report_name             TEXT             NOT NULL,
+    parcel_id               BIGINT           NOT NULL,
+    user_id                 BIGINT           NOT NULL,
+    analysis_date           DATE             NOT NULL,
+    argile_percent          DOUBLE PRECISION NOT NULL DEFAULT 0,
+    limon_percent           DOUBLE PRECISION NOT NULL DEFAULT 0,
+    sable_percent           DOUBLE PRECISION NOT NULL DEFAULT 0,
+    ph                      DOUBLE PRECISION NOT NULL DEFAULT 7,
+    ce_ds_m                 DOUBLE PRECISION NOT NULL DEFAULT 0,
+    calcaire_total_percent  DOUBLE PRECISION NOT NULL DEFAULT 0,
+    calcaire_actif_percent  DOUBLE PRECISION NOT NULL DEFAULT 0,
+    mo_percent              DOUBLE PRECISION NOT NULL DEFAULT 0,
+    rapport_cn              DOUBLE PRECISION NOT NULL DEFAULT 0,
+    p2o5_ppm                DOUBLE PRECISION NOT NULL DEFAULT 0,
+    k2o_ppm                 DOUBLE PRECISION NOT NULL DEFAULT 0,
+    mgo_ppm                 DOUBLE PRECISION NOT NULL DEFAULT 0,
+    cec_meq_100g            DOUBLE PRECISION NOT NULL DEFAULT 0,
+    esp_percent             DOUBLE PRECISION NOT NULL DEFAULT 0,
+    interpretations         TEXT,
+    created_at              TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at              TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS rapport_eau (
+    id                  BIGSERIAL PRIMARY KEY,
+    report_name         TEXT             NOT NULL,
+    parcel_id           BIGINT           NOT NULL,
+    user_id             BIGINT           NOT NULL,
+    analysis_date       DATE             NOT NULL,
+    ph                  DOUBLE PRECISION NOT NULL DEFAULT 7,
+    cew_ds_m            DOUBLE PRECISION NOT NULL DEFAULT 0,
+    residu_sec_mg_l     DOUBLE PRECISION NOT NULL DEFAULT 0,
+    chlorures_meq_l     DOUBLE PRECISION NOT NULL DEFAULT 0,
+    sulfates_meq_l      DOUBLE PRECISION NOT NULL DEFAULT 0,
+    bicarbonates_meq_l  DOUBLE PRECISION NOT NULL DEFAULT 0,
+    sodium_meq_l        DOUBLE PRECISION NOT NULL DEFAULT 0,
+    calcium_meq_l       DOUBLE PRECISION NOT NULL DEFAULT 0,
+    magnesium_meq_l     DOUBLE PRECISION NOT NULL DEFAULT 0,
+    sar_ratio           DOUBLE PRECISION NOT NULL DEFAULT 0,
+    durete_f            DOUBLE PRECISION NOT NULL DEFAULT 0,
+    interpretations     TEXT,
+    created_at          TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS subscription_plans (
+    id            BIGSERIAL PRIMARY KEY,
+    name          TEXT             NOT NULL,
+    price_dt      DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    duration_days INTEGER          NOT NULL DEFAULT 30,
+    features      TEXT             NOT NULL DEFAULT '[]',
+    active        BOOLEAN          NOT NULL DEFAULT TRUE,
+    created_at    TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS subscription_payments (
+    id             BIGSERIAL PRIMARY KEY,
+    profile_id     BIGINT           NOT NULL,
+    plan_id        BIGINT           NOT NULL,
+    amount_dt      DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    payment_method TEXT             NOT NULL DEFAULT 'cash',
+    status         TEXT             NOT NULL DEFAULT 'en_attente',
+    date_start     DATE,
+    date_exp       DATE,
+    validated_at   TIMESTAMP,
+    validated_by   BIGINT,
+    created_at     TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS material_reservations (
+    id                     BIGSERIAL PRIMARY KEY,
+    profile_id             BIGINT,
+    surface_id             BIGINT,
+    subscription_plan_id   BIGINT,
+    status                 TEXT             NOT NULL DEFAULT 'pending',
+    total_devices_price_dt DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    notes                  TEXT,
+    created_by             BIGINT,
+    created_at             TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at             TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS client_sales (
+    id                    BIGSERIAL PRIMARY KEY,
+    profile_id            BIGINT           NOT NULL,
+    subscription_plan_id  BIGINT,
+    reservation_id        BIGINT,
+    subscription_price_dt DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    equipment_price_dt    DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    total_dt              DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    payment_method        TEXT             NOT NULL DEFAULT 'cash',
+    status                TEXT             NOT NULL DEFAULT 'pending',
+    confirmed_by          BIGINT,
+    confirmed_at          TIMESTAMP,
+    created_at            TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS device_catalog (
+    id              BIGSERIAL PRIMARY KEY,
+    name            TEXT             NOT NULL,
+    device_type     TEXT             NOT NULL,
+    price_dt        DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    stock           INTEGER          NOT NULL DEFAULT 0,
+    available       BOOLEAN          NOT NULL DEFAULT TRUE,
+    connected_state TEXT             NOT NULL DEFAULT 'disconnected',
+    info            TEXT,
+    created_at      TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS device_sales (
+    id               BIGSERIAL PRIMARY KEY,
+    buyer_profile_id BIGINT           NOT NULL,
+    device_id        BIGINT           NOT NULL,
+    quantity         INTEGER          NOT NULL DEFAULT 1,
+    unit_price_dt    DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    total_dt         DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    payment_method   TEXT             NOT NULL DEFAULT 'cash',
+    status           TEXT             NOT NULL DEFAULT 'pending',
+    validated_at     TIMESTAMP,
+    validated_by     BIGINT,
+    created_at       TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS stock_items (
+    id                  BIGSERIAL PRIMARY KEY,
+    name                TEXT             NOT NULL,
+    category            TEXT             NOT NULL DEFAULT 'general',
+    quantity            INTEGER          NOT NULL DEFAULT 0,
+    purchase_price_dt   DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    low_stock_threshold INTEGER          NOT NULL DEFAULT 5,
+    features            TEXT,
+    created_at          TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS stock_movements (
+    id             BIGSERIAL PRIMARY KEY,
+    stock_item_id  BIGINT    NOT NULL,
+    movement_type  TEXT      NOT NULL DEFAULT 'out',
+    quantity       INTEGER   NOT NULL DEFAULT 0,
+    reason         TEXT,
+    reservation_id BIGINT,
+    created_by     BIGINT,
+    created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS reservation_items (
+    id             BIGSERIAL PRIMARY KEY,
+    reservation_id BIGINT           NOT NULL,
+    stock_item_id  BIGINT           NOT NULL,
+    quantity       INTEGER          NOT NULL DEFAULT 1,
+    unit_price_dt  DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    created_at     TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS reclamations (
+    id         BIGSERIAL PRIMARY KEY,
+    user_id    BIGINT    NOT NULL,
+    profile_id BIGINT,
+    sujet      TEXT      NOT NULL,
+    message    TEXT      NOT NULL,
+    statut     TEXT      NOT NULL DEFAULT 'ouvert',
+    traite_by  BIGINT,
+    traite_at  TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS support_notifications (
+    id               BIGSERIAL PRIMARY KEY,
+    title            TEXT      NOT NULL,
+    message          TEXT,
+    notif_type       TEXT      NOT NULL DEFAULT 'info',
+    is_read          BOOLEAN   NOT NULL DEFAULT FALSE,
+    link             TEXT,
+    created_for_role TEXT,
+    created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS subscrip_notif (
+    id             BIGSERIAL PRIMARY KEY,
+    client_email   TEXT      NOT NULL,
+    client_name    TEXT      NOT NULL,
+    days_remaining INTEGER   NOT NULL,
+    sent_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- AgriTech indexes
+CREATE INDEX IF NOT EXISTS idx_profiles_email          ON profiles(email);
+CREATE INDEX IF NOT EXISTS idx_parcelle_fk_user        ON parcelle(fk_user);
+CREATE INDEX IF NOT EXISTS idx_vannes_parcel_id        ON vannes(parcel_id);
+CREATE INDEX IF NOT EXISTS idx_vannes_user_id          ON vannes(user_id);
+CREATE INDEX IF NOT EXISTS idx_sub_payments_profile    ON subscription_payments(profile_id);
+CREATE INDEX IF NOT EXISTS idx_client_sales_profile    ON client_sales(profile_id);
+CREATE INDEX IF NOT EXISTS idx_stock_movements_item    ON stock_movements(stock_item_id);
+CREATE INDEX IF NOT EXISTS idx_reclamations_user       ON reclamations(user_id);
+
 -- Grant necessary permissions
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO piston_user;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO piston_user;
