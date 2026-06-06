@@ -16,7 +16,8 @@ export interface ApiError {
 }
 
 export interface UserProfile {
-  id: string;
+  id: string;          // users.id (UUID)
+  profileId?: number;  // profiles.id (Long) — sert de created_by
   email: string;
   role?: string;
   userRole?: string;

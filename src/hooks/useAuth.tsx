@@ -9,7 +9,8 @@ interface AuthUser {
 }
 
 interface Profile {
-  id: string;
+  id: string;        // profiles.id (Long) — utilisé comme created_by
+  userId: string;    // users.id (UUID)
   first_name: string | null;
   last_name: string | null;
   avatar_url: string | null;
@@ -34,12 +35,17 @@ const AuthContext = createContext<AuthContextType>({
   setToken: async () => {},
 });
 
-function decodeJwt(token: string): { userId: string; email: string; role: string } | null {
+function decodeJwt(token: string): { userId: string; email: string; role: string; profileId?: number } | null {
   try {
     const payload = token.split(".")[1];
     const decoded = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
     if (!decoded.userId || !decoded.email) return null;
-    return { userId: decoded.userId, email: decoded.email, role: decoded.role ?? "user" };
+    return {
+      userId: decoded.userId,
+      email: decoded.email,
+      role: decoded.role ?? "user",
+      profileId: decoded.profileId ?? undefined,
+    };
   } catch {
     return null;
   }
@@ -70,8 +76,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       const backendProfile = await getUserProfileApi(token);
+      // id = profiles.id (Long) pour created_by ; userId = users.id (UUID)
       setProfile({
-        id: backendProfile.id,
+        id: backendProfile.profileId != null ? String(backendProfile.profileId) : claims.profileId != null ? String(claims.profileId) : claims.userId,
+        userId: backendProfile.id,
         first_name: backendProfile.firstName,
         last_name: backendProfile.lastName,
         avatar_url: backendProfile.avatarUrl,
@@ -81,7 +89,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     } catch {
       setProfile({
-        id: claims.userId,
+        id: claims.profileId != null ? String(claims.profileId) : claims.userId,
+        userId: claims.userId,
         first_name: null,
         last_name: null,
         avatar_url: null,
