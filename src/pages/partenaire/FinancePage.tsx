@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+﻿import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -32,7 +32,7 @@ import { toast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, CheckCircle2, XCircle, CreditCard, Package, ShieldCheck, Users } from "lucide-react";
 import SecurityConfirmDialog from "@/components/SecurityConfirmDialog";
 
-// ── Types ──────────────────────────────────────────────────────────────────────
+// â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type Plan = {
   id: string;
@@ -64,18 +64,18 @@ type Reservation = {
   created_at: string;
 };
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const DT = (n: number) => `${Number(n ?? 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} DT`;
 
 const METHOD_LABEL: Record<string, string> = {
   carte: "Carte bancaire",
   virement: "Virement",
-  electronique: "Paiement électronique",
-  main_a_main: "Main à main",
-  especes: "Espèces",
+  electronique: "Paiement Ã©lectronique",
+  main_a_main: "Main Ã  main",
+  especes: "EspÃ¨ces",
   mobile: "Paiement mobile",
-  cash: "Espèces",
+  cash: "EspÃ¨ces",
 };
 
 function parseFeatures(raw: any): string[] {
@@ -102,11 +102,11 @@ function normalizePlan(raw: any): Plan {
   };
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
+// â”€â”€ Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function FinancePage() {
   const { profile } = useAuth();
-  const isAdmin = profile?.user_role === "ADMIN";
+  const isAdmin = profile?.user_role === "PARTENAIRE";
 
   const { data: rawPlans = [] } = useQuery({
     queryKey: ["plans"],
@@ -166,7 +166,7 @@ export default function FinancePage() {
   );
 }
 
-// ── Plans Tab ─────────────────────────────────────────────────────────────────
+// â”€â”€ Plans Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function PlansTab({ plans, isAdmin }: { plans: Plan[]; isAdmin: boolean }) {
   const qc = useQueryClient();
@@ -182,7 +182,7 @@ function PlansTab({ plans, isAdmin }: { plans: Plan[]; isAdmin: boolean }) {
         name: p.name,
         price_dt: p.price_dt,
         duration_days: p.duration_days,
-        features: featuresArr,   // array → Kotlin .toString() donne ["f1","f2"]
+        features: featuresArr,   // array â†’ Kotlin .toString() donne ["f1","f2"]
         active: p.active ?? true,
       };
       if (p.id) {
@@ -194,7 +194,7 @@ function PlansTab({ plans, isAdmin }: { plans: Plan[]; isAdmin: boolean }) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["plans"] });
       setEdit(null);
-      toast({ title: "Plan enregistré" });
+      toast({ title: "Plan enregistrÃ©" });
     },
     onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
@@ -203,7 +203,7 @@ function PlansTab({ plans, isAdmin }: { plans: Plan[]; isAdmin: boolean }) {
     mutationFn: (id: string) => deleteSubscriptionPlan(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["plans"] });
-      toast({ title: "Plan supprimé" });
+      toast({ title: "Plan supprimÃ©" });
     },
     onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
@@ -237,7 +237,7 @@ function PlansTab({ plans, isAdmin }: { plans: Plan[]; isAdmin: boolean }) {
                   <span className="text-sm text-muted-foreground"> / {p.duration_days}j</span>
                 </div>
                 <ul className="text-sm space-y-1">
-                  {p.features.map((f, i) => <li key={i}>✓ {f}</li>)}
+                  {p.features.map((f, i) => <li key={i}>âœ“ {f}</li>)}
                 </ul>
                 {isAdmin && (
                   <div className="flex gap-2 pt-2">
@@ -256,7 +256,7 @@ function PlansTab({ plans, isAdmin }: { plans: Plan[]; isAdmin: boolean }) {
             </Card>
           ))}
           {plans.length === 0 && (
-            <p className="text-muted-foreground text-center col-span-3 py-8">Aucun plan. Créez-en un.</p>
+            <p className="text-muted-foreground text-center col-span-3 py-8">Aucun plan. CrÃ©ez-en un.</p>
           )}
         </div>
 
@@ -278,17 +278,17 @@ function PlansTab({ plans, isAdmin }: { plans: Plan[]; isAdmin: boolean }) {
                       onChange={(e) => setEdit({ ...edit, price_dt: +e.target.value })} required />
                   </div>
                   <div>
-                    <Label>Durée (jours) *</Label>
+                    <Label>DurÃ©e (jours) *</Label>
                     <Input type="number" min="1" value={edit.duration_days ?? 30}
                       onChange={(e) => setEdit({ ...edit, duration_days: +e.target.value })} required />
                   </div>
                 </div>
                 <div>
-                  <Label>Fonctionnalités <span className="text-muted-foreground text-xs">(séparées par virgule)</span></Label>
+                  <Label>FonctionnalitÃ©s <span className="text-muted-foreground text-xs">(sÃ©parÃ©es par virgule)</span></Label>
                   <Input
                     value={edit.featuresStr ?? ""}
                     onChange={(e) => setEdit({ ...edit, featuresStr: e.target.value })}
-                    placeholder="Capteur sol, Électrovanne, Rapports..."
+                    placeholder="Capteur sol, Ã‰lectrovanne, Rapports..."
                   />
                 </div>
                 <div className="flex items-center gap-2">
@@ -310,7 +310,7 @@ function PlansTab({ plans, isAdmin }: { plans: Plan[]; isAdmin: boolean }) {
   );
 }
 
-// ── Clients Tab ───────────────────────────────────────────────────────────────
+// â”€â”€ Clients Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function ClientsTab({
   profById, planById, plans, isAdmin,
@@ -363,7 +363,7 @@ function ClientsTab({
       // soft-delete via status "annule"
       await updateMaterialReservation(id, { status: "annule" });
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["finance-reservations"] }); toast({ title: "Réservation annulée" }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["finance-reservations"] }); toast({ title: "RÃ©servation annulÃ©e" }); },
     onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
 
@@ -388,14 +388,14 @@ function ClientsTab({
       await updateMaterialReservation(res.id, { status: "installe" });
       await createSupportNotification({
         notif_type: "sale_confirmed",
-        title: "Vente confirmée",
-        message: `Vente de ${DT(total)} confirmée`,
+        title: "Vente confirmÃ©e",
+        message: `Vente de ${DT(total)} confirmÃ©e`,
         link: "/admin/ventes",
         created_for_role: "ADMIN",
       });
       qc.invalidateQueries({ queryKey: ["finance-reservations"] });
       qc.invalidateQueries({ queryKey: ["client-sales"] });
-      toast({ title: "Vente confirmée ✓", description: "Transférée vers la section Ventes" });
+      toast({ title: "Vente confirmÃ©e âœ“", description: "TransfÃ©rÃ©e vers la section Ventes" });
       setPendingSale(null);
     } catch (e: any) {
       toast({ title: "Erreur", description: e.message, variant: "destructive" });
@@ -404,7 +404,7 @@ function ClientsTab({
 
   return (
     <Card>
-      <CardHeader><CardTitle className="text-base">Clients prêts à la confirmation</CardTitle></CardHeader>
+      <CardHeader><CardTitle className="text-base">Clients prÃªts Ã  la confirmation</CardTitle></CardHeader>
       <CardContent className="p-0">
         <Table>
           <TableHeader>
@@ -412,9 +412,9 @@ function ClientsTab({
               <TableHead>Client</TableHead>
               <TableHead>Abonnement</TableHead>
               <TableHead>Prix Abo</TableHead>
-              <TableHead>Prix Matériel</TableHead>
+              <TableHead>Prix MatÃ©riel</TableHead>
               <TableHead>Total</TableHead>
-              <TableHead>Méthode</TableHead>
+              <TableHead>MÃ©thode</TableHead>
               <TableHead className="w-44">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -429,7 +429,7 @@ function ClientsTab({
               return (
                 <TableRow key={r.id}>
                   <TableCell className="font-medium">
-                    {client ? `${client.first_name ?? ""} ${client.last_name ?? ""}`.trim() || client.email : "—"}
+                    {client ? `${client.first_name ?? ""} ${client.last_name ?? ""}`.trim() || client.email : "â€”"}
                   </TableCell>
                   <TableCell>
                     <Select
@@ -454,7 +454,7 @@ function ClientsTab({
                     >
                       <SelectTrigger className="h-8 text-xs w-32"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="especes">Espèces</SelectItem>
+                        <SelectItem value="especes">EspÃ¨ces</SelectItem>
                         <SelectItem value="carte">Carte</SelectItem>
                         <SelectItem value="virement">Virement</SelectItem>
                         <SelectItem value="mobile">Mobile</SelectItem>
@@ -464,7 +464,7 @@ function ClientsTab({
                   <TableCell>
                     <div className="flex gap-1">
                       {sold ? (
-                        <Badge variant="outline" className="bg-emerald-500/15 text-emerald-700 border-emerald-300">✓ Vendu</Badge>
+                        <Badge variant="outline" className="bg-emerald-500/15 text-emerald-700 border-emerald-300">âœ“ Vendu</Badge>
                       ) : (
                         <Button
                           size="sm"
@@ -477,7 +477,7 @@ function ClientsTab({
                       {isAdmin && !sold && (
                         <Button
                           size="sm" variant="ghost" className="text-destructive"
-                          onClick={() => { if (confirm("Annuler cette réservation ?")) deleteResMut.mutate(r.id); }}
+                          onClick={() => { if (confirm("Annuler cette rÃ©servation ?")) deleteResMut.mutate(r.id); }}
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
@@ -490,7 +490,7 @@ function ClientsTab({
             {reservations.length === 0 && (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
-                  Aucun client en attente. Réservez du matériel dans "Réservation Matériel".
+                  Aucun client en attente. RÃ©servez du matÃ©riel dans "RÃ©servation MatÃ©riel".
                 </TableCell>
               </TableRow>
             )}
@@ -509,7 +509,7 @@ function ClientsTab({
   );
 }
 
-// ── SubPays Tab ───────────────────────────────────────────────────────────────
+// â”€â”€ SubPays Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function SubPaysTab({
   subpays, planById, profById, isAdmin, userId,
@@ -542,7 +542,7 @@ function SubPaysTab({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["subpays"] });
       qc.invalidateQueries({ queryKey: ["profiles"] });
-      toast({ title: "Mise à jour" });
+      toast({ title: "Mise Ã  jour" });
     },
     onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
@@ -562,7 +562,7 @@ function SubPaysTab({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["subpays"] });
       setCreating(false);
-      toast({ title: "Paiement créé" });
+      toast({ title: "Paiement crÃ©Ã©" });
     },
     onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
@@ -585,7 +585,7 @@ function SubPaysTab({
               <TableHead>Utilisateur</TableHead>
               <TableHead>Plan</TableHead>
               <TableHead>Montant</TableHead>
-              <TableHead>Méthode</TableHead>
+              <TableHead>MÃ©thode</TableHead>
               <TableHead>Expire</TableHead>
               <TableHead>Statut</TableHead>
               {isAdmin && <TableHead>Actions</TableHead>}
@@ -599,10 +599,10 @@ function SubPaysTab({
                 <TableRow key={s.id}>
                   <TableCell className="text-xs">{new Date(s.created_at).toLocaleDateString("fr-FR")}</TableCell>
                   <TableCell>{u ? `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim() || u.email : s.profile_id}</TableCell>
-                  <TableCell>{p?.name ?? "—"}</TableCell>
+                  <TableCell>{p?.name ?? "â€”"}</TableCell>
                   <TableCell className="font-semibold">{DT(s.amount_dt)}</TableCell>
                   <TableCell className="text-xs">{METHOD_LABEL[s.payment_method] ?? s.payment_method}</TableCell>
-                  <TableCell className="text-xs">{s.date_exp ?? "—"}</TableCell>
+                  <TableCell className="text-xs">{s.date_exp ?? "â€”"}</TableCell>
                   <TableCell>
                     <Badge
                       variant="outline"
@@ -667,10 +667,10 @@ function SubPaysTab({
             <div>
               <Label>Client *</Label>
               <select name="profile_id" required className="w-full border rounded-md px-3 py-2 text-sm bg-background">
-                <option value="">Sélectionner...</option>
+                <option value="">SÃ©lectionner...</option>
                 {profiles.map((p: any) => (
                   <option key={p.id} value={p.id}>
-                    {p.first_name} {p.last_name} — {p.email}
+                    {p.first_name} {p.last_name} â€” {p.email}
                   </option>
                 ))}
               </select>
@@ -678,9 +678,9 @@ function SubPaysTab({
             <div>
               <Label>Plan *</Label>
               <select name="plan_id" required className="w-full border rounded-md px-3 py-2 text-sm bg-background">
-                <option value="">Sélectionner...</option>
+                <option value="">SÃ©lectionner...</option>
                 {plans.map((p: any) => (
-                  <option key={p.id} value={p.id}>{p.name} — {DT(p.price_dt)}</option>
+                  <option key={p.id} value={p.id}>{p.name} â€” {DT(p.price_dt)}</option>
                 ))}
               </select>
             </div>
@@ -690,9 +690,9 @@ function SubPaysTab({
                 <Input name="amount_dt" type="number" step="0.01" min="0" required />
               </div>
               <div>
-                <Label>Méthode *</Label>
+                <Label>MÃ©thode *</Label>
                 <select name="payment_method" required className="w-full border rounded-md px-3 py-2 text-sm bg-background">
-                  <option value="especes">Espèces</option>
+                  <option value="especes">EspÃ¨ces</option>
                   <option value="carte">Carte</option>
                   <option value="virement">Virement</option>
                   <option value="mobile">Mobile</option>
@@ -700,13 +700,13 @@ function SubPaysTab({
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div><Label>Date début</Label><Input name="date_start" type="date" /></div>
+              <div><Label>Date dÃ©but</Label><Input name="date_start" type="date" /></div>
               <div><Label>Date expiration</Label><Input name="date_exp" type="date" /></div>
             </div>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setCreating(false)}>Annuler</Button>
               <Button type="submit" disabled={createMut.isPending}>
-                {createMut.isPending ? "Création..." : "Créer"}
+                {createMut.isPending ? "CrÃ©ation..." : "CrÃ©er"}
               </Button>
             </div>
           </form>

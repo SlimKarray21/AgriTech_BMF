@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { getUserProfileApi } from "@/services/auth-api";
-import { API_BASE_URL } from "@/services/api-config";
 
 export const TOKEN_KEY = "agritech_admin_token";
 
@@ -46,13 +45,9 @@ function decodeJwt(token: string): { userId: string; email: string; role: string
   }
 }
 
-function mapRole(backendRole: string, profileRole?: string | null): string {
-  // L'auth role (JWT) a priorité pour admin — il est signé et fiable
+function mapRole(backendRole: string): string {
   if (backendRole === "admin") return "ADMIN";
-  if (backendRole === "sous_admin") return "SOUS_ADMIN";
-  // Pour les users normaux, on regarde le profileRole de la table profiles
-  if (profileRole === "SOUS_ADMIN") return "SOUS_ADMIN";
-  if (profileRole === "ADMIN") return "ADMIN";
+  if (backendRole === "partenaire") return "PARTENAIRE";
   return "CLIENT";
 }
 
@@ -74,37 +69,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       const backendProfile = await getUserProfileApi(token);
-
-      // profileRole depuis le backend (si redémarré) ou fetch direct sinon
-      let profileRole: string | null = (backendProfile as any).profileRole ?? null;
-
-      if (!profileRole && backendProfile.role !== "admin") {
-        // Fetch la liste des profils pour trouver user_role du sous-admin
-        try {
-          const res = await fetch(`${API_BASE_URL}/api/agri/profiles`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (res.ok) {
-            const profiles: any[] = await res.json();
-            const mine = profiles.find(
-              (p: any) => p.email?.toLowerCase() === backendProfile.email?.toLowerCase()
-            );
-            profileRole = mine?.user_role ?? null;
-          }
-        } catch { /* ignore */ }
-      }
-
       setProfile({
         id: backendProfile.id,
         first_name: backendProfile.firstName,
         last_name: backendProfile.lastName,
         avatar_url: backendProfile.avatarUrl,
-        user_role: mapRole(backendProfile.role, profileRole),
+        user_role: mapRole(backendProfile.role),
         company_name: null,
         company_logo: null,
       });
     } catch {
-      // Fallback: build profile from JWT claims only
       setProfile({
         id: claims.userId,
         first_name: null,

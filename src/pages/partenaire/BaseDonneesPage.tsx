@@ -144,11 +144,7 @@ export default function BaseDonneesPage() {
   const selectedProfile = useMemo(() => profiles.find(p => p.id === selectedUserId), [profiles, selectedUserId]);
   const authUser = useMemo(() => {
     if (!selectedProfile) return null;
-    // Jointure par user_id (UUID) en priorité, fallback par email
-    return authUsers.find((u: any) =>
-      (selectedProfile.user_id && u.id === selectedProfile.user_id) ||
-      u.email?.toLowerCase() === selectedProfile.email?.toLowerCase()
-    );
+    return authUsers.find((u: any) => u.email?.toLowerCase() === selectedProfile.email?.toLowerCase());
   }, [authUsers, selectedProfile]);
 
   const userSurfaces = useMemo(() => surfaces.filter(s => s.fkUser === selectedUserId), [surfaces, selectedUserId]);

@@ -10,30 +10,7 @@ import teslaLogo from "@/assets/logo-tesla-energie.png";
 import { toast } from "@/hooks/use-toast";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { loginApi, verifyEmailApi, resendCodeApi, ApiError } from "@/services/auth-api";
-import { API_BASE_URL } from "@/services/api-config";
 import { useAuth } from "@/hooks/useAuth";
-
-async function checkIsSousAdmin(token: string): Promise<boolean> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/agri/profiles`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) return false;
-    const profiles: any[] = await res.json();
-    // Trouver le profil de l'utilisateur connecté via le token
-    const me = await fetch(`${API_BASE_URL}/user/profile`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!me.ok) return false;
-    const meData = await me.json();
-    const myProfile = profiles.find(
-      (p: any) => p.email?.toLowerCase() === meData.email?.toLowerCase()
-    );
-    return myProfile?.user_role === "SOUS_ADMIN";
-  } catch {
-    return false;
-  }
-}
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -55,16 +32,12 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const data = await loginApi(email, password);
-      // Pour les users, vérifier si leur profil est SOUS_ADMIN via l'API profiles
-      if (data.role !== "admin") {
-        const isSousAdmin = await checkIsSousAdmin(data.token);
-        if (!isSousAdmin) {
-          toast({ title: "Accès refusé", description: "Seuls les administrateurs peuvent accéder à ce panneau.", variant: "destructive" });
-          return;
-        }
+      if (data.role !== "admin" && data.role !== "partenaire") {
+        toast({ title: "Accès refusé", description: "Seuls les administrateurs et partenaires peuvent accéder à ce panneau.", variant: "destructive" });
+        return;
       }
       await setToken(data.token);
-      navigate("/admin/dashboard");
+      navigate(data.role === "partenaire" ? "/partenaire/dashboard" : "/admin/dashboard");
     } catch (err: unknown) {
       const apiErr = err as ApiError;
       if (apiErr.status === 403 && apiErr.userId) {
@@ -85,15 +58,12 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const data = await verifyEmailApi(pendingUserId, otpCode);
-      if (data.role !== "admin") {
-        const isSousAdmin = await checkIsSousAdmin(data.token);
-        if (!isSousAdmin) {
-          toast({ title: "Accès refusé", description: "Seuls les administrateurs peuvent accéder à ce panneau.", variant: "destructive" });
-          return;
-        }
+      if (data.role !== "admin" && data.role !== "partenaire") {
+        toast({ title: "Accès refusé", description: "Seuls les administrateurs et partenaires peuvent accéder à ce panneau.", variant: "destructive" });
+        return;
       }
       await setToken(data.token);
-      navigate("/admin/dashboard");
+      navigate(data.role === "partenaire" ? "/partenaire/dashboard" : "/admin/dashboard");
     } catch (err: unknown) {
       const apiErr = err as ApiError;
       toast({ title: "Code invalide", description: apiErr.error ?? apiErr.message ?? "Le code saisi est incorrect ou expiré.", variant: "destructive" });

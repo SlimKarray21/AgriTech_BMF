@@ -24,10 +24,31 @@ import FinancePage from "@/pages/admin/FinancePage";
 import StockPage from "@/pages/admin/StockPage";
 import ReservationMaterielPage from "@/pages/admin/ReservationMaterielPage";
 import VentesPage from "@/pages/admin/VentesPage";
+import PartenaireDetailsPage from "@/pages/admin/PartenaireDetailsPage";
 import LoginPage from "@/pages/auth/LoginPage";
 import ForgotPasswordPage from "@/pages/auth/ForgotPasswordPage";
 import ResetPasswordPage from "@/pages/auth/ResetPasswordPage";
 import NotFound from "./pages/NotFound";
+import PartenaireLayout from "@/components/PartenaireLayout";
+import PartenaireDashboardPage from "@/pages/partenaire/DashboardPage";
+import PartenaireSurfacesPage from "@/pages/partenaire/SurfacesPage";
+import PartenaireDonneesDetailleesPage from "@/pages/partenaire/DonneesDetailleesPage";
+import PartenaireCapteurPage from "@/pages/partenaire/CapteurPage";
+import PartenaireUsersPage from "@/pages/partenaire/UsersPage";
+import PartenaireSubscriptionsPage from "@/pages/partenaire/SubscriptionsPage";
+import PartenaireProfilePage from "@/pages/partenaire/ProfilePage";
+import PartenaireClientDetailPage from "@/pages/partenaire/ClientDetailPage";
+import PartenaireSurfaceDetailPage from "@/pages/partenaire/SurfaceDetailPage";
+import PartenaireRapportsPage from "@/pages/partenaire/RapportsPage";
+import PartenaireRapportSolPage from "@/pages/partenaire/RapportSolPage";
+import PartenaireRapportEauPage from "@/pages/partenaire/RapportEauPage";
+import PartenaireBaseDonneesPage from "@/pages/partenaire/BaseDonneesPage";
+import PartenaireReclamationsPage from "@/pages/partenaire/ReclamationsPage";
+import PartenaireFinancePage from "@/pages/partenaire/FinancePage";
+import PartenaireStockPage from "@/pages/partenaire/StockPage";
+import PartenaireReservationMaterielPage from "@/pages/partenaire/ReservationMaterielPage";
+import PartenaireVentesPage from "@/pages/partenaire/VentesPage";
+import PartenaireVerifyEmailPage from "@/pages/partenaire/VerifyEmailPage";
 
 const queryClient = new QueryClient();
 
@@ -64,6 +85,28 @@ const App = () => (
                 <Route path="stock" element={<StockPage />} />
                 <Route path="reservation-materiel" element={<ReservationMaterielPage />} />
                 <Route path="ventes" element={<VentesPage />} />
+                <Route path="partenaire/:partenaireId" element={<PartenaireDetailsPage />} />
+              </Route>
+              <Route path="/partenaire" element={<PartenaireLayout />}>
+                <Route path="dashboard" element={<PartenaireDashboardPage />} />
+                <Route path="surfaces" element={<PartenaireSurfacesPage />} />
+                <Route path="donnees-detaillees" element={<PartenaireDonneesDetailleesPage />} />
+                <Route path="capteurs" element={<PartenaireCapteurPage />} />
+                <Route path="users" element={<PartenaireUsersPage />} />
+                <Route path="subscriptions" element={<PartenaireSubscriptionsPage />} />
+                <Route path="profile" element={<PartenaireProfilePage />} />
+                <Route path="travail/client/:clientId" element={<PartenaireClientDetailPage />} />
+                <Route path="travail/surface/:surfaceId" element={<PartenaireSurfaceDetailPage />} />
+                <Route path="rapports" element={<PartenaireRapportsPage />} />
+                <Route path="rapport-sol" element={<PartenaireRapportSolPage />} />
+                <Route path="rapport-eau" element={<PartenaireRapportEauPage />} />
+                <Route path="base-donnees" element={<PartenaireBaseDonneesPage />} />
+                <Route path="reclamations" element={<PartenaireReclamationsPage />} />
+                <Route path="finance" element={<PartenaireFinancePage />} />
+                <Route path="stock" element={<PartenaireStockPage />} />
+                <Route path="reservation-materiel" element={<PartenaireReservationMaterielPage />} />
+                <Route path="ventes" element={<PartenaireVentesPage />} />
+                <Route path="users/verify-email" element={<PartenaireVerifyEmailPage />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>

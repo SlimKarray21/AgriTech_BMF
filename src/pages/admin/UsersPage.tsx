@@ -12,7 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { DeleteDialog } from "@/components/DeleteDialog";
 import { toast } from "@/hooks/use-toast";
-import { Pencil, CheckCircle, Clock, Search, Plus, ShieldCheck, User as UserIcon } from "lucide-react";
+import { Pencil, CheckCircle, Clock, Search, Plus, ShieldCheck, Handshake, User as UserIcon, ChevronRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import {
   AdminUser,
   getAdminUsersApi,
@@ -21,11 +22,11 @@ import {
   registerUserApi,
 } from "@/services/auth-api";
 import { getProfiles } from "@/services/data-service";
-import { API_BASE_URL } from "@/services/api-config";
 
 export default function UsersPage() {
   const { t } = useLanguage();
   const { profile: currentProfile } = useAuth();
+  const navigate = useNavigate();
   const token = localStorage.getItem(TOKEN_KEY) ?? "";
   const qc = useQueryClient();
 
@@ -39,24 +40,13 @@ export default function UsersPage() {
     enabled: !!token,
   });
 
-  const userRole = currentProfile?.user_role ?? "";
-  const isSousAdmin = userRole === "SOUS_ADMIN";
-  const currentProfileId = currentProfile?.id ?? "";
-
-  // Profils pour le filtrage SOUS_ADMIN et la mise à jour des rôles
   const { data: profilesData = [] } = useQuery({
     queryKey: ["profiles"],
     queryFn: getProfiles,
     enabled: true,
   });
-  const myCreatedEmails = isSousAdmin
-    ? new Set(profilesData.filter(p => p.created_by === currentProfileId).map(p => p.email))
-    : null;
 
-  const allUsers: AdminUser[] = data?.users ?? [];
-  const users: AdminUser[] = isSousAdmin && myCreatedEmails
-    ? allUsers.filter(u => myCreatedEmails.has(u.email))
-    : allUsers;
+  const users: AdminUser[] = data?.users ?? [];
 
   const updateRoleMut = useMutation({
     mutationFn: ({ userId, role }: { userId: string; role: string }) =>
@@ -102,17 +92,22 @@ export default function UsersPage() {
       toast({ title: "Erreur", description: e.error ?? e.message, variant: "destructive" }),
   });
 
-  const filtered = users.filter((u) =>
-    `${u.firstName ?? ""} ${u.lastName ?? ""} ${u.email}`
-      .toLowerCase()
-      .includes(search.toLowerCase())
+  // IDs des users créés par un partenaire (ne pas afficher dans la liste principale)
+  const partenaireCreatedIds = new Set(
+    profilesData.filter((p) => p.created_by).map((p) => p.user_id)
   );
 
-  // Résout le vrai rôle en croisant le rôle auth avec le profil
+  const filtered = users
+    .filter((u) => !partenaireCreatedIds.has(u.id))
+    .filter((u) =>
+      `${u.firstName ?? ""} ${u.lastName ?? ""} ${u.email}`
+        .toLowerCase()
+        .includes(search.toLowerCase())
+    );
+
   const resolveRole = (u: AdminUser): string => {
     if (u.role === "admin") return "admin";
-    const profile = profilesData.find(p => p.email?.toLowerCase() === u.email?.toLowerCase());
-    if (profile?.user_role === "SOUS_ADMIN") return "sous_admin";
+    if (u.role === "partenaire") return "partenaire";
     return "user";
   };
 
@@ -123,10 +118,10 @@ export default function UsersPage() {
           <ShieldCheck className="h-3 w-3 mr-1" />Admin
         </Badge>
       );
-    if (role === "sous_admin")
+    if (role === "partenaire")
       return (
-        <Badge className="bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-100">
-          <ShieldCheck className="h-3 w-3 mr-1" />Sous-Admin
+        <Badge className="bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100">
+          <Handshake className="h-3 w-3 mr-1" />Partenaire
         </Badge>
       );
     return (
@@ -141,38 +136,8 @@ export default function UsersPage() {
     if (!editing) return;
     const fd = new FormData(e.currentTarget);
     const frontendRole = fd.get("role") as string;
-
-    if (frontendRole === "sous_admin" || frontendRole === "user") {
-      // Pour Sous-Admin et Client : on met à jour uniquement profiles.user_role
-      // sans toucher au rôle auth (qui reste "user")
-      const userProfile = profilesData.find(
-        p => p.email?.toLowerCase() === editing.email?.toLowerCase()
-      );
-      if (!userProfile) {
-        toast({ title: "Profil introuvable — connectez-vous d'abord avec ce compte", variant: "destructive" });
-        return;
-      }
-      const profileRole = frontendRole === "sous_admin" ? "SOUS_ADMIN" : "CLIENT";
-      try {
-        await fetch(`${API_BASE_URL}/api/agri/profiles/${userProfile.id}`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("agritech_admin_token") ?? ""}`,
-          },
-          body: JSON.stringify({ user_role: profileRole }),
-        });
-        qc.invalidateQueries({ queryKey: ["profiles"] });
-        qc.invalidateQueries({ queryKey: ["admin-users"] });
-        setEditing(null);
-        toast({ title: `Rôle mis à jour → ${profileRole}` });
-      } catch {
-        toast({ title: "Erreur mise à jour", variant: "destructive" });
-      }
-    } else {
-      // Admin : on change le rôle auth + profil
-      updateRoleMut.mutate({ userId: editing.id, role: "admin" });
-    }
+    const backendRole = frontendRole === "admin" ? "admin" : frontendRole === "partenaire" ? "partenaire" : "user";
+    updateRoleMut.mutate({ userId: editing.id, role: backendRole });
   };
 
   const handleCreateSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -184,7 +149,7 @@ export default function UsersPage() {
       firstName: fd.get("firstName") as string,
       lastName: fd.get("lastName") as string,
       phoneNumber: (fd.get("phone") as string) || "",
-      createdBy: isSousAdmin && currentProfileId ? Number(currentProfileId) : undefined,
+      createdBy: undefined,
     });
   };
 
@@ -232,13 +197,24 @@ export default function UsersPage() {
                   </TableCell>
                 </TableRow>
               )}
-              {!isLoading && filtered.map((u) => (
-                <TableRow key={u.id}>
+              {!isLoading && filtered.map((u) => {
+                const isPartenaire = resolveRole(u) === "partenaire";
+                return (
+                <TableRow
+                  key={u.id}
+                  className={isPartenaire ? "cursor-pointer hover:bg-blue-50/50" : ""}
+                  onClick={isPartenaire ? () => navigate(`/admin/partenaire/${u.id}`) : undefined}
+                >
                   <TableCell className="font-medium">{u.email}</TableCell>
                   <TableCell>{u.firstName || "—"}</TableCell>
                   <TableCell>{u.lastName || "—"}</TableCell>
                   <TableCell className="text-sm">{u.phoneNumber || "—"}</TableCell>
-                  <TableCell>{getRoleBadge(resolveRole(u))}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      {getRoleBadge(resolveRole(u))}
+                      {isPartenaire && <ChevronRight className="h-3 w-3 text-muted-foreground" />}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     {u.emailVerified ? (
                       <span className="flex items-center gap-1 text-emerald-600">
@@ -261,7 +237,7 @@ export default function UsersPage() {
                         })
                       : "—"}
                   </TableCell>
-                  <TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
                     <div className="flex gap-1">
                       <Button variant="ghost" size="sm" onClick={() => setEditing(u)}>
                         <Pencil className="h-3 w-3" />
@@ -273,7 +249,8 @@ export default function UsersPage() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
               {!isLoading && filtered.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
@@ -285,7 +262,7 @@ export default function UsersPage() {
           </Table>
           {data && (
             <p className="text-xs text-muted-foreground px-4 py-2 border-t">
-              {data.total} utilisateur{data.total > 1 ? "s" : ""} au total
+              {users.length - partenaireCreatedIds.size} utilisateur{users.length - partenaireCreatedIds.size > 1 ? "s" : ""} au total
             </p>
           )}
         </CardContent>
@@ -310,7 +287,7 @@ export default function UsersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="sous_admin">Sous-Admin</SelectItem>
+                  <SelectItem value="partenaire">Partenaire</SelectItem>
                   <SelectItem value="user">Client</SelectItem>
                 </SelectContent>
               </Select>

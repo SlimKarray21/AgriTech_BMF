@@ -114,7 +114,7 @@ export async function registerUserApi(payload: {
   lastName: string;
   phoneNumber: string;
   createdBy?: number;
-}): Promise<{ userId: string; message: string; otpLength?: number }> {
+}): Promise<{ userId: string; message: string; otpLength?: number; expiresInMinutes?: number; otpCode?: string }> {
   const res = await fetch(`${API_BASE_URL}/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

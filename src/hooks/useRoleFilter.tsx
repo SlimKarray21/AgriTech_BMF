@@ -2,11 +2,6 @@ import { useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Profile, Surface } from "@/types/models";
 
-/**
- * Filters profiles based on current user's role:
- * - ADMIN: sees all profiles
- * - SOUS_ADMIN: sees only CLIENT profiles created by them
- */
 export function useFilteredProfiles(profiles: Profile[]) {
   const { profile: currentProfile } = useAuth();
   const userRole = currentProfile?.user_role ?? "CLIENT";
@@ -14,18 +9,15 @@ export function useFilteredProfiles(profiles: Profile[]) {
 
   return useMemo(() => {
     if (userRole === "ADMIN") return profiles;
-    if (userRole === "SOUS_ADMIN" && profileId) {
+    if (userRole === "PARTENAIRE" && profileId) {
       return profiles.filter(
-        (p) => p.created_by === profileId || p.id === profileId
+        (p) => p.user_role === "CLIENT" && p.created_by === profileId
       );
     }
     return [];
   }, [profiles, userRole, profileId]);
 }
 
-/**
- * Filters surfaces based on which profiles the user can see
- */
 export function useFilteredSurfaces(surfaces: Surface[], visibleProfileIds: Set<string>) {
   const { profile: currentProfile } = useAuth();
   const userRole = currentProfile?.user_role ?? "CLIENT";

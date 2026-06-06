@@ -17,48 +17,47 @@ import {
 type NavItem = { titleKey: string; url: string; icon: any; roles: string[] };
 
 const navGlobal: NavItem[] = [
-  { titleKey: "nav.dashboard", url: "/admin/dashboard", icon: LayoutDashboard, roles: ["ADMIN"] },
-  { titleKey: "nav.users", url: "/admin/users", icon: Users, roles: ["ADMIN"] },
-  { titleKey: "nav.subscriptions", url: "/admin/subscriptions", icon: CreditCard, roles: ["ADMIN"] },
-  { titleKey: "nav.finance", url: "/admin/finance", icon: Wallet, roles: ["ADMIN"] },
-  { titleKey: "nav.rapports", url: "/admin/rapports", icon: FileBarChart, roles: ["ADMIN"] },
-  { titleKey: "nav.reclamations", url: "/admin/reclamations", icon: MessageSquare, roles: ["ADMIN"] },
-  { titleKey: "nav.baseDonnees", url: "/admin/base-donnees", icon: HardDrive, roles: ["ADMIN"] },
+  { titleKey: "nav.dashboard", url: "/partenaire/dashboard", icon: LayoutDashboard, roles: ["PARTENAIRE"] },
+  { titleKey: "nav.users", url: "/partenaire/users", icon: Users, roles: ["PARTENAIRE"] },
+  { titleKey: "nav.subscriptions", url: "/partenaire/subscriptions", icon: CreditCard, roles: ["PARTENAIRE"] },
+  { titleKey: "nav.finance", url: "/partenaire/finance", icon: Wallet, roles: ["PARTENAIRE"] },
+  { titleKey: "nav.rapports", url: "/partenaire/rapports", icon: FileBarChart, roles: ["PARTENAIRE"] },
+  { titleKey: "nav.reclamations", url: "/partenaire/reclamations", icon: MessageSquare, roles: ["PARTENAIRE"] },
+  { titleKey: "nav.baseDonnees", url: "/partenaire/base-donnees", icon: HardDrive, roles: ["PARTENAIRE"] },
 ];
 
 const navStock: NavItem[] = [
-  { titleKey: "nav.stock", url: "/admin/stock", icon: Package, roles: ["ADMIN"] },
-  { titleKey: "nav.reservationMateriel", url: "/admin/reservation-materiel", icon: ClipboardList, roles: ["ADMIN"] },
-  { titleKey: "nav.ventes", url: "/admin/ventes", icon: ShoppingCart, roles: ["ADMIN"] },
+  { titleKey: "nav.stock", url: "/partenaire/stock", icon: Package, roles: ["PARTENAIRE"] },
+  { titleKey: "nav.reservationMateriel", url: "/partenaire/reservation-materiel", icon: ClipboardList, roles: ["PARTENAIRE"] },
+  { titleKey: "nav.ventes", url: "/partenaire/ventes", icon: ShoppingCart, roles: ["PARTENAIRE"] },
 ];
 
 const navTravail: NavItem[] = [
-  { titleKey: "nav.surfaces", url: "/admin/surfaces", icon: Grid3X3, roles: ["ADMIN"] },
-  { titleKey: "nav.donneesDetaillees", url: "/admin/donnees-detaillees", icon: Database, roles: ["ADMIN"] },
-  { titleKey: "nav.capteurs", url: "/admin/capteurs", icon: Cpu, roles: ["ADMIN"] },
+  { titleKey: "nav.surfaces", url: "/partenaire/surfaces", icon: Grid3X3, roles: ["PARTENAIRE"] },
+  { titleKey: "nav.donneesDetaillees", url: "/partenaire/donnees-detaillees", icon: Database, roles: ["PARTENAIRE"] },
+  { titleKey: "nav.capteurs", url: "/partenaire/capteurs", icon: Cpu, roles: ["PARTENAIRE"] },
 ];
 
 const pageTitleKeys: Record<string, string> = {
-  "/admin/dashboard": "nav.dashboard",
-  "/admin/travail": "nav.travail",
-  "/admin/surfaces": "nav.surfaces",
-  "/admin/donnees-detaillees": "nav.donneesDetaillees",
-  "/admin/capteurs": "nav.capteurs",
-  "/admin/users": "nav.users",
-  "/admin/subscriptions": "nav.subscriptions",
-  "/admin/rapports": "nav.rapports",
-  "/admin/rapport-sol": "nav.rapportSol",
-  "/admin/rapport-eau": "rapports.waterReport",
-  "/admin/base-donnees": "nav.baseDonnees",
-  "/admin/reclamations": "nav.reclamations",
-  "/admin/finance": "nav.finance",
-  "/admin/stock": "nav.stock",
-  "/admin/reservation-materiel": "nav.reservationMateriel",
-  "/admin/ventes": "nav.ventes",
-  "/admin/profile": "nav.profile",
+  "/partenaire/dashboard": "nav.dashboard",
+  "/partenaire/surfaces": "nav.surfaces",
+  "/partenaire/donnees-detaillees": "nav.donneesDetaillees",
+  "/partenaire/capteurs": "nav.capteurs",
+  "/partenaire/users": "nav.users",
+  "/partenaire/subscriptions": "nav.subscriptions",
+  "/partenaire/rapports": "nav.rapports",
+  "/partenaire/rapport-sol": "nav.rapportSol",
+  "/partenaire/rapport-eau": "rapports.waterReport",
+  "/partenaire/base-donnees": "nav.baseDonnees",
+  "/partenaire/reclamations": "nav.reclamations",
+  "/partenaire/finance": "nav.finance",
+  "/partenaire/stock": "nav.stock",
+  "/partenaire/reservation-materiel": "nav.reservationMateriel",
+  "/partenaire/ventes": "nav.ventes",
+  "/partenaire/profile": "nav.profile",
 };
 
-export default function AdminLayout() {
+export default function PartenaireLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, profile, loading, signOut } = useAuth();
@@ -66,12 +65,12 @@ export default function AdminLayout() {
 
   const userRole = profile?.user_role ?? "";
   const titleKey = pageTitleKeys[location.pathname];
-  const title = titleKey ? t(titleKey) : "Administration";
-  const isClientUser = userRole === "CLIENT";
+  const title = titleKey ? t(titleKey) : "Espace Partenaire";
+  const isNotPartenaire = userRole !== "PARTENAIRE";
 
   useEffect(() => {
-    if (isClientUser) void signOut();
-  }, [isClientUser, signOut]);
+    if (!loading && userRole && isNotPartenaire) void signOut();
+  }, [loading, userRole, isNotPartenaire, signOut]);
 
   if (loading) {
     return (
@@ -83,10 +82,10 @@ export default function AdminLayout() {
 
   if (!user) return <Navigate to="/auth/login" replace />;
   if (!profile) return null;
-  if (isClientUser) return <Navigate to="/auth/login" replace />;
+  if (isNotPartenaire) return <Navigate to="/auth/login" replace />;
 
-  if (location.pathname === "/admin" || location.pathname === "/admin/") {
-    return <Navigate to="/admin/dashboard" replace />;
+  if (location.pathname === "/partenaire" || location.pathname === "/partenaire/") {
+    return <Navigate to="/partenaire/dashboard" replace />;
   }
 
   const displayName = profile.first_name
@@ -106,12 +105,12 @@ export default function AdminLayout() {
               <img src={logoTesla} alt="TESLA" className="h-10 w-10 object-contain" />
               <div className="flex flex-col leading-tight">
                 <span className="text-sm font-bold text-sidebar-foreground tracking-wide">TESLA</span>
-                <span className="text-[10px] font-semibold tracking-[0.25em] text-primary">ENERGIE</span>
+                <span className="text-[10px] font-semibold tracking-[0.25em] text-primary">PARTENAIRE</span>
               </div>
             </div>
             <div
               className="flex items-center gap-2 cursor-pointer hover:bg-sidebar-accent/50 rounded-lg p-1.5 -mx-1.5 transition-colors"
-              onClick={() => navigate("/admin/profile")}
+              onClick={() => navigate("/partenaire/profile")}
             >
               <Avatar className="h-8 w-8">
                 <AvatarImage src={profile.avatar_url ?? undefined} />
