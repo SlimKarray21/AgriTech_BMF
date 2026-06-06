@@ -90,6 +90,7 @@ fun Route.authRoutes(jwtSecret: String, jwtIssuer: String, jwtAudience: String, 
                                 message = result.message,
                                 otpLength = result.otpLength,
                                 expiresInMinutes = result.expiresInMinutes,
+                                otpCode = result.otpCode,
                             )
                         )
                     }

@@ -41,7 +41,7 @@ fun Route.profilesRoutes() {
                 Profiles.selectAll().map {
                     buildJsonObject {
                         put("id",               it[Profiles.id])
-                        put("user_id",          it[Profiles.userId])
+                        put("user_id",          it[Profiles.userId] ?: JsonNull)
                         put("email",            it[Profiles.email])
                         put("first_name",       it[Profiles.firstName])
                         put("last_name",        it[Profiles.lastName])
@@ -115,6 +115,9 @@ fun Route.profilesRoutes() {
                     body["abo_capteur_sol"]?.jsonPrimitive?.booleanOrNull?.let  { v -> it[Profiles.aboCapSol]       = v }
                     body["abo_electrovanne"]?.jsonPrimitive?.booleanOrNull?.let { v -> it[Profiles.aboElectrovanne] = v }
                     body["abo_sante_plante"]?.jsonPrimitive?.booleanOrNull?.let { v -> it[Profiles.aboSantePlante]  = v }
+                    if (body.containsKey("created_by")) {
+                        it[Profiles.createdBy] = body["created_by"]?.jsonPrimitive?.longOrNull
+                    }
                     it[Profiles.updatedAt] = Instant.now()
                 }
             }

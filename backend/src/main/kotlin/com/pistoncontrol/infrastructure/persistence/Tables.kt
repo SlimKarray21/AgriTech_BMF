@@ -220,7 +220,7 @@ object ClimatsExpo : Table("climats_expo") {
 
 object Profiles : Table("profiles") {
     val id = long("id").autoIncrement()
-    val userId = long("user_id")
+    val userId = varchar("user_id", 36).nullable()
     val firstName = text("first_name")
     val lastName = text("last_name")
     val avatarUrl = text("avatar_url").nullable()

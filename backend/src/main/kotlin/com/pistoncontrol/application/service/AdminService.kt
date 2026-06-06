@@ -114,8 +114,8 @@ class AdminService(
         newRole: String
     ): AdminResult {
         // Validate role
-        if (newRole !in listOf("user", "admin", "sous_admin")) {
-            return AdminResult.Failure("Invalid role. Must be 'user', 'admin' or 'sous_admin'")
+        if (newRole !in listOf("user", "admin", "partenaire")) {
+            return AdminResult.Failure("Invalid role. Must be 'user', 'admin' or 'partenaire'")
         }
 
         // Get old role for audit log
@@ -140,7 +140,7 @@ class AdminService(
         // Sync user_role in profiles table
         val profileRole = when (newRole) {
             "admin"      -> "ADMIN"
-            "sous_admin" -> "SOUS_ADMIN"
+            "partenaire" -> "PARTENAIRE"
             else         -> "CLIENT"
         }
         dbQuery {

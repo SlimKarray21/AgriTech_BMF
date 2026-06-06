@@ -287,7 +287,7 @@ fun Route.adminWebRoutes(deviceService: com.pistoncontrol.application.service.De
             val params = call.receiveParameters()
             val newRole = params["role"]
 
-            if (newRole.isNullOrBlank() || newRole !in listOf("user", "admin")) {
+            if (newRole.isNullOrBlank() || newRole !in listOf("user", "admin", "partenaire")) {
                 call.respondRedirect("/admin/users/$userId?error=invalid_role")
                 return@post
             }

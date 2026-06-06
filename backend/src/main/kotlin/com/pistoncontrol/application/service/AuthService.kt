@@ -4,6 +4,7 @@ import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.pistoncontrol.infrastructure.persistence.DatabaseFactory.dbQuery
 import com.pistoncontrol.infrastructure.persistence.EmailVerificationCodes
+import com.pistoncontrol.infrastructure.persistence.Profiles
 import com.pistoncontrol.infrastructure.persistence.Users
 import mu.KotlinLogging
 import org.jetbrains.exposed.sql.*
@@ -43,6 +44,7 @@ class AuthService(
             val message: String,
             val otpLength: Int,
             val expiresInMinutes: Long,
+            val otpCode: String? = null,
         ) : AuthResult()
         data class Failure(val error: String, val statusCode: Int = 400) : AuthResult()
     }
@@ -82,13 +84,25 @@ class AuthService(
             return AuthResult.Failure("Email already registered", statusCode = 409)
         }
 
-        // Si createdBy est fourni, on met à jour le profil existant ou on le note pour plus tard
-        if (createdBy != null) {
-            dbQuery {
-                Profiles.select { Profiles.email eq email }.singleOrNull()?.let {
-                    Profiles.update({ Profiles.email eq email }) {
-                        it[Profiles.createdBy] = createdBy
-                    }
+        // Créer le profil AgriTech avec le vrai UUID
+        dbQuery {
+            val existingProfile = Profiles.select { Profiles.email eq email }.singleOrNull()
+            if (existingProfile == null) {
+                Profiles.insert {
+                    it[Profiles.userId] = userId.toString()
+                    it[Profiles.email] = email
+                    it[Profiles.firstName] = firstName
+                    it[Profiles.lastName] = lastName
+                    it[Profiles.phoneNumber] = phoneNumber
+                    it[Profiles.userRole] = "CLIENT"
+                    it[Profiles.createdBy] = createdBy
+                    it[Profiles.createdAt] = Instant.now()
+                    it[Profiles.updatedAt] = Instant.now()
+                }
+            } else {
+                Profiles.update({ Profiles.email eq email }) {
+                    it[Profiles.userId] = userId.toString()
+                    if (createdBy != null) it[Profiles.createdBy] = createdBy
                 }
             }
         }
@@ -124,6 +138,7 @@ class AuthService(
             "Registration successful. Please verify your email with the code sent to $email. Code expires in $otpExpiryMinutes minutes.",
             otpLength,
             otpExpiryMinutes,
+            otpCode = if (createdBy != null) otpCode else null,
         )
     }
 

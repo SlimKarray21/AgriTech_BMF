@@ -49,6 +49,7 @@ data class RegisterResponse(
     val message: String,
     val otpLength: Int? = null,
     val expiresInMinutes: Long? = null,
+    val otpCode: String? = null,
 )
 
 @Serializable
