@@ -18,7 +18,8 @@ export interface ApiError {
 export interface UserProfile {
   id: string;
   email: string;
-  role: string;
+  role?: string;
+  userRole?: string;
   firstName: string | null;
   lastName: string | null;
   avatarUrl: string | null;

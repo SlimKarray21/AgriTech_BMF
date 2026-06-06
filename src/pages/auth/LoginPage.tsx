@@ -32,12 +32,13 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const data = await loginApi(email, password);
-      if (data.role !== "admin" && data.role !== "partenaire") {
+      const role = data.role?.toUpperCase();
+      if (role !== "ADMIN" && role !== "PARTENAIRE") {
         toast({ title: "Accès refusé", description: "Seuls les administrateurs et partenaires peuvent accéder à ce panneau.", variant: "destructive" });
         return;
       }
       await setToken(data.token);
-      navigate(data.role === "partenaire" ? "/partenaire/dashboard" : "/admin/dashboard");
+      navigate(role === "PARTENAIRE" ? "/partenaire/dashboard" : "/admin/dashboard");
     } catch (err: unknown) {
       const apiErr = err as ApiError;
       if (apiErr.status === 403 && apiErr.userId) {
@@ -58,12 +59,13 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const data = await verifyEmailApi(pendingUserId, otpCode);
-      if (data.role !== "admin" && data.role !== "partenaire") {
+      const role = data.role?.toUpperCase();
+      if (role !== "ADMIN" && role !== "PARTENAIRE") {
         toast({ title: "Accès refusé", description: "Seuls les administrateurs et partenaires peuvent accéder à ce panneau.", variant: "destructive" });
         return;
       }
       await setToken(data.token);
-      navigate(data.role === "partenaire" ? "/partenaire/dashboard" : "/admin/dashboard");
+      navigate(role === "PARTENAIRE" ? "/partenaire/dashboard" : "/admin/dashboard");
     } catch (err: unknown) {
       const apiErr = err as ApiError;
       toast({ title: "Code invalide", description: apiErr.error ?? apiErr.message ?? "Le code saisi est incorrect ou expiré.", variant: "destructive" });

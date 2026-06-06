@@ -46,8 +46,9 @@ function decodeJwt(token: string): { userId: string; email: string; role: string
 }
 
 function mapRole(backendRole: string): string {
-  if (backendRole === "admin") return "ADMIN";
-  if (backendRole === "partenaire") return "PARTENAIRE";
+  const r = backendRole?.toUpperCase();
+  if (r === "ADMIN") return "ADMIN";
+  if (r === "PARTENAIRE") return "PARTENAIRE";
   return "CLIENT";
 }
 
@@ -74,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         first_name: backendProfile.firstName,
         last_name: backendProfile.lastName,
         avatar_url: backendProfile.avatarUrl,
-        user_role: mapRole(backendProfile.role),
+        user_role: mapRole(backendProfile.userRole ?? backendProfile.role ?? "CLIENT"),
         company_name: null,
         company_logo: null,
       });
