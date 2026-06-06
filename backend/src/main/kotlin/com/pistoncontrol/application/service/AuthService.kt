@@ -70,10 +70,8 @@ class AuthService(
             Users.insert {
                 it[Users.email] = email
                 it[Users.passwordHash] = hashedPassword
-                it[Users.role] = "user"
                 it[Users.firstName] = firstName
                 it[Users.lastName] = lastName
-                it[Users.phoneNumber] = phoneNumber
                 it[Users.emailVerified] = false
                 it[Users.createdAt] = Instant.now()
                 it[Users.updatedAt] = Instant.now()
@@ -89,7 +87,7 @@ class AuthService(
             val existingProfile = Profiles.select { Profiles.email eq email }.singleOrNull()
             if (existingProfile == null) {
                 Profiles.insert {
-                    it[Profiles.userId] = userId.toString()
+                    it[Profiles.userId] = userId
                     it[Profiles.email] = email
                     it[Profiles.firstName] = firstName
                     it[Profiles.lastName] = lastName
@@ -101,7 +99,7 @@ class AuthService(
                 }
             } else {
                 Profiles.update({ Profiles.email eq email }) {
-                    it[Profiles.userId] = userId.toString()
+                    it[Profiles.userId] = userId
                     if (createdBy != null) it[Profiles.createdBy] = createdBy
                 }
             }
@@ -162,8 +160,11 @@ class AuthService(
             )
         }
 
-        val role = user[Users.role]
-        val token = generateToken(userId, role, user[Users.email])
+        val (role, profileId) = dbQuery {
+            val p = Profiles.select { Profiles.userId eq userId }.singleOrNull()
+            Pair(p?.get(Profiles.userRole) ?: "CLIENT", p?.get(Profiles.id))
+        }
+        val token = generateToken(userId, role, user[Users.email], profileId)
         return AuthResult.Success(token, userId.toString(), role)
     }
 
@@ -222,8 +223,10 @@ class AuthService(
 
             EmailVerificationCodes.deleteWhere { SqlExpressionBuilder.run { EmailVerificationCodes.userId eq userUuid } }
 
-            val role = user[Users.role]
-            val token = generateToken(userUuid, role, user[Users.email])
+            val p = Profiles.select { Profiles.userId eq userUuid }.singleOrNull()
+            val role = p?.get(Profiles.userRole) ?: "CLIENT"
+            val profileId = p?.get(Profiles.id)
+            val token = generateToken(userUuid, role, user[Users.email], profileId)
             AuthResult.Success(token, userId, role)
         }
     }
@@ -307,8 +310,8 @@ class AuthService(
         }
     }
 
-    private fun generateToken(userId: UUID, role: String, email: String? = null): String {
-        return JWT.create()
+    private fun generateToken(userId: UUID, role: String, email: String? = null, profileId: Long? = null): String {
+        val builder = JWT.create()
             .withAudience(jwtAudience)
             .withIssuer(jwtIssuer)
             .withSubject(userId.toString())
@@ -316,7 +319,8 @@ class AuthService(
             .withClaim("role", role)
             .withClaim("email", email)
             .withExpiresAt(Date(System.currentTimeMillis() + TOKEN_EXPIRY_MS))
-            .sign(Algorithm.HMAC256(jwtSecret))
+        if (profileId != null) builder.withClaim("profileId", profileId)
+        return builder.sign(Algorithm.HMAC256(jwtSecret))
     }
 
     private fun hashPassword(plaintext: String): String {

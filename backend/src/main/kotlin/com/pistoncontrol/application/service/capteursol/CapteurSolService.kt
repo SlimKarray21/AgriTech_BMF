@@ -208,54 +208,9 @@ class CapteurSolService {
             return@dbQuery profileId
         }
 
-        // Step 4: Create a new profile for this email
-        logger.info { "[resolveUser] no profile found for email=$email – creating new profile" }
-
-        val now = Instant.now()
-        val firstName = authUser?.get(UsersTable.firstName) ?: "User"
-        val lastName = authUser?.get(UsersTable.lastName) ?: ""
-        val role = authUser?.get(UsersTable.role) ?: "user"
-
-        try {
-            val insertedProfileId = ProfilesTable.insert {
-                it[userId] = 0L
-                it[ProfilesTable.firstName] = firstName
-                it[ProfilesTable.lastName] = lastName
-                it[avatarUrl] = null
-                it[createdAt] = now
-                it[updatedAt] = now
-                it[userRole] = role
-                it[phoneNumber] = authUser?.get(UsersTable.phoneNumber)
-                it[location] = authUser?.get(UsersTable.location)
-                it[country] = null
-                it[city] = null
-                it[dateOfBirth] = authUser?.get(UsersTable.dateOfBirth)
-                it[dateDebAbo] = null
-                it[dateExpAbo] = null
-                it[typeAbo] = null
-                it[ProfilesTable.email] = email
-                it[createdBy] = null
-                it[companyName] = null
-                it[companyLogo] = null
-            } get ProfilesTable.id
-
-            ProfilesTable.update({ ProfilesTable.id eq insertedProfileId }) {
-                it[userId] = insertedProfileId
-            }
-
-            logger.info { "[resolveUser] OK: created new profile id=$insertedProfileId for email=$email" }
-            insertedProfileId
-        } catch (e: Exception) {
-            logger.error(e) { "[resolveUser] FAILED to insert profile for email=$email – retrying lookup (race condition?)" }
-            // Retry lookup in case of race condition (another request created the profile)
-            val retryProfile = ProfilesTable
-                .slice(ProfilesTable.id)
-                .select { ProfilesTable.email eq email }
-                .singleOrNull()
-                ?.let { it[ProfilesTable.id] }
-            logger.info { "[resolveUser] retry lookup result: profileId=$retryProfile" }
-            retryProfile
-        }
+        // Step 4: No profile found — after migration all profiles are created at registration
+        logger.warn { "[resolveUser] no profile found for email=$email – user may need to re-register" }
+        null
     }
 
     suspend fun listParcelles(userId: Long?): List<Parcelle> = DatabaseFactory.dbQuery {

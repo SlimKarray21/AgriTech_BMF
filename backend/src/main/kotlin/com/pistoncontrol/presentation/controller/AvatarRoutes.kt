@@ -14,6 +14,7 @@ import java.util.UUID
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.update
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import com.pistoncontrol.infrastructure.persistence.Profiles
 import com.pistoncontrol.infrastructure.persistence.Users
 import com.pistoncontrol.infrastructure.persistence.DatabaseFactory
 
@@ -304,9 +305,10 @@ fun Route.avatarRoutes(baseUrl: String) {
  * Update user's avatarUrl in database
  */
 private suspend fun updateUserAvatarUrl(userId: String, avatarUrl: String?) {
+    val userUuid = UUID.fromString(userId)
     DatabaseFactory.dbQuery {
-        Users.update({ Users.id eq UUID.fromString(userId) }) {
-            it[Users.avatarUrl] = avatarUrl
+        Profiles.update({ Profiles.userId eq userUuid }) {
+            it[Profiles.avatarUrl] = avatarUrl
         }
     }
     logger.info { "Updated avatarUrl for user $userId: $avatarUrl" }

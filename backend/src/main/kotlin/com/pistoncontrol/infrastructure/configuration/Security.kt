@@ -80,7 +80,7 @@ fun Application.configureSecurity() {
                 val userId = credential.payload.getClaim("userId").asString() ?: credential.payload.subject
                 val role = credential.payload.getClaim("role").asString()
 
-                if (userId != null && role == "admin") {
+                if (userId != null && role?.equals("ADMIN", ignoreCase = true) == true) {
                     JWTPrincipal(credential.payload)
                 } else null
             }

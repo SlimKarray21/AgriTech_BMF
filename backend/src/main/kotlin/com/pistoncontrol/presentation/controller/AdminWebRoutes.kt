@@ -12,7 +12,9 @@ import io.ktor.server.routing.*
 import io.ktor.server.sessions.*
 import org.mindrot.jbcrypt.BCrypt
 import com.pistoncontrol.infrastructure.persistence.DatabaseFactory.dbQuery
+import com.pistoncontrol.infrastructure.persistence.Profiles
 import com.pistoncontrol.infrastructure.persistence.Users
+import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.select
 import java.util.UUID
 
@@ -87,39 +89,36 @@ fun Route.adminWebRoutes(deviceService: com.pistoncontrol.application.service.De
                 return@post
             }
 
-            // Lookup user in database
-            val user = dbQuery {
-                Users.select { Users.email eq email }
+            val row = dbQuery {
+                Users.join(Profiles, JoinType.LEFT, onColumn = Users.id, otherColumn = Profiles.userId)
+                    .select { Users.email eq email }
                     .singleOrNull()
             }
 
-            if (user == null) {
+            if (row == null) {
                 call.respondRedirect("/admin/login?error=invalid_credentials")
                 return@post
             }
 
-            // Check password
-            if (!BCrypt.checkpw(password, user[Users.passwordHash])) {
+            if (!BCrypt.checkpw(password, row[Users.passwordHash])) {
                 call.respondRedirect("/admin/login?error=invalid_credentials")
                 return@post
             }
 
-            // Check admin role
-            if (user[Users.role] != "admin") {
+            val userRole = row.getOrNull(Profiles.userRole) ?: ""
+            if (!userRole.equals("ADMIN", ignoreCase = true)) {
                 call.respondRedirect("/admin/login?error=not_authorized")
                 return@post
             }
 
-            // Create session
             call.sessions.set(AdminSession(
-                userId = user[Users.id].toString(),
-                email = user[Users.email],
-                role = user[Users.role]
+                userId = row[Users.id].toString(),
+                email = row[Users.email],
+                role = userRole
             ))
 
-            // Log successful login
             auditLogService.logAction(
-                userId = user[Users.id],
+                userId = row[Users.id],
                 action = "ADMIN_WEB_LOGIN",
                 details = mapOf("method" to "web_form")
             )

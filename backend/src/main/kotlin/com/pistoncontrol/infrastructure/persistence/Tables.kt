@@ -8,14 +8,8 @@ object Users : Table("users") {
     val id = uuid("id").autoGenerate()
     val email = text("email")
     val passwordHash = text("password_hash")
-    val role = text("role")
-    val firstName = text("first_name").nullable()
-    val lastName = text("last_name").nullable()
-    val phoneNumber = text("phone_number").nullable()
-    val dateOfBirth = date("date_of_birth").nullable()
-    val location = text("location").nullable()
-    val avatarUrl = text("avatar_url").nullable()
-    val preferences = jsonb("preferences").default("{}")
+    val firstName = text("first_name")
+    val lastName = text("last_name")
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at")
     val emailVerified = bool("email_verified").default(false)
@@ -220,7 +214,7 @@ object ClimatsExpo : Table("climats_expo") {
 
 object Profiles : Table("profiles") {
     val id = long("id").autoIncrement()
-    val userId = varchar("user_id", 36).nullable()
+    val userId = uuid("user_id").references(Users.id)
     val firstName = text("first_name")
     val lastName = text("last_name")
     val avatarUrl = text("avatar_url").nullable()
@@ -228,7 +222,6 @@ object Profiles : Table("profiles") {
     val updatedAt = timestamp("updated_at")
     val userRole = text("user_role")
     val phoneNumber = text("phone_number").nullable()
-    val location = text("location").nullable()
     val country = text("country").nullable()
     val city = text("city").nullable()
     val dateOfBirth = date("date_of_birth").nullable()
@@ -239,9 +232,6 @@ object Profiles : Table("profiles") {
     val createdBy = long("created_by").nullable()
     val companyName = text("company_name").nullable()
     val companyLogo = text("company_logo").nullable()
-    val aboCapSol = bool("abo_capteur_sol").default(true)
-    val aboElectrovanne = bool("abo_electrovanne").default(false)
-    val aboSantePlante = bool("abo_sante_plante").default(false)
 
     override val primaryKey = PrimaryKey(id)
 }

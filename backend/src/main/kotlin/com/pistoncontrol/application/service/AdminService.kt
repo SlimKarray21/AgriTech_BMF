@@ -49,23 +49,27 @@ class AdminService(
      */
     suspend fun getAllUsers(limit: Int = 100, offset: Long = 0): List<User> {
         return dbQuery {
-            Users.selectAll()
+            Users.join(Profiles, org.jetbrains.exposed.sql.JoinType.LEFT, onColumn = Users.id, otherColumn = Profiles.userId)
+                .selectAll()
                 .limit(limit, offset)
                 .orderBy(Users.createdAt to SortOrder.DESC)
                 .map { row ->
                     User(
                         id = row[Users.id].toString(),
                         email = row[Users.email],
-                        role = row[Users.role],
                         firstName = row[Users.firstName],
                         lastName = row[Users.lastName],
                         createdAt = row[Users.createdAt].toString(),
-                        phoneNumber = row[Users.phoneNumber],
-                        dateOfBirth = row[Users.dateOfBirth]?.toString(),
-                        location = row[Users.location],
-                        avatarUrl = row[Users.avatarUrl],
-                        preferences = row[Users.preferences],
-                        emailVerified = row[Users.emailVerified]
+                        userRole = row.getOrNull(Profiles.userRole) ?: "CLIENT",
+                        phoneNumber = row.getOrNull(Profiles.phoneNumber),
+                        dateOfBirth = row.getOrNull(Profiles.dateOfBirth)?.toString(),
+                        typeAbo = row.getOrNull(Profiles.typeAbo),
+                        createdBy = row.getOrNull(Profiles.createdBy),
+                        companyName = row.getOrNull(Profiles.companyName),
+                        companyLogo = row.getOrNull(Profiles.companyLogo),
+                        avatarUrl = row.getOrNull(Profiles.avatarUrl),
+                        emailVerified = row[Users.emailVerified],
+                        profileId = row.getOrNull(Profiles.id)
                     )
                 }
         }
@@ -79,22 +83,26 @@ class AdminService(
      */
     suspend fun getUserById(userId: UUID): User? {
         return dbQuery {
-            Users.select { Users.id eq userId }
+            Users.join(Profiles, org.jetbrains.exposed.sql.JoinType.LEFT, onColumn = Users.id, otherColumn = Profiles.userId)
+                .select { Users.id eq userId }
                 .singleOrNull()
                 ?.let { row ->
                     User(
                         id = row[Users.id].toString(),
                         email = row[Users.email],
-                        role = row[Users.role],
                         firstName = row[Users.firstName],
                         lastName = row[Users.lastName],
                         createdAt = row[Users.createdAt].toString(),
-                        phoneNumber = row[Users.phoneNumber],
-                        dateOfBirth = row[Users.dateOfBirth]?.toString(),
-                        location = row[Users.location],
-                        avatarUrl = row[Users.avatarUrl],
-                        preferences = row[Users.preferences],
-                        emailVerified = row[Users.emailVerified]
+                        userRole = row.getOrNull(Profiles.userRole) ?: "CLIENT",
+                        phoneNumber = row.getOrNull(Profiles.phoneNumber),
+                        dateOfBirth = row.getOrNull(Profiles.dateOfBirth)?.toString(),
+                        typeAbo = row.getOrNull(Profiles.typeAbo),
+                        createdBy = row.getOrNull(Profiles.createdBy),
+                        companyName = row.getOrNull(Profiles.companyName),
+                        companyLogo = row.getOrNull(Profiles.companyLogo),
+                        avatarUrl = row.getOrNull(Profiles.avatarUrl),
+                        emailVerified = row[Users.emailVerified],
+                        profileId = row.getOrNull(Profiles.id)
                     )
                 }
         }
@@ -113,42 +121,25 @@ class AdminService(
         targetUserId: UUID,
         newRole: String
     ): AdminResult {
-        // Validate role
-        if (newRole !in listOf("user", "admin", "partenaire")) {
-            return AdminResult.Failure("Invalid role. Must be 'user', 'admin' or 'partenaire'")
+        val normalizedRole = when (newRole.uppercase()) {
+            "ADMIN"      -> "ADMIN"
+            "PARTENAIRE" -> "PARTENAIRE"
+            "USER", "CLIENT" -> "CLIENT"
+            else -> return AdminResult.Failure("Invalid role. Must be ADMIN, PARTENAIRE, or CLIENT")
         }
 
-        // Get old role for audit log
         val oldRole = dbQuery {
-            Users.select { Users.id eq targetUserId }
-                .singleOrNull()
-                ?.get(Users.role)
+            Profiles.select { Profiles.userId eq targetUserId }.singleOrNull()?.get(Profiles.userRole)
         }
 
         if (oldRole == null) {
             return AdminResult.Failure("User not found", statusCode = 404)
         }
 
-        // Update role in users table
         val updated = dbQuery {
-            Users.update({ Users.id eq targetUserId }) {
-                it[Users.role] = newRole
-                it[Users.updatedAt] = Instant.now()
-            }
-        }
-
-        // Sync user_role in profiles table
-        val profileRole = when (newRole) {
-            "admin"      -> "ADMIN"
-            "partenaire" -> "PARTENAIRE"
-            else         -> "CLIENT"
-        }
-        dbQuery {
-            val userEmail = Users.select { Users.id eq targetUserId }.singleOrNull()?.get(Users.email)
-            if (userEmail != null) {
-                Profiles.update({ Profiles.email eq userEmail }) {
-                    it[Profiles.userRole] = profileRole
-                }
+            Profiles.update({ Profiles.userId eq targetUserId }) {
+                it[Profiles.userRole] = normalizedRole
+                it[Profiles.updatedAt] = Instant.now()
             }
         }
 
@@ -156,7 +147,6 @@ class AdminService(
             return AdminResult.Failure("Failed to update user role", statusCode = 500)
         }
 
-        // Log the action
         auditLogService.logAction(
             userId = adminUserId,
             action = "UPDATE_USER_ROLE",
@@ -165,7 +155,7 @@ class AdminService(
             targetResourceId = targetUserId.toString(),
             details = mapOf(
                 "oldRole" to oldRole,
-                "newRole" to newRole
+                "newRole" to normalizedRole
             )
         )
 
@@ -241,7 +231,7 @@ class AdminService(
 
         val stats = dbQuery {
             val totalUsers = Users.selectAll().count()
-            val totalAdmins = Users.select { Users.role eq "admin" }.count()
+            val totalAdmins = Profiles.select { Profiles.userRole eq "ADMIN" }.count()
             val totalDevices = Devices.selectAll().count()
             val totalSchedules = Schedules.selectAll().count()
 

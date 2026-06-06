@@ -42,8 +42,12 @@ class UserService {
      * @return UserResult.Success with profile, or Failure if not found
      */
     suspend fun getUserById(userId: String): UserResult {
+        val userUuid = try { UUID.fromString(userId) } catch (e: Exception) {
+            return UserResult.Failure("Invalid user ID", statusCode = 400)
+        }
         val profile = dbQuery {
-            Users.select { Users.id eq UUID.fromString(userId) }
+            Users.join(Profiles, org.jetbrains.exposed.sql.JoinType.LEFT, onColumn = Users.id, otherColumn = Profiles.userId)
+                .select { Users.id eq userUuid }
                 .singleOrNull()
                 ?.let { rowToUserProfile(it) }
         }
@@ -85,30 +89,28 @@ class UserService {
         val updatedProfile = dbQuery {
             val userUuid = UUID.fromString(userId)
 
-            // Check if user exists
-            val existingUser = Users.select { Users.id eq userUuid }
-                .singleOrNull()
+            val existingUser = Users.select { Users.id eq userUuid }.singleOrNull()
+            if (existingUser == null) return@dbQuery null
 
-            if (existingUser == null) {
-                return@dbQuery null
-            }
-
-            // Update only provided fields
             Users.update({ Users.id eq userUuid }) {
                 request.firstName?.let { value -> it[firstName] = value }
                 request.lastName?.let { value -> it[lastName] = value }
-                request.phoneNumber?.let { value -> it[phoneNumber] = value }
+                it[updatedAt] = java.time.Instant.now()
+            }
+
+            Profiles.update({ Profiles.userId eq userUuid }) {
+                request.phoneNumber?.let { value -> it[Profiles.phoneNumber] = value }
                 request.dateOfBirth?.let { value ->
-                    it[dateOfBirth] = LocalDate.parse(value, dateFormatter)
+                    it[Profiles.dateOfBirth] = LocalDate.parse(value, dateFormatter)
                 }
-                request.location?.let { value -> it[location] = value }
-                request.avatarUrl?.let { value -> it[avatarUrl] = value }
+                request.avatarUrl?.let { value -> it[Profiles.avatarUrl] = value }
+                it[Profiles.updatedAt] = java.time.Instant.now()
             }
 
             logger.info { "Updated profile for user $userId" }
 
-            // Return updated user (refetch in same dbQuery block)
-            Users.select { Users.id eq userUuid }
+            Users.join(Profiles, org.jetbrains.exposed.sql.JoinType.LEFT, onColumn = Users.id, otherColumn = Profiles.userId)
+                .select { Users.id eq userUuid }
                 .singleOrNull()
                 ?.let { rowToUserProfile(it) }
         }
@@ -120,87 +122,20 @@ class UserService {
         }
     }
 
-    /**
-     * Update user preferences (JSONB field)
-     *
-     * Process:
-     * 1. Validate JSON format
-     * 2. Check if user exists
-     * 3. Update preferences
-     * 4. Return updated profile
-     *
-     * @param userId User's UUID
-     * @param request Preferences update request with JSON string
-     * @return UserResult.Success with updated profile, or Failure with error
-     */
-    suspend fun updateUserPreferences(userId: String, request: UpdatePreferencesRequest): UserResult {
-        // Validate JSON format
-        try {
-            kotlinx.serialization.json.Json.parseToJsonElement(request.preferences)
-        } catch (e: Exception) {
-            logger.warn { "Invalid JSON format for preferences: ${e.message}" }
-            return UserResult.Failure(
-                "Invalid JSON format for preferences",
-                statusCode = 400
-            )
-        }
-
-        val updatedProfile = dbQuery {
-            val userUuid = UUID.fromString(userId)
-
-            // Check if user exists
-            val existingUser = Users.select { Users.id eq userUuid }
-                .singleOrNull()
-
-            if (existingUser == null) {
-                return@dbQuery null
-            }
-
-            // Update preferences
-            Users.update({ Users.id eq userUuid }) {
-                it[preferences] = request.preferences
-            }
-
-            logger.info { "Updated preferences for user $userId" }
-
-            // Return updated user (refetch in same dbQuery block)
-            Users.select { Users.id eq userUuid }
-                .singleOrNull()
-                ?.let { rowToUserProfile(it) }
-        }
-
-        return if (updatedProfile != null) {
-            UserResult.Success(updatedProfile)
-        } else {
-            UserResult.Failure("User not found", statusCode = 404)
-        }
-    }
-
-    /**
-     * Convert database row to UserProfileResponse
-     */
     private fun rowToUserProfile(row: ResultRow): UserProfileResponse {
-        val profileRow = Profiles
-            .select { Profiles.email eq row[Users.email] }
-            .orderBy(Profiles.id, SortOrder.DESC)
-            .limit(1)
-            .singleOrNull()
-
         return UserProfileResponse(
             id = row[Users.id].toString(),
             email = row[Users.email],
-            role = row[Users.role],
-            profileRole = profileRow?.get(Profiles.userRole),
+            userRole = row.getOrNull(Profiles.userRole) ?: "CLIENT",
+            profileId = row.getOrNull(Profiles.id),
             firstName = row[Users.firstName],
             lastName = row[Users.lastName],
-            phoneNumber = row[Users.phoneNumber],
-            dateOfBirth = row[Users.dateOfBirth]?.format(dateFormatter),
-            location = row[Users.location],
-            typeAbo = profileRow?.get(Profiles.typeAbo),
-            dateDebAbo = profileRow?.get(Profiles.dateDebAbo)?.format(dateFormatter),
-            dateExpAbo = profileRow?.get(Profiles.dateExpAbo)?.format(dateFormatter),
-            avatarUrl = row[Users.avatarUrl],
-            preferences = row[Users.preferences]
+            phoneNumber = row.getOrNull(Profiles.phoneNumber),
+            dateOfBirth = row.getOrNull(Profiles.dateOfBirth)?.format(dateFormatter),
+            typeAbo = row.getOrNull(Profiles.typeAbo),
+            dateDebAbo = row.getOrNull(Profiles.dateDebAbo)?.format(dateFormatter),
+            dateExpAbo = row.getOrNull(Profiles.dateExpAbo)?.format(dateFormatter),
+            avatarUrl = row.getOrNull(Profiles.avatarUrl)
         )
     }
 }

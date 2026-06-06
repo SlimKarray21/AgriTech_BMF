@@ -18,5 +18,8 @@ fun ApplicationCall.jwtEmailClaim(): String? =
 fun ApplicationCall.jwtRoleClaim(): String? =
     jwtPrincipal()?.claimString("role")
 
+fun ApplicationCall.jwtProfileIdClaim(): Long? =
+    jwtPrincipal()?.payload?.getClaim("profileId")?.asLong()
+
 fun ApplicationCall.isAdminJwt(): Boolean =
-    jwtRoleClaim() == "admin"
+    jwtRoleClaim()?.equals("ADMIN", ignoreCase = true) == true

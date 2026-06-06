@@ -40,29 +40,25 @@ fun Route.profilesRoutes() {
             val rows = transaction {
                 Profiles.selectAll().map {
                     buildJsonObject {
-                        put("id",               it[Profiles.id])
-                        put("user_id",          it[Profiles.userId] ?: JsonNull)
-                        put("email",            it[Profiles.email])
-                        put("first_name",       it[Profiles.firstName])
-                        put("last_name",        it[Profiles.lastName])
-                        put("user_role",        it[Profiles.userRole])
-                        put("phone_number",     it[Profiles.phoneNumber])
-                        put("location",         it[Profiles.location])
-                        put("country",          it[Profiles.country])
-                        put("city",             it[Profiles.city])
-                        put("avatar_url",       it[Profiles.avatarUrl])
-                        put("date_of_birth",    it[Profiles.dateOfBirth]?.toString())
-                        put("date_deb_abo",     it[Profiles.dateDebAbo]?.toString())
-                        put("date_exp_abo",     it[Profiles.dateExpAbo]?.toString())
-                        put("type_abo",         it[Profiles.typeAbo])
-                        put("company_name",     it[Profiles.companyName])
-                        put("company_logo",     it[Profiles.companyLogo])
-                        put("created_by",       it[Profiles.createdBy])
-                        put("abo_capteur_sol",  it[Profiles.aboCapSol])
-                        put("abo_electrovanne", it[Profiles.aboElectrovanne])
-                        put("abo_sante_plante", it[Profiles.aboSantePlante])
-                        put("created_at",       it[Profiles.createdAt].toString())
-                        put("updated_at",       it[Profiles.updatedAt].toString())
+                        put("id",            it[Profiles.id])
+                        put("user_id",       it[Profiles.userId].toString())
+                        put("email",         it[Profiles.email])
+                        put("first_name",    it[Profiles.firstName])
+                        put("last_name",     it[Profiles.lastName])
+                        put("user_role",     it[Profiles.userRole])
+                        put("phone_number",  it[Profiles.phoneNumber])
+                        put("country",       it[Profiles.country])
+                        put("city",          it[Profiles.city])
+                        put("avatar_url",    it[Profiles.avatarUrl])
+                        put("date_of_birth", it[Profiles.dateOfBirth]?.toString())
+                        put("date_deb_abo",  it[Profiles.dateDebAbo]?.toString())
+                        put("date_exp_abo",  it[Profiles.dateExpAbo]?.toString())
+                        put("type_abo",      it[Profiles.typeAbo])
+                        put("company_name",  it[Profiles.companyName])
+                        put("company_logo",  it[Profiles.companyLogo])
+                        put("created_by",    it[Profiles.createdBy])
+                        put("created_at",    it[Profiles.createdAt].toString())
+                        put("updated_at",    it[Profiles.updatedAt].toString())
                     }
                 }
             }
@@ -74,15 +70,13 @@ fun Route.profilesRoutes() {
             val row = transaction {
                 Profiles.select { Profiles.id eq id }.firstOrNull()?.let {
                     buildJsonObject {
-                        put("id",               it[Profiles.id])
-                        put("email",            it[Profiles.email])
-                        put("first_name",       it[Profiles.firstName])
-                        put("last_name",        it[Profiles.lastName])
-                        put("user_role",        it[Profiles.userRole])
-                        put("type_abo",         it[Profiles.typeAbo])
-                        put("abo_capteur_sol",  it[Profiles.aboCapSol])
-                        put("abo_electrovanne", it[Profiles.aboElectrovanne])
-                        put("abo_sante_plante", it[Profiles.aboSantePlante])
+                        put("id",         it[Profiles.id])
+                        put("user_id",    it[Profiles.userId].toString())
+                        put("email",      it[Profiles.email])
+                        put("first_name", it[Profiles.firstName])
+                        put("last_name",  it[Profiles.lastName])
+                        put("user_role",  it[Profiles.userRole])
+                        put("type_abo",   it[Profiles.typeAbo])
                     }
                 }
             }
@@ -95,26 +89,23 @@ fun Route.profilesRoutes() {
             val body = call.receive<JsonObject>()
             transaction {
                 Profiles.update({ Profiles.id eq id }) {
-                    body["first_name"]?.jsonPrimitive?.contentOrNull?.let       { v -> it[Profiles.firstName]      = v }
-                    body["last_name"]?.jsonPrimitive?.contentOrNull?.let        { v -> it[Profiles.lastName]       = v }
-                    body["user_role"]?.jsonPrimitive?.contentOrNull?.let        { v -> it[Profiles.userRole]       = v }
-                    body["phone_number"]?.jsonPrimitive?.contentOrNull?.let     { v -> it[Profiles.phoneNumber]    = v }
-                    body["location"]?.jsonPrimitive?.contentOrNull?.let         { v -> it[Profiles.location]       = v }
-                    body["country"]?.jsonPrimitive?.contentOrNull?.let          { v -> it[Profiles.country]        = v }
-                    body["city"]?.jsonPrimitive?.contentOrNull?.let             { v -> it[Profiles.city]           = v }
-                    body["email"]?.jsonPrimitive?.contentOrNull?.let            { v -> it[Profiles.email]          = v }
-                    body["type_abo"]?.jsonPrimitive?.contentOrNull?.let         { v -> it[Profiles.typeAbo]        = v }
-                    body["company_name"]?.jsonPrimitive?.contentOrNull?.let     { v -> it[Profiles.companyName]    = v }
-                    body["company_logo"]?.jsonPrimitive?.contentOrNull?.let     { v -> it[Profiles.companyLogo]    = v }
+                    body["first_name"]?.jsonPrimitive?.contentOrNull?.let    { v -> it[Profiles.firstName]   = v }
+                    body["last_name"]?.jsonPrimitive?.contentOrNull?.let     { v -> it[Profiles.lastName]    = v }
+                    body["user_role"]?.jsonPrimitive?.contentOrNull?.let     { v -> it[Profiles.userRole]    = v }
+                    body["phone_number"]?.jsonPrimitive?.contentOrNull?.let  { v -> it[Profiles.phoneNumber] = v }
+                    body["country"]?.jsonPrimitive?.contentOrNull?.let       { v -> it[Profiles.country]     = v }
+                    body["city"]?.jsonPrimitive?.contentOrNull?.let          { v -> it[Profiles.city]        = v }
+                    body["email"]?.jsonPrimitive?.contentOrNull?.let         { v -> it[Profiles.email]       = v }
+                    body["type_abo"]?.jsonPrimitive?.contentOrNull?.let      { v -> it[Profiles.typeAbo]     = v }
+                    body["company_name"]?.jsonPrimitive?.contentOrNull?.let  { v -> it[Profiles.companyName] = v }
+                    body["company_logo"]?.jsonPrimitive?.contentOrNull?.let  { v -> it[Profiles.companyLogo] = v }
+                    body["avatar_url"]?.jsonPrimitive?.contentOrNull?.let    { v -> it[Profiles.avatarUrl]   = v }
                     body["date_deb_abo"]?.jsonPrimitive?.contentOrNull?.let { v ->
                         it.set<LocalDate?>(Profiles.dateDebAbo, runCatching { LocalDate.parse(v) }.getOrNull())
                     }
                     body["date_exp_abo"]?.jsonPrimitive?.contentOrNull?.let { v ->
                         it.set<LocalDate?>(Profiles.dateExpAbo, runCatching { LocalDate.parse(v) }.getOrNull())
                     }
-                    body["abo_capteur_sol"]?.jsonPrimitive?.booleanOrNull?.let  { v -> it[Profiles.aboCapSol]       = v }
-                    body["abo_electrovanne"]?.jsonPrimitive?.booleanOrNull?.let { v -> it[Profiles.aboElectrovanne] = v }
-                    body["abo_sante_plante"]?.jsonPrimitive?.booleanOrNull?.let { v -> it[Profiles.aboSantePlante]  = v }
                     if (body.containsKey("created_by")) {
                         it[Profiles.createdBy] = body["created_by"]?.jsonPrimitive?.longOrNull
                     }

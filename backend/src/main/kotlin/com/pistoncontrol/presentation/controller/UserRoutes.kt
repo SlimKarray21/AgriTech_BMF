@@ -1,6 +1,5 @@
 package com.pistoncontrol.presentation.controller
 
-import com.pistoncontrol.domain.model.UpdatePreferencesRequest
 import com.pistoncontrol.domain.model.UpdateProfileRequest
 import com.pistoncontrol.application.service.UserService
 import io.ktor.http.*
@@ -111,48 +110,6 @@ fun Route.userRoutes(userService: UserService) {
                 }
             }
 
-            /**
-             * PUT /user/preferences
-             * Update current user's preferences (JSONB field)
-             *
-             * Request Body:
-             * {
-             *   "preferences": "{\"theme\": \"dark\", \"notifications\": true}"
-             * }
-             *
-             * Success Response (200 OK):
-             * {
-             *   "id": "uuid",
-             *   "email": "user@example.com",
-             *   "preferences": "{\"theme\": \"dark\", \"notifications\": true}",
-             *   ...
-             * }
-             */
-            put("/preferences") {
-                try {
-                    val principal = call.principal<JWTPrincipal>()!!
-                    val userId = principal.payload.getClaim("userId").asString()
-                    val request = call.receive<UpdatePreferencesRequest>()
-
-                    // Service handles JSON validation
-                    when (val result = userService.updateUserPreferences(userId, request)) {
-                        is UserService.UserResult.Success -> {
-                            call.respond(HttpStatusCode.OK, result.profile)
-                        }
-                        is UserService.UserResult.Failure -> {
-                            call.respond(
-                                HttpStatusCode.fromValue(result.statusCode),
-                                ErrorResponse(result.error)
-                            )
-                        }
-                    }
-                } catch (e: Exception) {
-                    call.respond(
-                        HttpStatusCode.InternalServerError,
-                        ErrorResponse("Failed to update preferences: ${e.message}")
-                    )
-                }
-            }
         }
     }
 }
