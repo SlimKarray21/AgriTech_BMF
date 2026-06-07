@@ -16,8 +16,8 @@ class BottomNavBar extends ConsumerWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     final tabs = [
-      _Tab(Icons.home_rounded,              Icons.home_outlined,             'Accueil'),
-      _Tab(Icons.terrain_rounded,           Icons.terrain_outlined,          'Parcelles'),
+      _Tab(Icons.home_rounded,              Icons.home_outlined,             langState.t('nav.accueil')),
+      _Tab(Icons.terrain_rounded,           Icons.terrain_outlined,          langState.t('nav.home')),
       _Tab(Icons.monitor_heart_rounded,     Icons.monitor_heart_outlined,    langState.t('nav.health')),
       _Tab(Icons.water_drop_rounded,        Icons.water_drop_outlined,       langState.t('nav.valves')),
       _Tab(Icons.cloud_rounded,             Icons.cloud_outlined,            langState.t('nav.weather')),

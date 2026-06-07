@@ -24,10 +24,79 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   DateTime? _aboStart;
   DateTime? _aboEnd;
 
+  final TextEditingController _recSujet = TextEditingController();
+  final TextEditingController _recMessage = TextEditingController();
+  bool _recSubmitting = false;
+  bool _savingSettings = false;
+
   @override
   void initState() {
     super.initState();
     _loadProfile();
+  }
+
+  @override
+  void dispose() {
+    _recSujet.dispose();
+    _recMessage.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveSettings(String Function(String) t) async {
+    final name = _ownerName.trim();
+    final parts = name.isEmpty ? <String>[] : name.split(RegExp(r'\s+'));
+    final firstName = parts.isNotEmpty ? parts.first : '';
+    final lastName = parts.length > 1 ? parts.sublist(1).join(' ') : '';
+    setState(() => _savingSettings = true);
+    try {
+      await ref.read(uiEarthApiProvider).user.updateProfile({
+        'firstName': firstName,
+        'lastName': lastName,
+      });
+      if (!mounted) return;
+      await _loadProfile();
+      if (!mounted) return;
+      setState(() => _subPage = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(t('profile.saved'))),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(t('profile.save_error'))),
+      );
+    } finally {
+      if (mounted) setState(() => _savingSettings = false);
+    }
+  }
+
+  Future<void> _submitReclamation(String Function(String) t) async {
+    final sujet = _recSujet.text.trim();
+    final message = _recMessage.text.trim();
+    if (sujet.isEmpty || message.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(t('reclamation.required'))),
+      );
+      return;
+    }
+    setState(() => _recSubmitting = true);
+    try {
+      await ref.read(uiEarthApiProvider).user.createReclamation(sujet, message);
+      if (!mounted) return;
+      _recSujet.clear();
+      _recMessage.clear();
+      setState(() => _subPage = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(t('reclamation.sent'))),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(t('reclamation.error'))),
+      );
+    } finally {
+      if (mounted) setState(() => _recSubmitting = false);
+    }
   }
 
   Future<void> _loadProfile() async {
@@ -81,6 +150,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       body = _help(theme, t);
     } else if (_subPage == 'abonnement') {
       body = _subscription(theme, t);
+    } else if (_subPage == 'reclamation') {
+      body = _reclamation(theme, t);
     } else {
       body = _home(theme, t, parcelles.length, totalHa, isRtl);
     }
@@ -145,6 +216,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         _MenuItem(Icons.settings_outlined,           t('profile.settings'),      () => setState(() => _subPage = 'parametres'), theme),
         _MenuItem(Icons.shield_outlined,             t('profile.privacy'),       () {},                                         theme),
         _MenuItem(Icons.workspace_premium_outlined,  t('profile.subscription'),  () => setState(() => _subPage = 'abonnement'), theme),
+        _MenuItem(Icons.report_problem_outlined,     t('profile.complaint'),     () => setState(() => _subPage = 'reclamation'), theme),
         _MenuItem(Icons.help_outline,                t('profile.help'),          () => setState(() => _subPage = 'aide'),       theme),
         const Divider(height: 32),
 
@@ -201,8 +273,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           width: double.infinity,
           height: 44,
           child: ElevatedButton(
-            onPressed: () => setState(() => _subPage = null),
-            child: Text(t('profile.save')),
+            onPressed: _savingSettings ? null : () => _saveSettings(t),
+            child: _savingSettings
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : Text(t('profile.save')),
           ),
         ),
       ],
@@ -303,6 +377,66 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ],
             ),
           ),
+      ],
+    );
+  }
+
+  // ── Réclamation ───────────────────────────────────────────────────────────
+
+  Widget _reclamation(ThemeData theme, String Function(String) t) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+      children: [
+        _backHeader(t('profile.complaint'), theme),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: theme.colorScheme.outline),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(t('reclamation.subject'), style: theme.textTheme.labelMedium),
+              const SizedBox(height: 6),
+              TextField(
+                controller: _recSujet,
+                decoration: InputDecoration(
+                  hintText: t('reclamation.subject_hint'),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(t('reclamation.message'), style: theme.textTheme.labelMedium),
+              const SizedBox(height: 6),
+              TextField(
+                controller: _recMessage,
+                maxLines: 5,
+                decoration: InputDecoration(
+                  hintText: t('reclamation.message_hint'),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _recSubmitting ? null : () => _submitReclamation(t),
+                  icon: _recSubmitting
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.send),
+                  label: Text(t('reclamation.send')),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.farmLeaf,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }

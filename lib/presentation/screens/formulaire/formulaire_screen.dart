@@ -54,6 +54,80 @@ class _FormulaireScreenState extends ConsumerState<FormulaireScreen> {
     'Zaghouan': ['Zaghouan', 'Zriba', 'Bir Mcherga', 'El Fahs', 'Nadhour'],
   };
 
+  // Traduction d'affichage FR -> AR pour pays / gouvernorats / villes.
+  // La valeur stockée reste en français (clé de _tunisiaGovernoratesCities).
+  static const Map<String, String> _locAr = {
+    'Tunisie': 'تونس',
+    // Gouvernorats
+    'Ariana': 'أريانة', 'Béja': 'باجة', 'Ben Arous': 'بن عروس', 'Bizerte': 'بنزرت',
+    'Gabès': 'قابس', 'Gafsa': 'قفصة', 'Jendouba': 'جندوبة', 'Kairouan': 'القيروان',
+    'Kasserine': 'القصرين', 'Kébili': 'قبلي', 'Kef': 'الكاف', 'Mahdia': 'المهدية',
+    'Manouba': 'منوبة', 'Médenine': 'مدنين', 'Monastir': 'المنستير', 'Nabeul': 'نابل',
+    'Sfax': 'صفاقس', 'Sidi Bouzid': 'سيدي بوزيد', 'Siliana': 'سليانة', 'Sousse': 'سوسة',
+    'Tataouine': 'تطاوين', 'Tozeur': 'توزر', 'Tunis': 'تونس', 'Zaghouan': 'زغوان',
+    // Villes — Ariana
+    'Ariana Ville': 'أريانة المدينة', 'Raoued': 'رواد', 'Soukra': 'سكرة',
+    'Kalaat Landalous': 'قلعة الأندلس', 'Mnihla': 'المنيهلة', 'Ettadhamen': 'التضامن',
+    // Béja
+    'Amdoun': 'عمدون', 'Testour': 'تستور', 'Medjez El Bab': 'مجاز الباب', 'Nefza': 'نفزة', 'Teboursouk': 'تبرسق',
+    // Ben Arous
+    'Hammam Lif': 'حمام الأنف', 'Hammam Chott': 'حمام الشط', 'Ezzahra': 'الزهراء', 'Fouchana': 'فوشانة',
+    'Mornag': 'مرناق', 'Rades': 'رادس', 'Boumhel': 'بومهل',
+    // Bizerte
+    'Menzel Bourguiba': 'منزل بورقيبة', 'Mateur': 'ماطر', 'Ras Jebel': 'رأس الجبل', 'Sejnane': 'سجنان',
+    'Ghar El Melh': 'غار الملح', 'Tinja': 'تينجة',
+    // Gabès
+    'Gabès Ville': 'قابس المدينة', 'Ghannouch': 'غنوش', 'Matmata': 'مطماطة', 'Mareth': 'مارث',
+    'El Hamma': 'الحامة', 'Métouia': 'المطوية',
+    // Gafsa
+    'Métlaoui': 'المتلوي', 'Redeyef': 'الرديف', 'Moularès': 'أم العرائس', 'Sened': 'سند', 'El Ksar': 'القصر',
+    // Jendouba
+    'Tabarka': 'طبرقة', 'Aïn Draham': 'عين دراهم', 'Fernana': 'فرنانة', 'Ghardimaou': 'غار الدماء', 'Bou Salem': 'بوسالم',
+    // Kairouan
+    'Chebika': 'الشبيكة', 'Sbikha': 'السبيخة', 'Haffouz': 'حفوز', 'Oueslatia': 'الوسلاتية', 'Nasrallah': 'نصر الله',
+    // Kasserine
+    'Sbeitla': 'سبيطلة', 'Foussana': 'فوسانة', 'Thala': 'تالة', 'Feriana': 'فريانة', 'Sbiba': 'سبيبة',
+    // Kébili
+    'Douz': 'دوز', 'Souk Lahad': 'سوق الأحد', 'El Faouar': 'الفوار',
+    // Kef
+    'Le Kef': 'الكاف', 'Tajerouine': 'تاجروين', 'Dahmani': 'الدهماني',
+    'Sakiet Sidi Youssef': 'ساقية سيدي يوسف', 'Kalaat Senan': 'قلعة سنان',
+    // Mahdia
+    'Ksour Essef': 'قصور الساف', 'Chebba': 'الشابة', 'El Jem': 'الجم', 'Melloulèche': 'ملولش', 'Boumerdès': 'بومرداس',
+    // Manouba
+    'Oued Ellil': 'وادي الليل', 'Tebourba': 'طبربة', 'Borj El Amri': 'برج العامري', 'Douar Hicher': 'دوار هيشر',
+    // Médenine
+    'Djerba Midoun': 'جربة ميدون', 'Djerba Houmt Souk': 'جربة حومة السوق', 'Zarzis': 'جرجيس',
+    'Ben Guerdane': 'بن قردان', 'Ajim': 'أجيم',
+    // Monastir
+    'Moknine': 'المكنين', 'Ksibet El Mediouni': 'قصيبة المديوني', 'Jemmal': 'جمال', 'Bekalta': 'البقالطة',
+    'Ksar Hellal': 'قصر هلال', 'Teboulba': 'طبلبة',
+    // Nabeul
+    'Hammamet': 'الحمامات', 'Dar Chaabane': 'دار شعبان', 'Kelibia': 'قليبية', 'Korba': 'قربة',
+    'Menzel Temime': 'منزل تميم', 'Soliman': 'سليمان',
+    // Sfax
+    'Sfax Ville': 'صفاقس المدينة', 'Sakiet Ezzit': 'ساقية الزيت', 'Sakiet Eddaier': 'ساقية الدائر',
+    'Agareb': 'عقارب', 'Menzel Chaker': 'منزل شاكر', 'El Amra': 'العامرة', 'Jebeniana': 'جبنيانة',
+    'Mahres': 'المحرس', 'Kerkennah': 'قرقنة', 'Thyna': 'طينة', 'Bir Ali Ben Khalifa': 'بئر علي بن خليفة', 'Skhira': 'الصخيرة',
+    // Sidi Bouzid
+    'Meknassy': 'المكناسي', 'Regueb': 'الرقاب', 'Menzel Bouzaiane': 'منزل بوزيان',
+    'Bir El Hafey': 'بئر الحفي', 'Cebbala': 'السبالة',
+    // Siliana
+    'Gaafour': 'قعفور', 'Bouarada': 'بوعرادة', 'El Krib': 'الكريب', 'Makthar': 'مكثر',
+    // Sousse
+    'Sousse Ville': 'سوسة المدينة', 'Hammam Sousse': 'حمام سوسة', 'Kalaa Kebira': 'القلعة الكبرى',
+    'Kalaa Seghira': 'القلعة الصغرى', 'Msaken': 'مساكن', 'Akouda': 'أكودة', 'Enfidha': 'النفيضة', 'Sidi Bou Ali': 'سيدي بوعلي',
+    // Tataouine
+    'Remada': 'رمادة', 'Bir Lahmar': 'بئر الأحمر', 'Dehiba': 'الذهيبة', 'Ghomrassen': 'غمراسن',
+    // Tozeur
+    'Nefta': 'نفطة', 'Degache': 'دقاش', 'Tameghza': 'تمغزة',
+    // Tunis
+    'Tunis Centre Ville': 'تونس المدينة', 'La Marsa': 'المرسى', 'Le Bardo': 'باردو', 'Carthage': 'قرطاج',
+    'La Goulette': 'حلق الوادي', 'El Omrane': 'العمران', 'Bab Bhar': 'باب بحر', 'Bab Souika': 'باب سويقة', 'Sidi El Béchir': 'سيدي البشير',
+    // Zaghouan
+    'Zriba': 'الزريبة', 'Bir Mcherga': 'بئر مشارقة', 'El Fahs': 'الفحص', 'Nadhour': 'الناظور',
+  };
+
   static const Map<String, List<String>> _plantTypesByCategory = {
     'Cultures maraichères': [
       'Tomate',
@@ -82,6 +156,30 @@ class _FormulaireScreenState extends ConsumerState<FormulaireScreen> {
     'Grandes cultures': ['Blé', 'Orge', 'Avoine', 'Maïs', 'Sorgho'],
     'Légumineuses': ['Pois chiche', 'Lentille', 'Fève', 'Haricot'],
     'Cultures spéciales': ['Palmier dattier', 'Vigne', 'Pastèque', 'Melon', 'Fraisier'],
+  };
+
+  // Traduction d'affichage FR -> AR pour catégories et types de plantes.
+  static const Map<String, String> _plantAr = {
+    // Catégories
+    'Cultures maraichères': 'الخضروات',
+    'Arbres fruitiers': 'الأشجار المثمرة',
+    'Grandes cultures': 'المحاصيل الكبرى',
+    'Légumineuses': 'البقوليات',
+    'Cultures spéciales': 'زراعات خاصة',
+    // Cultures maraichères
+    'Tomate': 'طماطم', 'Piment': 'فلفل', 'Pomme de terre': 'بطاطا', 'Oignon': 'بصل',
+    'Ail': 'ثوم', 'Carotte': 'جزر', 'Laitue': 'خس', 'Courgette': 'كوسة',
+    'Aubergine': 'باذنجان', 'Concombre': 'خيار',
+    // Arbres fruitiers
+    'Olivier': 'زيتون', 'Oranger': 'برتقال', 'Citronnier': 'ليمون', 'Mandarinier': 'يوسفي',
+    'Pommier': 'تفاح', 'Poirier': 'إجاص', 'Pêcher': 'خوخ', 'Abricotier': 'مشمش',
+    'Grenadier': 'رمان', 'Figuier': 'تين',
+    // Grandes cultures
+    'Blé': 'قمح', 'Orge': 'شعير', 'Avoine': 'شوفان', 'Maïs': 'ذرة', 'Sorgho': 'ذرة بيضاء',
+    // Légumineuses
+    'Pois chiche': 'حمص', 'Lentille': 'عدس', 'Fève': 'فول', 'Haricot': 'فاصوليا',
+    // Cultures spéciales
+    'Palmier dattier': 'نخيل', 'Vigne': 'عنب', 'Pastèque': 'بطيخ', 'Melon': 'شمام', 'Fraisier': 'فراولة',
   };
 
   int _nbPlants = 1;
@@ -478,6 +576,10 @@ class _FormulaireScreenState extends ConsumerState<FormulaireScreen> {
         : (_tunisiaGovernoratesCities[selectedGovernorate] ?? const <String>[]);
     final selectedCity = _cityCtrl.text.isEmpty ? null : _cityCtrl.text;
 
+    final bool isAr = langState.lang == Lang.ar;
+    String locLabel(String fr) => isAr ? (_locAr[fr] ?? fr) : fr;
+    String plantLabel(String fr) => isAr ? (_plantAr[fr] ?? fr) : fr;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -490,13 +592,14 @@ class _FormulaireScreenState extends ConsumerState<FormulaireScreen> {
             ]),
         const SizedBox(height: 12),
         _FormField(langState.t('wizard.country'),
-            TextEditingController(text: _country),
+            TextEditingController(text: locLabel(_country)),
             enabled: false),
         const SizedBox(height: 12),
         _DropdownField(
           label: langState.t('wizard.gouvernorat'),
           value: selectedGovernorate,
           items: _tunisiaGovernoratesCities.keys.toList(growable: false),
+          display: locLabel,
           onChanged: (value) {
             setState(() {
               _gouvernoratCtrl.text = value ?? '';
@@ -509,8 +612,9 @@ class _FormulaireScreenState extends ConsumerState<FormulaireScreen> {
           label: langState.t('wizard.city'),
           value: cities.contains(selectedCity) ? selectedCity : null,
           items: cities,
+          display: locLabel,
           hintText: selectedGovernorate == null
-              ? 'Choisissez d\'abord un gouvernorat'
+              ? langState.t('wizard.choose_gov_first')
               : null,
           onChanged: selectedGovernorate == null
               ? null
@@ -591,6 +695,7 @@ class _FormulaireScreenState extends ConsumerState<FormulaireScreen> {
                 label: langState.t('wizard.plant_category'),
                 value: selectedCategory,
                 items: _plantTypesByCategory.keys.toList(growable: false),
+                display: plantLabel,
                 hintText: langState.t('wizard.plant_choose_category'),
                 onChanged: (value) {
                   setState(() {
@@ -606,6 +711,7 @@ class _FormulaireScreenState extends ConsumerState<FormulaireScreen> {
                     label: langState.t('wizard.plant_type'),
                     value: selectedPlantType,
                     items: typeOptions,
+                    display: plantLabel,
                     hintText: selectedCategory == null
                       ? langState.t('wizard.plant_choose_category_first')
                       : langState.t('wizard.plant_choose_type'),
@@ -827,6 +933,7 @@ class _DropdownField extends StatelessWidget {
   final List<String> items;
   final ValueChanged<String?>? onChanged;
   final String? hintText;
+  final String Function(String)? display;
 
   const _DropdownField({
     required this.label,
@@ -834,6 +941,7 @@ class _DropdownField extends StatelessWidget {
     required this.items,
     required this.onChanged,
     this.hintText,
+    this.display,
   });
 
   @override
@@ -849,7 +957,7 @@ class _DropdownField extends StatelessWidget {
               .map(
                 (item) => DropdownMenuItem<String>(
                   value: item,
-                  child: Text(item, style: const TextStyle(fontSize: 13)),
+                  child: Text(display != null ? display!(item) : item, style: const TextStyle(fontSize: 13)),
                 ),
               )
               .toList(growable: false),

@@ -16,4 +16,8 @@ class UserApi {
       _c.postMultipartAvatar('/user/avatar', bytes, filename);
 
   Future<Map<String, dynamic>?> deleteAvatar() => _c.deleteJson('/user/avatar');
+
+  /// Crée une réclamation pour l'utilisateur connecté (profile_id dérivé côté serveur).
+  Future<Map<String, dynamic>?> createReclamation(String sujet, String message) =>
+      _c.postJson('/reclamations', {'sujet': sujet, 'message': message});
 }

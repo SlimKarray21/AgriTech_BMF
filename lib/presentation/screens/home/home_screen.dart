@@ -315,16 +315,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   style: theme.textTheme.labelSmall,
                 ),
                 const Divider(height: 24),
-                _SectionHeader(icon: Icons.science_outlined, color: AppColors.farmEarth, title: langState.t('index.soil_data')),
-                const SizedBox(height: 8),
-                Row(children: [
-                  Expanded(child: _DataChip(parcelle.soil.temperature, langState.t('index.soil_temp'), AppColors.farmSun)),
-                  const SizedBox(width: 8),
-                  Expanded(child: _DataChip(parcelle.soil.humidity, langState.t('index.soil_humidity'), AppColors.farmWater)),
-                  const SizedBox(width: 8),
-                  Expanded(child: _DataChip(parcelle.soil.ph, langState.t('index.soil_ph'), AppColors.farmEarth)),
-                ]),
-                const SizedBox(height: 16),
                 _SectionHeader(icon: Icons.wb_sunny_outlined, color: AppColors.farmSun, title: langState.t('index.climate_data')),
                 const SizedBox(height: 8),
                 Wrap(spacing: 8, runSpacing: 8, children: [
@@ -347,8 +337,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         color: v.isOpen ? AppColors.farmWater.withValues(alpha: 0.3) : theme.colorScheme.outline,
                       ),
                     ),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        Row(children: [
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -385,8 +377,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ),
                         Switch(
                           value: v.isOpen,
-                          onChanged: (_) => p.Provider.of<ValveProvider>(sheetCtx, listen: false).toggleValve(v.id),
+                          onChanged: (_) => _toggleValveSafe(sheetCtx, v),
                         ),
+                        ]),
+                        const SizedBox(height: 8),
+                        // Données du sol (capteur de la vanne)
+                        Row(children: [
+                          Expanded(child: _DataChip(parcelle.soil.temperature, langState.t('index.soil_temp'), AppColors.farmSun)),
+                          const SizedBox(width: 8),
+                          Expanded(child: _DataChip(parcelle.soil.humidity, langState.t('index.soil_humidity'), AppColors.farmWater)),
+                          const SizedBox(width: 8),
+                          Expanded(child: _DataChip(parcelle.soil.ph, langState.t('index.soil_ph'), AppColors.farmEarth)),
+                        ]),
                       ],
                     ),
                   );
@@ -431,6 +433,63 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       case 'recolte': return AppColors.farmSun;
       default: return AppColors.farmLeaf;
     }
+  }
+
+  // Même condition que l'écran Vannes : au moins 1 vanne ouverte par parcelle.
+  Future<void> _toggleValveSafe(BuildContext context, ValveModel valve) async {
+    final valveProvider = p.Provider.of<ValveProvider>(context, listen: false);
+    final nextOpen = !valve.isOpen;
+
+    // ── SÉCURITÉ : au moins 1 vanne ouverte par parcelle ────────────────────
+    if (!nextOpen) {
+      final parcelleValves = valveProvider.byParcelle(valve.parcelleId);
+      final openInParcelle = parcelleValves.where((v) => v.isOpen).length;
+      if (openInParcelle <= 1) {
+        if (context.mounted) {
+          final langS = ref.read(languageProvider);
+          await showDialog<void>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              icon: const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 40),
+              title: Text(langS.t('vannes.security_title'), textAlign: TextAlign.center),
+              content: Text(langS.t('vannes.security_msg'), textAlign: TextAlign.center),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: Text(langS.t('vannes.understood')),
+                ),
+              ],
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    if (valve.backendId != null) {
+      try {
+        await ref.read(uiEarthApiProvider).capteurSol.updateVanne(valve.backendId!, {
+          'isOpen': nextOpen,
+          'lastAction': nextOpen ? 'Ouvert depuis mobile' : 'Fermé depuis mobile',
+        });
+      } on ApiException catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erreur backend vanne: ${e.message}')),
+          );
+        }
+        return;
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erreur réseau vanne: $e')),
+          );
+        }
+        return;
+      }
+    }
+
+    valveProvider.toggleValve(valve.id);
   }
 }
 
