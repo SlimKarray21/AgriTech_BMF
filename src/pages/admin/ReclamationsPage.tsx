@@ -13,8 +13,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DeleteDialog } from "@/components/DeleteDialog";
-import { CheckCircle2, Clock, Plus, MessageSquare, RotateCcw } from "lucide-react";
+import { CheckCircle2, Clock, Plus, MessageSquare, RotateCcw, Users, Package } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 export default function ReclamationsPage() {
@@ -60,7 +61,77 @@ export default function ReclamationsPage() {
     });
   };
 
-  const filtered = reclamations.filter(r => filterStatus === "all" || r.statut === filterStatus);
+  const byStatus = (list: typeof reclamations) =>
+    list.filter(r => filterStatus === "all" || r.statut === filterStatus);
+
+  const userList = byStatus(reclamations.filter(r => r.userRole !== "PARTENAIRE"));
+  const partenaireList = byStatus(reclamations.filter(r => r.userRole === "PARTENAIRE"));
+
+  const renderTable = (list: typeof reclamations, firstColLabel: string, emptyLabel: string) => (
+    <Card>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{firstColLabel}</TableHead>
+              <TableHead>Sujet</TableHead>
+              <TableHead>Message</TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead>Statut</TableHead>
+              <TableHead className="w-32">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {list.map((r) => (
+              <TableRow key={r.id}>
+                <TableCell className="font-medium">
+                  <div>{r.userName}</div>
+                  <div className="text-xs text-muted-foreground">{r.userEmail}</div>
+                </TableCell>
+                <TableCell>{r.sujet}</TableCell>
+                <TableCell className="max-w-xs truncate text-sm text-muted-foreground whitespace-pre-line">{r.message}</TableCell>
+                <TableCell className="text-sm">{new Date(r.created_at).toLocaleDateString("fr-FR")}</TableCell>
+                <TableCell>
+                  {r.statut === "traite" ? (
+                    <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-100">
+                      <CheckCircle2 className="mr-1 h-3 w-3" /> Traité
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="border-orange-400 bg-orange-50 text-orange-700 dark:bg-orange-950/30">
+                      <Clock className="mr-1 h-3 w-3" /> En attente
+                    </Badge>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <div className="flex gap-1">
+                    {isPrivileged && r.statut === "en_attente" && (
+                      <Button variant="ghost" size="sm" title="Marquer comme traité" onClick={() => setStatusMut.mutate({ id: r.id, statut: "traite" })}>
+                        <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                      </Button>
+                    )}
+                    {isPrivileged && r.statut === "traite" && (
+                      <Button variant="ghost" size="sm" title="Rouvrir" onClick={() => setStatusMut.mutate({ id: r.id, statut: "en_attente" })}>
+                        <RotateCcw className="h-3 w-3 text-amber-600" />
+                      </Button>
+                    )}
+                    {profile?.user_role === "ADMIN" && (
+                      <DeleteDialog onConfirm={() => deleteMut.mutate(r.id)} itemName={r.sujet} />
+                    )}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+            {list.length === 0 && (
+              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                {emptyLabel}
+              </TableCell></TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
 
   return (
     <div className="space-y-6">
@@ -79,69 +150,18 @@ export default function ReclamationsPage() {
         </div>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Utilisateur</TableHead>
-                <TableHead>Sujet</TableHead>
-                <TableHead>Message</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Statut</TableHead>
-                <TableHead className="w-32">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="font-medium">
-                    <div>{r.userName}</div>
-                    <div className="text-xs text-muted-foreground">{r.userEmail}</div>
-                  </TableCell>
-                  <TableCell>{r.sujet}</TableCell>
-                  <TableCell className="max-w-xs truncate text-sm text-muted-foreground">{r.message}</TableCell>
-                  <TableCell className="text-sm">{new Date(r.created_at).toLocaleDateString("fr-FR")}</TableCell>
-                  <TableCell>
-                    {r.statut === "traite" ? (
-                      <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-100">
-                        <CheckCircle2 className="mr-1 h-3 w-3" /> Traité
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="border-orange-400 bg-orange-50 text-orange-700 dark:bg-orange-950/30">
-                        <Clock className="mr-1 h-3 w-3" /> En attente
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      {isPrivileged && r.statut === "en_attente" && (
-                        <Button variant="ghost" size="sm" title="Marquer comme traité" onClick={() => setStatusMut.mutate({ id: r.id, statut: "traite" })}>
-                          <CheckCircle2 className="h-3 w-3 text-emerald-600" />
-                        </Button>
-                      )}
-                      {isPrivileged && r.statut === "traite" && (
-                        <Button variant="ghost" size="sm" title="Rouvrir" onClick={() => setStatusMut.mutate({ id: r.id, statut: "en_attente" })}>
-                          <RotateCcw className="h-3 w-3 text-amber-600" />
-                        </Button>
-                      )}
-                      {profile?.user_role === "ADMIN" && (
-                        <DeleteDialog onConfirm={() => deleteMut.mutate(r.id)} itemName={r.sujet} />
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {filtered.length === 0 && (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                  <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                  Aucune réclamation
-                </TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="users">
+        <TabsList>
+          <TabsTrigger value="users"><Users className="mr-1 h-4 w-4" /> Utilisateurs <Badge variant="secondary" className="ml-1">{userList.length}</Badge></TabsTrigger>
+          <TabsTrigger value="partenaires"><Package className="mr-1 h-4 w-4" /> Demandes Matériel <Badge variant="secondary" className="ml-1">{partenaireList.length}</Badge></TabsTrigger>
+        </TabsList>
+        <TabsContent value="users" className="mt-4">
+          {renderTable(userList, "Utilisateur", "Aucune réclamation utilisateur")}
+        </TabsContent>
+        <TabsContent value="partenaires" className="mt-4">
+          {renderTable(partenaireList, "Partenaire", "Aucune demande de matériel")}
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={creating} onOpenChange={setCreating}>
         <DialogContent>

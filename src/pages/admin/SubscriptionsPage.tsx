@@ -53,10 +53,9 @@ export default function SubscriptionsPage() {
   const removeMut = useMutation({
     mutationFn: (id: string) =>
       updateProfile(id, {
-        date_deb_abo: undefined,
-        date_exp_abo: undefined,
-        type_abo: undefined,
-        abo_electrovanne: false,
+        date_deb_abo: "",
+        date_exp_abo: "",
+        type_abo: "",
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["profiles"] });
@@ -114,8 +113,6 @@ export default function SubscriptionsPage() {
         date_deb_abo: startDate || undefined,
         date_exp_abo: endDate || undefined,
         type_abo: selectedPlan?.name ?? undefined,
-        abo_capteur_sol: true,
-        abo_electrovanne: false,
       },
     });
   };

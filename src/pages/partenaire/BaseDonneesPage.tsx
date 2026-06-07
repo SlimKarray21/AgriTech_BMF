@@ -166,9 +166,6 @@ export default function BaseDonneesPage() {
               <p className="text-sm text-muted-foreground">{t("bdd.userFile")}</p>
             </div>
           </div>
-          <Button onClick={() => setShowWizard(true)} className="bg-primary hover:bg-primary/90">
-            <Plus className="mr-2 h-4 w-4" /> Nouveau Projet
-          </Button>
         </div>
 
         <NewProjectDialog
@@ -259,7 +256,7 @@ export default function BaseDonneesPage() {
                               </p>
                             </div>
                           </div>
-                          <Button variant="ghost" size="sm" onClick={() => navigate("/admin/rapport-eau")}>
+                          <Button variant="ghost" size="sm" onClick={() => navigate("/partenaire/rapport-eau")}>
                             <Eye className="h-4 w-4" />
                           </Button>
                         </div>
@@ -288,7 +285,7 @@ export default function BaseDonneesPage() {
                               </p>
                             </div>
                           </div>
-                          <Button variant="ghost" size="sm" onClick={() => navigate("/admin/rapport-sol")}>
+                          <Button variant="ghost" size="sm" onClick={() => navigate("/partenaire/rapport-sol")}>
                             <Eye className="h-4 w-4" />
                           </Button>
                         </div>
@@ -303,7 +300,12 @@ export default function BaseDonneesPage() {
           {/* PARCELLES */}
           <TabsContent value="parcelles">
             <Card>
-              <CardHeader><CardTitle className="text-base flex items-center gap-2"><Grid3X3 className="h-4 w-4" /> {t("bdd.parcelles")} ({userSurfaces.length})</CardTitle></CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2"><Grid3X3 className="h-4 w-4" /> {t("bdd.parcelles")} ({userSurfaces.length})</CardTitle>
+                <Button onClick={() => setShowWizard(true)} size="sm" className="bg-primary hover:bg-primary/90">
+                  <Plus className="mr-2 h-4 w-4" /> Nouveau Projet
+                </Button>
+              </CardHeader>
               <CardContent>
                 {userSurfaces.length === 0 ? (
                   <p className="text-sm text-muted-foreground">{t("parcelle.none")}</p>
@@ -421,9 +423,6 @@ export default function BaseDonneesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-foreground">{t("bdd.title")}</h2>
-        <Button onClick={() => setShowWizard(true)} className="bg-primary hover:bg-primary/90">
-          <Plus className="mr-2 h-4 w-4" /> Nouveau Projet
-        </Button>
       </div>
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

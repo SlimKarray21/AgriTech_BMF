@@ -15,7 +15,8 @@ export default function LocationSelector({ value, onChange }: LocationSelectorPr
 
   // Parse existing value "Pays,Gouvernorat,Ville" or "Pays,Gouvernorat,Ville,Village"
   const parts = value ? value.split(",").map((s) => s.trim()) : [];
-  const [selectedCountry, setSelectedCountry] = useState(parts[0] || "");
+  // Pays fixé à Tunisie
+  const [selectedCountry, setSelectedCountry] = useState(parts[0] || "Tunisie");
   const [selectedGov, setSelectedGov] = useState(parts[1] || "");
   const [selectedCity, setSelectedCity] = useState(parts[2] || "");
   const [village, setVillage] = useState(parts[3] || "");
@@ -48,8 +49,8 @@ export default function LocationSelector({ value, onChange }: LocationSelectorPr
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       <div>
         <Label>{t("location.country")}</Label>
-        <Select value={selectedCountry} onValueChange={handleCountryChange}>
-          <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+        <Select value={selectedCountry} onValueChange={handleCountryChange} disabled>
+          <SelectTrigger><SelectValue placeholder="Tunisie" /></SelectTrigger>
           <SelectContent>
             {countries.map((c) => (
               <SelectItem key={c.code} value={c.name}>{c.name}</SelectItem>

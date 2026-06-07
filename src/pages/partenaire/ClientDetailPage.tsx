@@ -22,7 +22,7 @@ export default function ClientDetailPage() {
     return (
       <div className="text-center py-12">
         <p className="text-muted-foreground">Utilisateur introuvable</p>
-        <Button variant="outline" className="mt-4" onClick={() => navigate("/admin/travail")}>
+        <Button variant="outline" className="mt-4" onClick={() => navigate(-1)}>
           <ArrowLeft className="mr-2 h-4 w-4" /> Retour
         </Button>
       </div>
@@ -32,7 +32,7 @@ export default function ClientDetailPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/admin/travail")}>
+        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>

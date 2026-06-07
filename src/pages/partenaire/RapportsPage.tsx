@@ -13,7 +13,7 @@ export default function RapportsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl">
         <Card
           className="cursor-pointer hover:shadow-lg transition-all hover:scale-[1.02] border-2 hover:border-blue-300"
-          onClick={() => navigate("/admin/rapport-eau")}
+          onClick={() => navigate("/partenaire/rapport-eau")}
         >
           <CardContent className="p-8 flex flex-col items-center gap-4 text-center">
             <div className="h-16 w-16 rounded-full bg-blue-100 flex items-center justify-center">
@@ -26,7 +26,7 @@ export default function RapportsPage() {
 
         <Card
           className="cursor-pointer hover:shadow-lg transition-all hover:scale-[1.02] border-2 hover:border-emerald-300"
-          onClick={() => navigate("/admin/rapport-sol")}
+          onClick={() => navigate("/partenaire/rapport-sol")}
         >
           <CardContent className="p-8 flex flex-col items-center gap-4 text-center">
             <div className="h-16 w-16 rounded-full bg-emerald-100 flex items-center justify-center">

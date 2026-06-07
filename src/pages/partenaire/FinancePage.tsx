@@ -156,7 +156,8 @@ export default function FinancePage() {
           <ClientsTab profById={profById} planById={planById} plans={plans} isAdmin={isAdmin} />
         </TabsContent>
         <TabsContent value="plans" className="mt-4">
-          <PlansTab plans={plans} isAdmin={isAdmin} />
+          {/* Le partenaire voit les abonnements en lecture seule (gestion réservée à l'admin) */}
+          <PlansTab plans={plans} canManage={false} />
         </TabsContent>
         <TabsContent value="subpays" className="mt-4">
           <SubPaysTab subpays={subpays} planById={planById} profById={profById} isAdmin={isAdmin} userId={profile?.id} />
@@ -168,7 +169,7 @@ export default function FinancePage() {
 
 // â”€â”€ Plans Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-function PlansTab({ plans, isAdmin }: { plans: Plan[]; isAdmin: boolean }) {
+function PlansTab({ plans, canManage }: { plans: Plan[]; canManage: boolean }) {
   const qc = useQueryClient();
   const [edit, setEdit] = useState<(Partial<Plan> & { featuresStr?: string }) | null>(null);
 
@@ -215,7 +216,7 @@ function PlansTab({ plans, isAdmin }: { plans: Plan[]; isAdmin: boolean }) {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-base">Plans d'abonnement</CardTitle>
-        {isAdmin && (
+        {canManage && (
           <Button size="sm" onClick={openNew}>
             <Plus className="h-4 w-4 mr-1" />Nouveau plan
           </Button>
@@ -239,7 +240,7 @@ function PlansTab({ plans, isAdmin }: { plans: Plan[]; isAdmin: boolean }) {
                 <ul className="text-sm space-y-1">
                   {p.features.map((f, i) => <li key={i}>âœ“ {f}</li>)}
                 </ul>
-                {isAdmin && (
+                {canManage && (
                   <div className="flex gap-2 pt-2">
                     <Button size="sm" variant="outline" className="flex-1" onClick={() => openEdit(p)}>
                       <Pencil className="h-3 w-3 mr-1" />Modifier

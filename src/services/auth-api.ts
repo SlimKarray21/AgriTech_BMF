@@ -75,14 +75,15 @@ export async function getUserProfileApi(token: string): Promise<UserProfile> {
 export interface AdminUser {
   id: string;
   email: string;
-  role: string;
+  role?: string;      // ancien champ (peut être absent)
+  userRole: string;   // ADMIN | PARTENAIRE | CLIENT
   firstName: string | null;
   lastName: string | null;
   phoneNumber: string | null;
-  location: string | null;
   avatarUrl: string | null;
   emailVerified: boolean;
   createdAt: string;
+  profileId?: number;
 }
 
 export async function getAdminUsersApi(token: string, limit = 200, offset = 0): Promise<{ users: AdminUser[]; total: number }> {

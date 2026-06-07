@@ -35,6 +35,7 @@ export interface Reclamation {
   // joined
   userName?: string;
   userEmail?: string;
+  userRole?: string;
 }
 
 export interface TypePlante {

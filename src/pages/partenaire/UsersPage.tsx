@@ -24,6 +24,8 @@ export default function UsersPage() {
 
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState("");
+  const [phoneRaw, setPhoneRaw] = useState("");
+  const [phoneError, setPhoneError] = useState("");
 
   // État dialog vérification
   const [verifyDialog, setVerifyDialog] = useState<{
@@ -79,6 +81,7 @@ export default function UsersPage() {
     onSuccess: (data, variables) => {
       qc.invalidateQueries({ queryKey: ["profiles"] });
       setCreating(false);
+      setPhoneRaw("");
       // Ouvrir le dialog de vérification
       setOtpInput(data.otpCode ?? "");
       setVerified(false);
@@ -93,15 +96,29 @@ export default function UsersPage() {
       toast({ title: "Erreur", description: e.error ?? e.message, variant: "destructive" }),
   });
 
+  const formatPhone = (raw: string) => {
+    const digits = raw.replace(/\D/g, "").slice(0, 8);
+    setPhoneRaw(digits);
+    if (digits.length > 0 && digits.length < 8) {
+      setPhoneError("Le numéro doit contenir 8 chiffres après +216");
+    } else {
+      setPhoneError("");
+    }
+  };
+
   const handleCreateSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (phoneRaw.length > 0 && phoneRaw.length < 8) {
+      setPhoneError("Le numéro doit contenir 8 chiffres après +216");
+      return;
+    }
     const fd = new FormData(e.currentTarget);
     createMut.mutate({
       email: fd.get("email") as string,
       password: fd.get("password") as string,
       firstName: fd.get("firstName") as string,
       lastName: fd.get("lastName") as string,
-      phoneNumber: (fd.get("phone") as string) || "",
+      phoneNumber: phoneRaw.length === 8 ? `+216${phoneRaw}` : "",
       createdBy: currentProfile?.id ? Number(currentProfile.id) : undefined,
     });
   };
@@ -231,10 +248,24 @@ export default function UsersPage() {
             </div>
             <div>
               <Label>{t("auth.phone")}</Label>
-              <Input name="phone" placeholder="+21600000000" />
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium bg-muted px-3 py-2 rounded-md border border-input text-muted-foreground select-none">+216</span>
+                <div className="flex-1">
+                  <Input
+                    name="phone"
+                    inputMode="numeric"
+                    placeholder="00 000 000"
+                    value={phoneRaw.replace(/(\d{2})(\d{3})(\d{3})/, "$1 $2 $3")}
+                    onChange={(e) => formatPhone(e.target.value)}
+                    maxLength={10}
+                    className={phoneError ? "border-destructive" : ""}
+                  />
+                  {phoneError && <p className="text-xs text-destructive mt-1">{phoneError}</p>}
+                </div>
+              </div>
             </div>
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setCreating(false)}>{t("common.cancel")}</Button>
+              <Button type="button" variant="outline" onClick={() => { setCreating(false); setPhoneRaw(""); setPhoneError(""); }}>{t("common.cancel")}</Button>
               <Button type="submit" disabled={createMut.isPending}>
                 {createMut.isPending ? "Création..." : "Créer"}
               </Button>

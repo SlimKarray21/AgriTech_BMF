@@ -63,12 +63,9 @@ export const updateProfile = async (id: string, data: Partial<Profile>): Promise
   if (data.email !== undefined)            body.email            = data.email;
   if (data.date_deb_abo !== undefined)     body.date_deb_abo     = data.date_deb_abo || null;
   if (data.date_exp_abo !== undefined)     body.date_exp_abo     = data.date_exp_abo || null;
-  if (data.type_abo !== undefined)         body.type_abo         = data.type_abo || null;
+  if (data.type_abo !== undefined)         body.type_abo         = data.type_abo  || null;
   if (data.company_name !== undefined)     body.company_name     = data.company_name || null;
   if (data.company_logo !== undefined)     body.company_logo     = data.company_logo || null;
-  if (data.abo_capteur_sol !== undefined)  body.abo_capteur_sol  = data.abo_capteur_sol;
-  if (data.abo_electrovanne !== undefined) body.abo_electrovanne = data.abo_electrovanne;
-  if (data.abo_sante_plante !== undefined) body.abo_sante_plante = data.abo_sante_plante;
   return apiFetch(`/api/agri/profiles/${id}`, { method: "PATCH", body: JSON.stringify(body) });
 };
 
@@ -364,6 +361,7 @@ export const getReclamations = async (): Promise<Reclamation[]> => {
       created_at: r.created_at,
       userName: prof ? `${prof.first_name ?? ""} ${prof.last_name ?? ""}`.trim() : "—",
       userEmail: prof?.email ?? "—",
+      userRole: prof?.user_role ?? "",
     };
   });
 };
@@ -500,6 +498,13 @@ export const getReservationItems = async (): Promise<any[]> =>
 
 export const createReservationItem = async (d: any): Promise<any> =>
   apiFetch("/api/agri/reservation-items", { method: "POST", body: JSON.stringify(d) });
+
+export const getReservationItemsByReservation = async (reservationId: string): Promise<any[]> =>
+  apiFetch(`/api/agri/reservation-items?reservation_id=${reservationId}`);
+
+export const deleteReservationItem = async (id: string): Promise<void> => {
+  await apiFetch(`/api/agri/reservation-items/${id}`, { method: "DELETE" });
+};
 
 // ── SUPPORT NOTIFICATIONS ─────────────────────────────────────────────────────
 

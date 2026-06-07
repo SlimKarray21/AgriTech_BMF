@@ -38,7 +38,7 @@ export default function LoginPage() {
         return;
       }
       await setToken(data.token);
-      navigate(role === "PARTENAIRE" ? "/partenaire/dashboard" : "/admin/dashboard");
+      navigate(role === "PARTENAIRE" ? "/partenaire/users" : "/admin/dashboard");
     } catch (err: unknown) {
       const apiErr = err as ApiError;
       if (apiErr.status === 403 && apiErr.userId) {
@@ -65,7 +65,7 @@ export default function LoginPage() {
         return;
       }
       await setToken(data.token);
-      navigate(role === "PARTENAIRE" ? "/partenaire/dashboard" : "/admin/dashboard");
+      navigate(role === "PARTENAIRE" ? "/partenaire/users" : "/admin/dashboard");
     } catch (err: unknown) {
       const apiErr = err as ApiError;
       toast({ title: "Code invalide", description: apiErr.error ?? apiErr.message ?? "Le code saisi est incorrect ou expiré.", variant: "destructive" });

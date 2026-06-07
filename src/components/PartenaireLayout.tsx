@@ -17,25 +17,12 @@ import {
 type NavItem = { titleKey: string; url: string; icon: any; roles: string[] };
 
 const navGlobal: NavItem[] = [
-  { titleKey: "nav.dashboard", url: "/partenaire/dashboard", icon: LayoutDashboard, roles: ["PARTENAIRE"] },
   { titleKey: "nav.users", url: "/partenaire/users", icon: Users, roles: ["PARTENAIRE"] },
   { titleKey: "nav.subscriptions", url: "/partenaire/subscriptions", icon: CreditCard, roles: ["PARTENAIRE"] },
-  { titleKey: "nav.finance", url: "/partenaire/finance", icon: Wallet, roles: ["PARTENAIRE"] },
   { titleKey: "nav.rapports", url: "/partenaire/rapports", icon: FileBarChart, roles: ["PARTENAIRE"] },
   { titleKey: "nav.reclamations", url: "/partenaire/reclamations", icon: MessageSquare, roles: ["PARTENAIRE"] },
+  { titleKey: "nav.demandeMateriel", url: "/partenaire/demande-materiel", icon: Package, roles: ["PARTENAIRE"] },
   { titleKey: "nav.baseDonnees", url: "/partenaire/base-donnees", icon: HardDrive, roles: ["PARTENAIRE"] },
-];
-
-const navStock: NavItem[] = [
-  { titleKey: "nav.stock", url: "/partenaire/stock", icon: Package, roles: ["PARTENAIRE"] },
-  { titleKey: "nav.reservationMateriel", url: "/partenaire/reservation-materiel", icon: ClipboardList, roles: ["PARTENAIRE"] },
-  { titleKey: "nav.ventes", url: "/partenaire/ventes", icon: ShoppingCart, roles: ["PARTENAIRE"] },
-];
-
-const navTravail: NavItem[] = [
-  { titleKey: "nav.surfaces", url: "/partenaire/surfaces", icon: Grid3X3, roles: ["PARTENAIRE"] },
-  { titleKey: "nav.donneesDetaillees", url: "/partenaire/donnees-detaillees", icon: Database, roles: ["PARTENAIRE"] },
-  { titleKey: "nav.capteurs", url: "/partenaire/capteurs", icon: Cpu, roles: ["PARTENAIRE"] },
 ];
 
 const pageTitleKeys: Record<string, string> = {
@@ -50,6 +37,7 @@ const pageTitleKeys: Record<string, string> = {
   "/partenaire/rapport-eau": "rapports.waterReport",
   "/partenaire/base-donnees": "nav.baseDonnees",
   "/partenaire/reclamations": "nav.reclamations",
+  "/partenaire/demande-materiel": "nav.demandeMateriel",
   "/partenaire/finance": "nav.finance",
   "/partenaire/stock": "nav.stock",
   "/partenaire/reservation-materiel": "nav.reservationMateriel",
@@ -85,7 +73,7 @@ export default function PartenaireLayout() {
   if (isNotPartenaire) return <Navigate to="/auth/login" replace />;
 
   if (location.pathname === "/partenaire" || location.pathname === "/partenaire/") {
-    return <Navigate to="/partenaire/dashboard" replace />;
+    return <Navigate to="/partenaire/users" replace />;
   }
 
   const displayName = profile.first_name
@@ -128,48 +116,12 @@ export default function PartenaireLayout() {
               <SidebarGroupLabel>Général</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {navGlobal.filter(item => item.roles.includes(userRole)).map((item) => (
+                  {navGlobal.map((item) => (
                     <SidebarMenuItem key={item.titleKey}>
                       <SidebarMenuButton asChild>
                         <NavLink to={item.url} end className="hover:bg-sidebar-accent/50" activeClassName="bg-primary/10 text-primary font-medium">
                           <item.icon className="mr-2 h-4 w-4" />
                           <span className="flex-1">{t(item.titleKey)}</span>
-                        </NavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-
-            <SidebarGroup>
-              <SidebarGroupLabel>Stock</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {navStock.filter(item => item.roles.includes(userRole)).map((item) => (
-                    <SidebarMenuItem key={item.titleKey}>
-                      <SidebarMenuButton asChild>
-                        <NavLink to={item.url} end className="hover:bg-sidebar-accent/50" activeClassName="bg-primary/10 text-primary font-medium">
-                          <item.icon className="mr-2 h-4 w-4" />
-                          <span className="flex-1">{t(item.titleKey)}</span>
-                        </NavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-
-            <SidebarGroup>
-              <SidebarGroupLabel>{t("nav.travail")}</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {navTravail.filter(item => item.roles.includes(userRole)).map((item) => (
-                    <SidebarMenuItem key={item.titleKey}>
-                      <SidebarMenuButton asChild>
-                        <NavLink to={item.url} end className="hover:bg-sidebar-accent/50" activeClassName="bg-primary/10 text-primary font-medium">
-                          <item.icon className="mr-2 h-4 w-4" />
-                          <span>{t(item.titleKey)}</span>
                         </NavLink>
                       </SidebarMenuButton>
                     </SidebarMenuItem>

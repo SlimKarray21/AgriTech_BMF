@@ -28,12 +28,19 @@ export default function SubscriptionsPage() {
     queryKey: ["plans"],
     queryFn: getSubscriptionPlans,
   });
+  const parseFeatures = (raw: any): string[] => {
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw !== "string" || !raw.trim()) return [];
+    try { const p = JSON.parse(raw); if (Array.isArray(p)) return p; } catch { /* not JSON */ }
+    return raw.split(",").map((s: string) => s.trim()).filter(Boolean);
+  };
   const plans = rawPlans.map((p: any) => ({
     id: String(p.id),
     name: String(p.name),
     price_dt: Number(p.price_dt ?? 0),
     duration_days: Number(p.duration_days ?? 30),
     active: Boolean(p.active ?? true),
+    features: parseFeatures(p.features),
   })).filter((p: any) => p.active);
 
   const [editing, setEditing] = useState<Profile | null>(null);
@@ -143,6 +150,38 @@ export default function SubscriptionsPage() {
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-foreground">{t("nav.subscriptions")}</h2>
+
+      {/* Abonnements disponibles — lecture seule (gérés par l'admin) */}
+      {plans.length > 0 && (
+        <Card>
+          <CardContent className="p-5">
+            <h3 className="text-base font-semibold mb-4 flex items-center gap-2">
+              <Package className="h-4 w-4 text-primary" /> Abonnements disponibles
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {plans.map((p: any) => (
+                <Card key={p.id} className="border-2">
+                  <CardContent className="p-4 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <h4 className="font-bold leading-tight">{p.name}</h4>
+                      <Badge variant="outline" className="bg-emerald-500/15 text-emerald-700 border-emerald-300 shrink-0">Actif</Badge>
+                    </div>
+                    <div>
+                      <span className="text-2xl font-bold text-primary">{p.price_dt.toLocaleString("fr-FR")} DT</span>
+                      <span className="text-sm text-muted-foreground"> / {p.duration_days}j</span>
+                    </div>
+                    {p.features.length > 0 && (
+                      <ul className="text-sm space-y-1 text-muted-foreground">
+                        {p.features.map((f: string, i: number) => <li key={i}>✓ {f}</li>)}
+                      </ul>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {plans.length === 0 && (
         <div className="rounded-lg border border-orange-200 bg-orange-50 dark:bg-orange-950/20 p-4 text-sm text-orange-700 flex items-center gap-2">

@@ -30,14 +30,46 @@ export default function DonneesDetailleesPage() {
   const { data: surfaces = [] } = useQuery({ queryKey: ["surfaces"], queryFn: getSurfaces });
   const { data: profiles = [] } = useQuery({ queryKey: ["profiles"], queryFn: getProfiles });
 
-  const userBySurfaceId = useMemo(() => {
-    const m = new Map<string, string>();
-    surfaces.forEach(s => {
-      const u = profiles.find(p => p.id === s.fkUser);
-      if (u) m.set(s.id, `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim() || u.email || "—");
-    });
-    return m;
-  }, [surfaces, profiles]);
+  const userName = (u: any) =>
+    u ? (`${u.first_name ?? ""} ${u.last_name ?? ""}`.trim() || u.email || "—") : "Utilisateur inconnu";
+
+  // Plantes groupées : user -> parcelle -> plantes
+  const plantesGrouped = useMemo(() => {
+    const bySurface = new Map<string, Plante[]>();
+    for (const p of plantes) {
+      const arr = bySurface.get(p.fkSurface) ?? [];
+      arr.push(p);
+      bySurface.set(p.fkSurface, arr);
+    }
+    const byUser = new Map<string, { user: any; surfaces: { surface: any; plantes: Plante[] }[] }>();
+    for (const s of surfaces) {
+      const sp = bySurface.get(s.id);
+      if (!sp || sp.length === 0) continue;
+      const key = s.fkUser ?? "unknown";
+      if (!byUser.has(key)) byUser.set(key, { user: profiles.find(pr => pr.id === s.fkUser), surfaces: [] });
+      byUser.get(key)!.surfaces.push({ surface: s, plantes: sp });
+    }
+    return Array.from(byUser.values());
+  }, [plantes, surfaces, profiles]);
+
+  // Vannes groupées : user -> parcelle -> vannes
+  const vannesGrouped = useMemo(() => {
+    const bySurface = new Map<string, Vanne[]>();
+    for (const v of vannes) {
+      const arr = bySurface.get(v.fkSurface) ?? [];
+      arr.push(v);
+      bySurface.set(v.fkSurface, arr);
+    }
+    const byUser = new Map<string, { user: any; surfaces: { surface: any; vannes: Vanne[] }[] }>();
+    for (const s of surfaces) {
+      const sv = bySurface.get(s.id);
+      if (!sv || sv.length === 0) continue;
+      const key = s.fkUser ?? "unknown";
+      if (!byUser.has(key)) byUser.set(key, { user: profiles.find(pr => pr.id === s.fkUser), surfaces: [] });
+      byUser.get(key)!.surfaces.push({ surface: s, vannes: sv });
+    }
+    return Array.from(byUser.values());
+  }, [vannes, surfaces, profiles]);
 
   // Types CRUD
   const [showTypeForm, setShowTypeForm] = useState(false);
@@ -133,27 +165,45 @@ export default function DonneesDetailleesPage() {
               </form>
             </CardContent></Card>
           )}
-          <Card><CardContent className="p-0">
-            <Table>
-              <TableHeader><TableRow><TableHead>Nom</TableHead><TableHead>Âge</TableHead><TableHead>👤 Utilisateur</TableHead><TableHead>🌱 Parcelle</TableHead><TableHead>Type</TableHead><TableHead className="w-24">{t("common.actions")}</TableHead></TableRow></TableHeader>
-              <TableBody>
-                {plantes.map(p => (
-                  <TableRow key={p.id}>
-                    <TableCell>{p.nomPlante}</TableCell><TableCell>{p.age} ans</TableCell>
-                    <TableCell className="text-sm">{userBySurfaceId.get(p.fkSurface) ?? "—"}</TableCell>
-                    <TableCell>{p.surfaceNom}</TableCell><TableCell>{p.typePlanteNom}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => setEditPlante(p)}><Pencil className="h-3 w-3" /></Button>
-                        <DeleteDialog onConfirm={() => deletePlanteMut.mutate(p.id)} itemName={p.nomPlante} />
-                      </div>
-                    </TableCell>
-                  </TableRow>
+          {plantesGrouped.length === 0 && (
+            <Card><CardContent className="py-10 text-center text-muted-foreground">{t("donnees.noPlante")}</CardContent></Card>
+          )}
+          {plantesGrouped.map(group => (
+            <Card key={group.user?.id ?? "unknown"}>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  👤 {userName(group.user)}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {group.surfaces.map(({ surface, plantes: sPlantes }) => (
+                  <div key={surface.id} className="border rounded-lg overflow-hidden">
+                    <div className="px-4 py-2 bg-muted/40 font-medium text-sm flex items-center gap-2">
+                      <Leaf className="h-4 w-4 text-emerald-600" /> {surface.nomSurface}
+                      <span className="text-xs text-muted-foreground">({sPlantes.length} plante{sPlantes.length > 1 ? "s" : ""})</span>
+                    </div>
+                    <Table>
+                      <TableHeader><TableRow><TableHead>Nom</TableHead><TableHead>Âge</TableHead><TableHead className="w-24 text-right">{t("common.actions")}</TableHead></TableRow></TableHeader>
+                      <TableBody>
+                        {sPlantes.map(p => (
+                          <TableRow key={p.id}>
+                            <TableCell className="font-medium">{p.nomPlante}</TableCell>
+                            <TableCell>{p.age} ans</TableCell>
+                            <TableCell>
+                              <div className="flex gap-1 justify-end">
+                                <Button variant="ghost" size="sm" onClick={() => setEditPlante(p)}><Pencil className="h-3 w-3" /></Button>
+                                <DeleteDialog onConfirm={() => deletePlanteMut.mutate(p.id)} itemName={p.nomPlante} />
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 ))}
-                {plantes.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">{t("donnees.noPlante")}</TableCell></TableRow>}
-              </TableBody>
-            </Table>
-          </CardContent></Card>
+              </CardContent>
+            </Card>
+          ))}
         </TabsContent>
 
         {/* Vannes */}
@@ -176,28 +226,46 @@ export default function DonneesDetailleesPage() {
               </form>
             </CardContent></Card>
           )}
-          <Card><CardContent className="p-0">
-            <Table>
-              <TableHeader><TableRow><TableHead>Nom</TableHead><TableHead>Débit (L/h)</TableHead><TableHead>Nb plantes</TableHead><TableHead>👤 Utilisateur</TableHead><TableHead>🌱 Parcelle</TableHead><TableHead className="w-24">{t("common.actions")}</TableHead></TableRow></TableHeader>
-              <TableBody>
-                {vannes.map(v => (
-                  <TableRow key={v.id}>
-                    <TableCell>{v.nomVanne}</TableCell><TableCell>{v.debitEauParVanne}</TableCell>
-                    <TableCell>{v.nbPlantParVanne}</TableCell>
-                    <TableCell className="text-sm">{userBySurfaceId.get(v.fkSurface) ?? "—"}</TableCell>
-                    <TableCell>{v.surfaceNom}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => setEditVanne(v)}><Pencil className="h-3 w-3" /></Button>
-                        <DeleteDialog onConfirm={() => deleteVanneMut.mutate(v.id)} itemName={v.nomVanne} />
-                      </div>
-                    </TableCell>
-                  </TableRow>
+          {vannesGrouped.length === 0 && (
+            <Card><CardContent className="py-10 text-center text-muted-foreground">{t("donnees.noVanne")}</CardContent></Card>
+          )}
+          {vannesGrouped.map(group => (
+            <Card key={group.user?.id ?? "unknown"}>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  👤 {userName(group.user)}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {group.surfaces.map(({ surface, vannes: sVannes }) => (
+                  <div key={surface.id} className="border rounded-lg overflow-hidden">
+                    <div className="px-4 py-2 bg-muted/40 font-medium text-sm flex items-center gap-2">
+                      <Droplets className="h-4 w-4 text-blue-500" /> {surface.nomSurface}
+                      <span className="text-xs text-muted-foreground">({sVannes.length} vanne{sVannes.length > 1 ? "s" : ""})</span>
+                    </div>
+                    <Table>
+                      <TableHeader><TableRow><TableHead>Nom</TableHead><TableHead>Débit (L/h)</TableHead><TableHead>Nb plantes</TableHead><TableHead className="w-24 text-right">{t("common.actions")}</TableHead></TableRow></TableHeader>
+                      <TableBody>
+                        {sVannes.map(v => (
+                          <TableRow key={v.id}>
+                            <TableCell className="font-medium">{v.nomVanne}</TableCell>
+                            <TableCell>{v.debitEauParVanne}</TableCell>
+                            <TableCell>{v.nbPlantParVanne}</TableCell>
+                            <TableCell>
+                              <div className="flex gap-1 justify-end">
+                                <Button variant="ghost" size="sm" onClick={() => setEditVanne(v)}><Pencil className="h-3 w-3" /></Button>
+                                <DeleteDialog onConfirm={() => deleteVanneMut.mutate(v.id)} itemName={v.nomVanne} />
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 ))}
-                {vannes.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">{t("donnees.noVanne")}</TableCell></TableRow>}
-              </TableBody>
-            </Table>
-          </CardContent></Card>
+              </CardContent>
+            </Card>
+          ))}
         </TabsContent>
       </Tabs>
 

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -14,13 +13,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ClipboardList, Plus, Trash2, MapPin, User as UserIcon, Search, CheckCircle2, RotateCcw, Wifi, WifiOff, Clock, Pencil, Sparkles } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import {
+  getSurfaces, updateSurface,
+  getProfiles, updateProfile,
+  getSubscriptionPlans,
+  getStockItems, updateStockItem, createStockMovement,
+  getMaterialReservations, createMaterialReservation, updateMaterialReservation,
+  getReservationItemsByReservation, createReservationItem, deleteReservationItem,
+  createClientSale,
+  createSubscriptionPayment,
+} from "@/services/data-service";
+import type { Surface } from "@/types/models";
 
 type Reservation = {
   id: string; profile_id: string | null; surface_id: string | null;
   subscription_plan_id: string | null; status: string; notes: string | null;
   total_devices_price_dt: number; created_at: string; created_by: string | null;
 };
-type Surface = { id: string; nom_surface: string; localisation: string; fk_user: string | null; is_connected: boolean; created_at: string };
 type StockItem = { id: string; name: string; quantity: number; purchase_price_dt: number; category: string };
 type ResItem = { id: string; reservation_id: string; stock_item_id: string; quantity: number; unit_price_dt: number };
 type Plan = { id: string; name: string; price_dt: number; duration_days: number };
@@ -29,57 +38,62 @@ const DT = (n: number) => `${Number(n ?? 0).toLocaleString("fr-FR", { maximumFra
 
 export default function ReservationMaterielPage() {
   const qc = useQueryClient();
-  const { profile } = useAuth();
+  const { profile: currentProfile } = useAuth();
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("non");
 
-  useEffect(() => {
-    const ch = supabase.channel("res-page-rt")
-      .on("postgres_changes", { event: "*", schema: "public", table: "material_reservations" }, () => { qc.invalidateQueries({ queryKey: ["reservations-all"] }); })
-      .on("postgres_changes", { event: "*", schema: "public", table: "reservation_items" }, () => qc.invalidateQueries({ queryKey: ["reservation-items"] }))
-      .on("postgres_changes", { event: "*", schema: "public", table: "surfaces" }, () => qc.invalidateQueries({ queryKey: ["surfaces-all"] }))
-      .on("postgres_changes", { event: "*", schema: "public", table: "stock_items" }, () => qc.invalidateQueries({ queryKey: ["stock-items-all"] }))
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [qc]);
-
-  const { data: reservations = [] } = useQuery<Reservation[]>({
-    queryKey: ["reservations-all"],
-    queryFn: async () => (await supabase.from("material_reservations").select("*").order("created_at", { ascending: false })).data as any || [],
-  });
-  const { data: surfaces = [] } = useQuery<Surface[]>({
+  const { data: rawSurfaces = [] } = useQuery({
     queryKey: ["surfaces-all"],
-    queryFn: async () => (await supabase.from("surfaces").select("id,nom_surface,localisation,fk_user,is_connected,created_at").limit(2000)).data as any || [],
+    queryFn: getSurfaces,
+    refetchInterval: 10000,
   });
   const { data: profiles = [] } = useQuery({
     queryKey: ["profiles-all"],
-    queryFn: async () => (await supabase.from("profiles").select("id,first_name,last_name,email,date_exp_abo,type_abo,created_by")).data as any || [],
+    queryFn: getProfiles,
+    refetchInterval: 10000,
+  });
+  const { data: reservations = [] } = useQuery<Reservation[]>({
+    queryKey: ["reservations-all"],
+    queryFn: getMaterialReservations,
+    refetchInterval: 10000,
   });
   const { data: plans = [] } = useQuery<Plan[]>({
     queryKey: ["plans-active"],
-    queryFn: async () => (await supabase.from("subscription_plans").select("id,name,price_dt,duration_days").eq("active", true)).data as any || [],
+    queryFn: getSubscriptionPlans,
   });
   const { data: stockItems = [] } = useQuery<StockItem[]>({
     queryKey: ["stock-items-all"],
-    queryFn: async () => (await supabase.from("stock_items").select("id,name,quantity,purchase_price_dt,category")).data as any || [],
+    queryFn: getStockItems,
+    refetchInterval: 10000,
   });
 
-  const profById = useMemo(() => Object.fromEntries(profiles.map((p: any) => [p.id, p])), [profiles]);
-  const planById = useMemo(() => Object.fromEntries(plans.map(p => [p.id, p])), [plans]);
+  // Clients créés par ce partenaire
+  const myClientIds = useMemo(() => new Set(
+    profiles
+      .filter((p: any) => p.user_role === "CLIENT" && String(p.created_by) === String(currentProfile?.id))
+      .map((p: any) => String(p.id))
+  ), [profiles, currentProfile?.id]);
 
-  const visibleSurfaces = surfaces;
+  const profById = useMemo(() => Object.fromEntries(profiles.map((p: any) => [String(p.id), p])), [profiles]);
+  const planById = useMemo(() => Object.fromEntries(plans.map((p: any) => [p.id, p])), [plans]);
 
-  // Latest reservation per surface
+  // Parcelles appartenant aux clients de ce partenaire
+  const visibleSurfaces = useMemo(
+    () => rawSurfaces.filter(s => s.fkUser && myClientIds.has(s.fkUser)),
+    [rawSurfaces, myClientIds]
+  );
+
   const resBySurface = useMemo(() => {
     const m = new Map<string, Reservation>();
-    for (const r of reservations) {
-      if (!r.surface_id) continue;
-      if (!m.has(r.surface_id)) m.set(r.surface_id, r); // already sorted desc
+    const sorted = [...reservations].sort((a, b) => b.created_at?.localeCompare(a.created_at ?? "") ?? 0);
+    for (const r of sorted) {
+      if (r.surface_id == null) continue;
+      const key = String(r.surface_id);
+      if (!m.has(key)) m.set(key, r);
     }
     return m;
   }, [reservations]);
 
-  // Bucketize surfaces
   const buckets = useMemo(() => {
     const nonConn: Surface[] = [];
     const enAtt: Surface[] = [];
@@ -87,18 +101,14 @@ export default function ReservationMaterielPage() {
     for (const s of visibleSurfaces) {
       const r = resBySurface.get(s.id);
       const st = r?.status;
-      if (s.is_connected || st === "installe") {
-        conn.push(s);
-      } else if (st === "reserve" || st === "confirme") {
-        enAtt.push(s);
-      } else {
-        nonConn.push(s);
-      }
+      if (s.isConnected || st === "installe") conn.push(s);
+      else if (st === "reserve" || st === "confirme") enAtt.push(s);
+      else nonConn.push(s);
     }
     const filter = (arr: Surface[]) => arr.filter(s => {
       if (!search) return true;
-      const p = s.fk_user ? profById[s.fk_user] : null;
-      const hay = `${s.nom_surface} ${s.localisation} ${p?.first_name ?? ""} ${p?.last_name ?? ""} ${p?.email ?? ""}`.toLowerCase();
+      const p = s.fkUser ? profById[s.fkUser] : null;
+      const hay = `${s.nomSurface} ${s.localisation ?? ""} ${p?.first_name ?? ""} ${p?.last_name ?? ""} ${p?.email ?? ""}`.toLowerCase();
       return hay.includes(search.toLowerCase());
     });
     return { nonConn: filter(nonConn), enAtt: filter(enAtt), conn: filter(conn) };
@@ -140,7 +150,7 @@ export default function ReservationMaterielPage() {
       <ParcelleEditDialog
         surface={editSurface}
         reservation={editSurface ? resBySurface.get(editSurface.id) ?? null : null}
-        profile={editSurface?.fk_user ? profById[editSurface.fk_user] : null}
+        profile={editSurface?.fkUser ? profById[editSurface.fkUser] : null}
         stockItems={stockItems}
         plans={plans}
         onClose={() => setEditSurface(null)}
@@ -162,21 +172,27 @@ function SurfaceTable({
   const ensureReservation = async (s: Surface): Promise<Reservation> => {
     const existing = resBySurface.get(s.id);
     if (existing) return existing;
-    const { data, error } = await supabase.from("material_reservations").insert({
-      profile_id: s.fk_user, surface_id: s.id, status: "nouvelle_demande",
-    }).select("*").single();
-    if (error) throw error;
-    return data as any;
+    const data = await createMaterialReservation({
+      profile_id: s.fkUser ? Number(s.fkUser) : null,
+      surface_id: Number(s.id),
+      status: "nouvelle_demande",
+    });
+    return data as Reservation;
   };
 
-  // CONFIRMER RESERVATION (non -> att) : sets status='reserve' -> trigger decrements stock
   const confirmRes = useMutation({
     mutationFn: async (s: Surface) => {
-      const r = await ensureReservation(s);
-      const { data: items } = await supabase.from("reservation_items").select("id").eq("reservation_id", r.id);
-      if (!items || items.length === 0) throw new Error("Ajoutez au moins un matériel à cette parcelle avant de confirmer.");
-      const { error } = await supabase.from("material_reservations").update({ status: "reserve" }).eq("id", r.id);
-      if (error) throw error;
+      const r = resBySurface.get(s.id);
+      const p = s.fkUser ? profById[s.fkUser] : null;
+      const hasMat = !!r && (r.total_devices_price_dt ?? 0) > 0;
+      const hasAbo = !!r?.subscription_plan_id || !!p?.type_abo;
+      if (!hasMat)
+        throw new Error("Ajoutez au moins un matériel à cette parcelle avant de confirmer.");
+      if (!hasAbo)
+        throw new Error("Ajoutez un abonnement à cette parcelle avant de confirmer.");
+
+      // Le backend décrémente le stock et enregistre les mouvements lors du passage à "reserve"
+      await updateMaterialReservation(r!.id, { status: "reserve" });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["reservations-all"] });
@@ -186,7 +202,6 @@ function SurfaceTable({
     onError: (e: any) => toast({ title: "Action impossible", description: e.message, variant: "destructive" }),
   });
 
-  // PASSER A CONNECTÉE (att -> conn) : status='installe' -> trigger updates surface.is_connected, also creates client_sale
   const markConnected = useMutation({
     mutationFn: async (s: Surface) => {
       const r = resBySurface.get(s.id);
@@ -194,21 +209,25 @@ function SurfaceTable({
       const plan = r.subscription_plan_id ? planById[r.subscription_plan_id] : null;
       const subPrice = plan?.price_dt ?? 0;
       const total = subPrice + (r.total_devices_price_dt ?? 0);
-      // Create sale (integration Ventes)
-      await supabase.from("client_sales").insert({
-        profile_id: r.profile_id, reservation_id: r.id, subscription_plan_id: r.subscription_plan_id,
-        subscription_price_dt: subPrice, equipment_price_dt: r.total_devices_price_dt,
-        total_dt: total, payment_method: "carte", status: "confirme", confirmed_at: new Date().toISOString(),
+      await createClientSale({
+        profile_id: r.profile_id ? Number(r.profile_id) : null,
+        reservation_id: Number(r.id),
+        subscription_plan_id: r.subscription_plan_id ? Number(r.subscription_plan_id) : null,
+        subscription_price_dt: subPrice,
+        equipment_price_dt: r.total_devices_price_dt,
+        total_dt: total,
+        payment_method: "carte",
+        status: "confirme",
+        confirmed_at: new Date().toISOString(),
       });
-      // Update subscription dates on profile
       if (plan && r.profile_id) {
         const start = new Date(); const exp = new Date(); exp.setDate(exp.getDate() + (plan.duration_days || 30));
-        await supabase.from("profiles").update({
-          date_deb_abo: start.toISOString().slice(0, 10), date_exp_abo: exp.toISOString().slice(0, 10),
-        }).eq("id", r.profile_id);
+        await updateProfile(r.profile_id, {
+          date_deb_abo: start.toISOString().slice(0, 10),
+          date_exp_abo: exp.toISOString().slice(0, 10),
+        });
       }
-      const { error } = await supabase.from("material_reservations").update({ status: "installe" }).eq("id", r.id);
-      if (error) throw error;
+      await updateMaterialReservation(r.id, { status: "installe" });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["reservations-all"] });
@@ -219,14 +238,12 @@ function SurfaceTable({
     onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
 
-  // RETOUR EN ATTENTE (conn -> att)
   const backToWaiting = useMutation({
     mutationFn: async (s: Surface) => {
       const r = resBySurface.get(s.id);
       if (!r) return;
-      const { error } = await supabase.from("material_reservations").update({ status: "reserve" }).eq("id", r.id);
-      if (error) throw error;
-      await supabase.from("surfaces").update({ is_connected: false }).eq("id", s.id);
+      await updateMaterialReservation(r.id, { status: "reserve" });
+      await updateSurface(s.id, { isConnected: false });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["reservations-all"] });
@@ -235,24 +252,26 @@ function SurfaceTable({
     },
   });
 
-  // SUPPRESSION (conn -> non) : retour matériel au stock + reset
   const removeConnection = useMutation({
     mutationFn: async (s: Surface) => {
       const r = resBySurface.get(s.id);
       if (!r) return;
-      const { data: items } = await supabase.from("reservation_items").select("stock_item_id,quantity").eq("reservation_id", r.id);
-      for (const it of items ?? []) {
-        const cur = await supabase.from("stock_items").select("quantity").eq("id", it.stock_item_id).single();
-        const newQty = (cur.data?.quantity ?? 0) + it.quantity;
-        await supabase.from("stock_items").update({ quantity: newQty }).eq("id", it.stock_item_id);
-        await supabase.from("stock_movements").insert({
-          stock_item_id: it.stock_item_id, movement_type: "adjustment", quantity: it.quantity,
-          reason: "Désinstallation parcelle — retour stock", reservation_id: r.id,
+      const items = await getReservationItemsByReservation(r.id);
+      for (const it of items) {
+        const cur = stockItems.find(si => String(si.id) === String(it.stock_item_id));
+        const newQty = (cur?.quantity ?? 0) + it.quantity;
+        await updateStockItem(String(it.stock_item_id), { quantity: newQty });
+        await createStockMovement({
+          stock_item_id: Number(it.stock_item_id),
+          movement_type: "adjustment",
+          quantity: it.quantity,
+          reason: "Désinstallation parcelle — retour stock",
+          reservation_id: Number(r.id),
         });
+        await deleteReservationItem(String(it.id));
       }
-      await supabase.from("reservation_items").delete().eq("reservation_id", r.id);
-      await supabase.from("material_reservations").update({ status: "nouvelle_demande", total_devices_price_dt: 0 }).eq("id", r.id);
-      await supabase.from("surfaces").update({ is_connected: false }).eq("id", s.id);
+      await updateMaterialReservation(r.id, { status: "nouvelle_demande", total_devices_price_dt: 0 });
+      await updateSurface(s.id, { isConnected: false });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["reservations-all"] });
@@ -287,22 +306,30 @@ function SurfaceTable({
           <TableBody>
             {surfaces.map(s => {
               const r = resBySurface.get(s.id);
-              const p = s.fk_user ? profById[s.fk_user] : null;
+              const p = s.fkUser ? profById[s.fkUser] : null;
               const plan = r?.subscription_plan_id ? planById[r.subscription_plan_id] : null;
-              const subPrice = plan?.price_dt ?? 0;
-              const total = subPrice + (r?.total_devices_price_dt ?? 0);
+              const aboPlan = plan ?? (p?.type_abo ? plans.find(pl => pl.name === p.type_abo) : null);
+              const subPrice = aboPlan?.price_dt ?? 0;
+              const matPrice = r?.total_devices_price_dt ?? 0;
+              const total = subPrice + matPrice;
               return (
                 <TableRow key={s.id}>
                   <TableCell>
-                    <div className="font-medium flex items-center gap-1.5"><MapPin className="h-3 w-3 text-primary" />{s.nom_surface}</div>
+                    <div className="font-medium flex items-center gap-1.5"><MapPin className="h-3 w-3 text-primary" />{s.nomSurface}</div>
                     <div className="text-xs text-muted-foreground">{s.localisation || "—"}</div>
                   </TableCell>
                   <TableCell>
                     <div className="font-medium text-sm">{p ? `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || p.email : "—"}</div>
                     <div className="text-xs text-muted-foreground">{p?.email}</div>
                   </TableCell>
-                  <TableCell className="text-sm">{r?.total_devices_price_dt ? DT(r.total_devices_price_dt) : <span className="text-muted-foreground">—</span>}</TableCell>
-                  <TableCell className="text-sm">{plan?.name ?? <span className="text-muted-foreground">—</span>}</TableCell>
+                  <TableCell className="text-sm font-medium">{DT(matPrice)}</TableCell>
+                  <TableCell className="text-sm">
+                    {aboPlan?.name
+                      ? <div><span className="font-medium">{aboPlan.name}</span><div className="text-xs text-muted-foreground">{DT(subPrice)}</div></div>
+                      : p?.type_abo
+                        ? <div><span className="font-medium">{p.type_abo}</span>{p.date_exp_abo && <div className="text-xs text-muted-foreground">exp. {p.date_exp_abo}</div>}</div>
+                        : <span className="text-muted-foreground">—</span>}
+                  </TableCell>
                   <TableCell className="font-semibold text-primary">{total > 0 ? DT(total) : "—"}</TableCell>
                   <TableCell>{statusBadge(mode)}</TableCell>
                   <TableCell>
@@ -352,44 +379,47 @@ function ParcelleEditDialog({
   const [planId, setPlanId] = useState<string>("");
   const [notes, setNotes] = useState("");
   const [addItem, setAddItem] = useState<{ stock_item_id: string; quantity: number }>({ stock_item_id: "", quantity: 1 });
+  const [internalResId, setInternalResId] = useState<string | null>(null);
+  const currentResId = internalResId ?? (reservation?.id != null ? String(reservation.id) : null);
 
-  const stockById = useMemo(() => Object.fromEntries(stockItems.map(s => [s.id, s])), [stockItems]);
+  const stockById = useMemo(() => Object.fromEntries(stockItems.map(s => [String(s.id), s])), [stockItems]);
 
-  // Renewal discount logic: 10% if user already has an active/past subscription
   const hasActiveSub = !!profile?.date_exp_abo;
-  const selectedPlan = plans.find(p => p.id === planId);
+  const selectedPlan = plans.find((p: any) => p.id === planId);
   const baseAbo = selectedPlan?.price_dt ?? 0;
   const discount = hasActiveSub ? baseAbo * 0.1 : 0;
   const finalAbo = baseAbo - discount;
 
-  const { data: items = [] } = useQuery<ResItem[]>({
-    queryKey: ["reservation-items", reservation?.id],
-    queryFn: async () => {
-      if (!reservation) return [];
-      return (await supabase.from("reservation_items").select("*").eq("reservation_id", reservation.id)).data as any || [];
-    },
-    enabled: !!reservation,
+  const { data: items = [], refetch: refetchItems } = useQuery<ResItem[]>({
+    queryKey: ["reservation-items", currentResId],
+    queryFn: () => currentResId ? getReservationItemsByReservation(currentResId) : Promise.resolve([]),
+    enabled: !!currentResId,
   });
 
   useEffect(() => {
-    if (reservation) { setPlanId(reservation.subscription_plan_id ?? ""); setNotes(reservation.notes ?? ""); }
+    setInternalResId(null);
+    if (reservation) { setPlanId(String(reservation.subscription_plan_id ?? "")); setNotes(reservation.notes ?? ""); }
     else { setPlanId(""); setNotes(""); }
-  }, [reservation]);
+  }, [surface?.id]);
 
   const ensureReservation = async (): Promise<string> => {
-    if (reservation) return reservation.id;
+    if (currentResId) return currentResId;
     if (!surface) throw new Error("Aucune parcelle");
-    const { data, error } = await supabase.from("material_reservations").insert({
-      profile_id: surface.fk_user, surface_id: surface.id, status: "nouvelle_demande",
-    }).select("id").single();
-    if (error) throw error;
-    return data!.id;
+    const data = await createMaterialReservation({
+      profile_id: surface.fkUser ? Number(surface.fkUser) : null,
+      surface_id: Number(surface.id),
+      status: "nouvelle_demande",
+    });
+    const rid = String(data.id);
+    setInternalResId(rid);
+    qc.invalidateQueries({ queryKey: ["reservations-all"] });
+    return rid;
   };
 
   const recalcTotal = async (rid: string) => {
-    const { data } = await supabase.from("reservation_items").select("quantity,unit_price_dt").eq("reservation_id", rid);
-    const t = (data ?? []).reduce((s: number, i: any) => s + i.quantity * i.unit_price_dt, 0);
-    await supabase.from("material_reservations").update({ total_devices_price_dt: t }).eq("id", rid);
+    const latest = await getReservationItemsByReservation(rid);
+    const t = latest.reduce((s: number, i: any) => s + i.quantity * i.unit_price_dt, 0);
+    await updateMaterialReservation(rid, { total_devices_price_dt: t });
     qc.invalidateQueries({ queryKey: ["reservations-all"] });
   };
 
@@ -399,15 +429,17 @@ function ParcelleEditDialog({
       const stock = stockById[addItem.stock_item_id];
       if (!stock) return;
       const rid = await ensureReservation();
-      const { error } = await supabase.from("reservation_items").insert({
-        reservation_id: rid, stock_item_id: addItem.stock_item_id,
-        quantity: addItem.quantity, unit_price_dt: stock.purchase_price_dt,
+      await createReservationItem({
+        reservation_id: Number(rid),
+        stock_item_id: Number(addItem.stock_item_id),
+        quantity: addItem.quantity,
+        unit_price_dt: stock.purchase_price_dt,
       });
-      if (error) throw error;
       await recalcTotal(rid);
+      return rid;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["reservation-items"] });
+    onSuccess: (rid) => {
+      qc.invalidateQueries({ queryKey: ["reservation-items", rid] });
       setAddItem({ stock_item_id: "", quantity: 1 });
     },
     onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
@@ -415,35 +447,47 @@ function ParcelleEditDialog({
 
   const delItem = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("reservation_items").delete().eq("id", id);
-      if (error) throw error;
-      if (reservation) await recalcTotal(reservation.id);
+      await deleteReservationItem(id);
+      if (currentResId) await recalcTotal(currentResId);
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["reservation-items"] }),
+    onSuccess: () => {
+      if (currentResId) qc.invalidateQueries({ queryKey: ["reservation-items", currentResId] });
+    },
   });
 
   const saveMut = useMutation({
     mutationFn: async () => {
       const rid = await ensureReservation();
-      const { error } = await supabase.from("material_reservations").update({
-        subscription_plan_id: planId || null, notes,
-      }).eq("id", rid);
-      if (error) throw error;
+      // Recompute material total from actual items so the "Matériel" column reflects it
+      const latest = await getReservationItemsByReservation(rid);
+      const matTotal = latest.reduce((s: number, i: any) => s + i.quantity * i.unit_price_dt, 0);
+      await updateMaterialReservation(rid, {
+        subscription_plan_id: planId ? Number(planId) : null,
+        notes,
+        total_devices_price_dt: matTotal,
+      });
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["reservations-all"] }); toast({ title: "Enregistré" }); },
+    onSuccess: async () => {
+      await qc.refetchQueries({ queryKey: ["reservations-all"] });
+      toast({ title: "Enregistré" });
+      onClose();
+    },
+    onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
 
-  // RÉABONNER: create a subscription_payment with discounted amount
   const reabonner = useMutation({
     mutationFn: async () => {
       if (!profile?.id || !selectedPlan) throw new Error("Sélectionnez un abonnement et un client");
       const start = new Date(); const exp = new Date(); exp.setDate(exp.getDate() + (selectedPlan.duration_days || 30));
-      const { error } = await supabase.from("subscription_payments").insert({
-        profile_id: profile.id, plan_id: selectedPlan.id,
-        amount_dt: finalAbo, payment_method: "carte", status: "en_attente",
-        date_start: start.toISOString().slice(0, 10), date_exp: exp.toISOString().slice(0, 10),
+      await createSubscriptionPayment({
+        profile_id: Number(profile.id),
+        plan_id: Number(selectedPlan.id),
+        amount_dt: finalAbo,
+        payment_method: "carte",
+        status: "en_attente",
+        date_start: start.toISOString().slice(0, 10),
+        date_exp: exp.toISOString().slice(0, 10),
       });
-      if (error) throw error;
     },
     onSuccess: () => toast({ title: "Réabonnement créé", description: `Montant: ${DT(finalAbo)}${hasActiveSub ? " (remise 10% appliquée)" : ""}. À valider dans Finance.` }),
     onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
@@ -455,54 +499,38 @@ function ParcelleEditDialog({
     <Dialog open={!!surface} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><MapPin className="h-5 w-5 text-primary" /> {surface.nom_surface}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><MapPin className="h-5 w-5 text-primary" /> {surface.nomSurface}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
+          {selectedPlan ? (
+            <div className="p-3 rounded-lg border bg-gradient-to-br from-primary/5 to-transparent">
+              <div className="text-sm font-medium text-primary mb-2">Abonnement</div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">{selectedPlan.name}</span>
+                <span className="font-semibold">{DT(selectedPlan.price_dt)}</span>
+              </div>
+            </div>
+          ) : profile?.type_abo ? (
+            <div className="p-3 rounded-lg border bg-gradient-to-br from-primary/5 to-transparent">
+              <div className="text-sm font-medium text-primary mb-2">Abonnement</div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">{profile.type_abo}</span>
+                {profile.date_exp_abo && <span className="text-xs text-muted-foreground">exp. {profile.date_exp_abo}</span>}
+              </div>
+            </div>
+          ) : (
+            <div className="p-3 rounded-lg border bg-muted/30 text-sm text-muted-foreground">Aucun abonnement</div>
+          )}
+
           <div className="grid grid-cols-2 gap-3 text-sm p-3 bg-muted/40 rounded-lg">
             <div><UserIcon className="h-3 w-3 inline mr-1 text-muted-foreground" />{profile ? `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() || profile.email : "—"}</div>
             <div><MapPin className="h-3 w-3 inline mr-1 text-muted-foreground" />{surface.localisation || "—"}</div>
           </div>
 
           <div>
-            <Label>Abonnement (Finance/Abonnements)</Label>
-            <Select value={planId} onValueChange={setPlanId}>
-              <SelectTrigger><SelectValue placeholder="Sélectionner un abonnement" /></SelectTrigger>
-              <SelectContent>
-                {plans.map(p => <SelectItem key={p.id} value={p.id}>{p.name} — {DT(p.price_dt)} / {p.duration_days}j</SelectItem>)}
-              </SelectContent>
-            </Select>
-            {selectedPlan && (
-              <div className="mt-2 p-3 rounded-lg border bg-gradient-to-br from-primary/5 to-transparent">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Prix de l'abonnement</span>
-                  <span className={hasActiveSub ? "line-through text-muted-foreground" : "font-semibold"}>{DT(baseAbo)}</span>
-                </div>
-                {hasActiveSub && (
-                  <>
-                    <div className="flex items-center justify-between text-sm text-emerald-700">
-                      <span className="flex items-center gap-1"><Sparkles className="h-3 w-3" />Remise réabonnement (-10%)</span>
-                      <span>-{DT(discount)}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-base font-bold text-primary border-t mt-2 pt-2">
-                      <span>Nouveau prix</span><span>{DT(finalAbo)}</span>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div>
             <Label>Notes</Label>
             <Textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} />
-          </div>
-
-          <div className="flex gap-2 flex-wrap">
-            <Button size="sm" variant="outline" onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>Enregistrer</Button>
-            <Button size="sm" variant="outline" onClick={() => reabonner.mutate()} disabled={!selectedPlan || !profile} className="border-primary text-primary hover:bg-primary/10">
-              <Sparkles className="h-3 w-3 mr-1" /> Réabonner {hasActiveSub && "(−10%)"}
-            </Button>
           </div>
 
           <div className="border rounded-lg">
@@ -514,14 +542,14 @@ function ParcelleEditDialog({
               <TableHeader><TableRow><TableHead>Appareil</TableHead><TableHead>Qté</TableHead><TableHead>PU</TableHead><TableHead>Total</TableHead><TableHead></TableHead></TableRow></TableHeader>
               <TableBody>
                 {items.map(i => {
-                  const s = stockById[i.stock_item_id];
+                  const s = stockById[String(i.stock_item_id)];
                   return (
                     <TableRow key={i.id}>
                       <TableCell>{s?.name ?? "—"}</TableCell>
                       <TableCell>{i.quantity}</TableCell>
                       <TableCell>{DT(i.unit_price_dt)}</TableCell>
                       <TableCell className="font-semibold">{DT(i.quantity * i.unit_price_dt)}</TableCell>
-                      <TableCell><Button size="sm" variant="ghost" className="text-destructive" onClick={() => delItem.mutate(i.id)}><Trash2 className="h-3 w-3" /></Button></TableCell>
+                      <TableCell><Button size="sm" variant="ghost" className="text-destructive" onClick={() => delItem.mutate(String(i.id))}><Trash2 className="h-3 w-3" /></Button></TableCell>
                     </TableRow>
                   );
                 })}
@@ -534,7 +562,7 @@ function ParcelleEditDialog({
                 <Select value={addItem.stock_item_id} onValueChange={v => setAddItem({ ...addItem, stock_item_id: v })}>
                   <SelectTrigger><SelectValue placeholder="Choisir..." /></SelectTrigger>
                   <SelectContent>
-                    {stockItems.filter(s => s.quantity > 0).map(s => <SelectItem key={s.id} value={s.id}>{s.name} (stock: {s.quantity}) — {DT(s.purchase_price_dt)}</SelectItem>)}
+                    {stockItems.filter(s => s.quantity > 0).map(s => <SelectItem key={s.id} value={String(s.id)}>{s.name} (stock: {s.quantity}) — {DT(s.purchase_price_dt)}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -549,6 +577,9 @@ function ParcelleEditDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Fermer</Button>
+          <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending} className="bg-primary hover:bg-primary/90">
+            {saveMut.isPending ? "Confirmation..." : "Confirmer"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

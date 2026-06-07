@@ -44,6 +44,7 @@ import PartenaireRapportSolPage from "@/pages/partenaire/RapportSolPage";
 import PartenaireRapportEauPage from "@/pages/partenaire/RapportEauPage";
 import PartenaireBaseDonneesPage from "@/pages/partenaire/BaseDonneesPage";
 import PartenaireReclamationsPage from "@/pages/partenaire/ReclamationsPage";
+import PartenaireDemandeMaterielPage from "@/pages/partenaire/DemandeMaterielPage";
 import PartenaireFinancePage from "@/pages/partenaire/FinancePage";
 import PartenaireStockPage from "@/pages/partenaire/StockPage";
 import PartenaireReservationMaterielPage from "@/pages/partenaire/ReservationMaterielPage";
@@ -88,10 +89,6 @@ const App = () => (
                 <Route path="partenaire/:partenaireId" element={<PartenaireDetailsPage />} />
               </Route>
               <Route path="/partenaire" element={<PartenaireLayout />}>
-                <Route path="dashboard" element={<PartenaireDashboardPage />} />
-                <Route path="surfaces" element={<PartenaireSurfacesPage />} />
-                <Route path="donnees-detaillees" element={<PartenaireDonneesDetailleesPage />} />
-                <Route path="capteurs" element={<PartenaireCapteurPage />} />
                 <Route path="users" element={<PartenaireUsersPage />} />
                 <Route path="subscriptions" element={<PartenaireSubscriptionsPage />} />
                 <Route path="profile" element={<PartenaireProfilePage />} />
@@ -102,10 +99,7 @@ const App = () => (
                 <Route path="rapport-eau" element={<PartenaireRapportEauPage />} />
                 <Route path="base-donnees" element={<PartenaireBaseDonneesPage />} />
                 <Route path="reclamations" element={<PartenaireReclamationsPage />} />
-                <Route path="finance" element={<PartenaireFinancePage />} />
-                <Route path="stock" element={<PartenaireStockPage />} />
-                <Route path="reservation-materiel" element={<PartenaireReservationMaterielPage />} />
-                <Route path="ventes" element={<PartenaireVentesPage />} />
+                <Route path="demande-materiel" element={<PartenaireDemandeMaterielPage />} />
                 <Route path="users/verify-email" element={<PartenaireVerifyEmailPage />} />
               </Route>
               <Route path="*" element={<NotFound />} />
