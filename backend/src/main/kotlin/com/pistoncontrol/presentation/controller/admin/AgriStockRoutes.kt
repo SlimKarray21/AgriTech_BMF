@@ -172,10 +172,47 @@ fun Route.materialReservationsRoutes() {
             val id = call.parameters["id"]?.toLongOrNull()
                 ?: return@patch call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid id"))
             val body = call.receive<JsonObject>()
+            val newStatus = body["status"]?.jsonPrimitive?.contentOrNull
             transaction {
+                // Confirmation d'une réservation (-> "reserve") : décrémenter le stock
+                // et enregistrer un mouvement, une seule fois (garde anti double décrément).
+                if (newStatus == "reserve") {
+                    val oldStatus = MaterialReservations
+                        .select { MaterialReservations.id eq id }
+                        .singleOrNull()?.get(MaterialReservations.status)
+                    if (oldStatus != "reserve" && oldStatus != "installe") {
+                        val items = ReservationItems
+                            .select { ReservationItems.reservationId eq id }
+                            .toList()
+                        for (item in items) {
+                            val sid = item[ReservationItems.stockItemId]
+                            val qty = item[ReservationItems.quantity]
+                            val curQty = StockItems
+                                .select { StockItems.id eq sid }
+                                .singleOrNull()?.get(StockItems.quantity) ?: 0
+                            StockItems.update({ StockItems.id eq sid }) {
+                                it[StockItems.quantity]  = maxOf(0, curQty - qty)
+                                it[StockItems.updatedAt] = Instant.now()
+                            }
+                            StockMovements.insert {
+                                it[StockMovements.stockItemId]   = sid
+                                it[StockMovements.movementType]  = "reservation"
+                                it[StockMovements.quantity]      = -qty
+                                it[StockMovements.reason]        = "Matériel réservé"
+                                it[StockMovements.reservationId] = id
+                                it[StockMovements.createdAt]     = Instant.now()
+                            }
+                        }
+                    }
+                }
                 MaterialReservations.update({ MaterialReservations.id eq id }) {
                     body["status"]?.jsonPrimitive?.contentOrNull?.let { v -> it[MaterialReservations.status] = v }
                     body["notes"]?.jsonPrimitive?.contentOrNull?.let  { v -> it[MaterialReservations.notes]  = v }
+                    body["total_devices_price_dt"]?.jsonPrimitive?.doubleOrNull?.let { v ->
+                        it[MaterialReservations.totalDevicesPriceDt] = v
+                    }
+                    if (body.containsKey("subscription_plan_id"))
+                        it[MaterialReservations.subscriptionPlanId] = body["subscription_plan_id"]?.jsonPrimitive?.longOrNull
                     it[MaterialReservations.updatedAt] = Instant.now()
                 }
             }
@@ -187,8 +224,13 @@ fun Route.materialReservationsRoutes() {
 fun Route.reservationItemsRoutes() {
     route("/reservation-items") {
         get {
+            val reservationId = call.request.queryParameters["reservation_id"]?.toLongOrNull()
             val rows = transaction {
-                ReservationItems.selectAll().map {
+                val query = if (reservationId != null)
+                    ReservationItems.select { ReservationItems.reservationId eq reservationId }
+                else
+                    ReservationItems.selectAll()
+                query.map {
                     buildJsonObject {
                         put("id",             it[ReservationItems.id])
                         put("reservation_id", it[ReservationItems.reservationId])
@@ -213,6 +255,13 @@ fun Route.reservationItemsRoutes() {
                 }[ReservationItems.id]
             }
             call.respond(HttpStatusCode.Created, buildJsonObject { put("id", newId) })
+        }
+        delete("/{id}") {
+            val id = call.parameters["id"]?.toLongOrNull()
+                ?: return@delete call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid id"))
+            val count = transaction { ReservationItems.deleteWhere { ReservationItems.id eq id } }
+            if (count == 0) call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
+            else call.respond(HttpStatusCode.OK, mapOf("message" to "Deleted"))
         }
     }
 }

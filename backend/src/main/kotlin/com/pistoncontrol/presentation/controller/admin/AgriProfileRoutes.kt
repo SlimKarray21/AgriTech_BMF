@@ -96,16 +96,17 @@ fun Route.profilesRoutes() {
                     body["country"]?.jsonPrimitive?.contentOrNull?.let       { v -> it[Profiles.country]     = v }
                     body["city"]?.jsonPrimitive?.contentOrNull?.let          { v -> it[Profiles.city]        = v }
                     body["email"]?.jsonPrimitive?.contentOrNull?.let         { v -> it[Profiles.email]       = v }
-                    body["type_abo"]?.jsonPrimitive?.contentOrNull?.let      { v -> it[Profiles.typeAbo]     = v }
+                    if (body.containsKey("type_abo"))
+                        it[Profiles.typeAbo] = body["type_abo"]?.jsonPrimitive?.contentOrNull
                     body["company_name"]?.jsonPrimitive?.contentOrNull?.let  { v -> it[Profiles.companyName] = v }
                     body["company_logo"]?.jsonPrimitive?.contentOrNull?.let  { v -> it[Profiles.companyLogo] = v }
                     body["avatar_url"]?.jsonPrimitive?.contentOrNull?.let    { v -> it[Profiles.avatarUrl]   = v }
-                    body["date_deb_abo"]?.jsonPrimitive?.contentOrNull?.let { v ->
-                        it.set<LocalDate?>(Profiles.dateDebAbo, runCatching { LocalDate.parse(v) }.getOrNull())
-                    }
-                    body["date_exp_abo"]?.jsonPrimitive?.contentOrNull?.let { v ->
-                        it.set<LocalDate?>(Profiles.dateExpAbo, runCatching { LocalDate.parse(v) }.getOrNull())
-                    }
+                    if (body.containsKey("date_deb_abo"))
+                        it[Profiles.dateDebAbo] = body["date_deb_abo"]?.jsonPrimitive?.contentOrNull
+                            ?.let { v -> runCatching { LocalDate.parse(v) }.getOrNull() }
+                    if (body.containsKey("date_exp_abo"))
+                        it[Profiles.dateExpAbo] = body["date_exp_abo"]?.jsonPrimitive?.contentOrNull
+                            ?.let { v -> runCatching { LocalDate.parse(v) }.getOrNull() }
                     if (body.containsKey("created_by")) {
                         it[Profiles.createdBy] = body["created_by"]?.jsonPrimitive?.longOrNull
                     }

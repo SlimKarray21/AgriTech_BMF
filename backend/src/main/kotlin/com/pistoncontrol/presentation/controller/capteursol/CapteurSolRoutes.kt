@@ -14,6 +14,12 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.double
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import com.pistoncontrol.infrastructure.persistence.Reclamations
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.transactions.transaction
+import java.time.Instant
 import com.pistoncontrol.common.utils.arrayValue
 import com.pistoncontrol.common.utils.doubleValue
 import com.pistoncontrol.common.utils.intValue
@@ -145,11 +151,45 @@ fun Route.capteurSolRoutes(service: CapteurSolApplicationService = CapteurSolApp
             }
         }
 
+        // Réclamation créée par l'utilisateur mobile (profile_id = son propre profil)
+        route("/reclamations") {
+            post {
+                val capteurUserId = authenticatedCapteurUserId(call, service) ?: return@post
+                val body = try {
+                    call.receive<JsonObject>()
+                } catch (e: Exception) {
+                    return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid payload"))
+                }
+                val vSujet = body["sujet"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+                val vMessage = body["message"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+                if (vSujet.isBlank() || vMessage.isBlank()) {
+                    return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("sujet et message requis"))
+                }
+                val newId = transaction {
+                    Reclamations.insert {
+                        it[Reclamations.userId]    = capteurUserId
+                        it[Reclamations.profileId] = capteurUserId
+                        it[Reclamations.sujet]     = vSujet
+                        it[Reclamations.message]   = vMessage
+                        it[Reclamations.statut]    = "en_attente"
+                        it[Reclamations.createdAt] = Instant.now()
+                        it[Reclamations.updatedAt] = Instant.now()
+                    }[Reclamations.id]
+                }
+                call.respond(HttpStatusCode.Created, buildJsonObject { put("id", newId) })
+            }
+        }
+
         route("/parcelles") {
             get {
                 val capteurUserId = authenticatedCapteurUserId(call, service) ?: return@get
                 val isAdmin = call.isAdminJwt()
-                val data = service.listParcelles(if (isAdmin) null else capteurUserId)
+                val role = call.jwtPrincipal()?.payload?.getClaim("role")?.asString()?.uppercase()
+                val data = when {
+                    isAdmin -> service.listParcelles(null)
+                    role == "PARTENAIRE" -> service.listParcellesForPartenaire(capteurUserId)
+                    else -> service.listParcelles(capteurUserId)
+                }
                 call.respond(HttpStatusCode.OK, data)
             }
 
@@ -250,8 +290,11 @@ fun Route.capteurSolRoutes(service: CapteurSolApplicationService = CapteurSolApp
             get {
                 val capteurUserId = authenticatedCapteurUserId(call, service) ?: return@get
                 val isAdmin = call.isAdminJwt()
+                val role = call.jwtPrincipal()?.payload?.getClaim("role")?.asString()?.uppercase()
                 val parcelId = call.request.queryParameters["parcelId"]?.toLongOrNull()
-                val data = service.listVannes(parcelId = parcelId, userId = if (isAdmin) null else capteurUserId)
+                // Admin et partenaire voient toutes les vannes (le frontend filtre par parcelle visible)
+                val ownerFilter = if (isAdmin || role == "PARTENAIRE") null else capteurUserId
+                val data = service.listVannes(parcelId = parcelId, userId = ownerFilter)
                 call.respond(HttpStatusCode.OK, data)
             }
 

@@ -222,6 +222,16 @@ class CapteurSolService {
         query.map(::toParcelle)
     }
 
+    // Parcelles visibles par un partenaire : les siennes + celles de ses clients (profiles.created_by = partenaire).
+    suspend fun listParcellesForPartenaire(partenaireProfileId: Long): List<Parcelle> = DatabaseFactory.dbQuery {
+        val clientIds = ProfilesTable
+            .slice(ProfilesTable.id)
+            .select { ProfilesTable.createdBy eq partenaireProfileId }
+            .map { it[ProfilesTable.id] }
+        val visibleIds = (clientIds + partenaireProfileId).distinct()
+        ParcelleTable.select { ParcelleTable.fkUser inList visibleIds }.map(::toParcelle)
+    }
+
     suspend fun createParcelle(input: CreateParcelleInput): Parcelle = DatabaseFactory.dbQuery {
         val now = Instant.now()
         val id = ParcelleTable.insert {
