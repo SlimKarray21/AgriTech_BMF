@@ -1,11 +1,11 @@
 import { API_BASE_URL } from "./api-config";
-import { TOKEN_KEY } from "@/hooks/useAuth";
+import { getToken } from "@/lib/token";
 import { Profile, TypePlante, Surface, Plante, Vanne, Sol, Climat, Reclamation } from "@/types/models";
 
 // ── HTTP helper ──────────────────────────────────────────────────────────────
 
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = localStorage.getItem(TOKEN_KEY);
+  const token = getToken();
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers: {

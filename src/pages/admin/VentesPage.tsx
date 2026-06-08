@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { getClientSales, getProfiles, getSubscriptionPlans } from "@/services/data-service";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -24,28 +24,20 @@ const DT = (n: number) => `${Number(n ?? 0).toLocaleString("fr-FR", { maximumFra
 const METHODS: Record<string, string> = { especes: "Espèces", carte: "Carte", virement: "Virement", mobile: "Paiement mobile" };
 
 export default function VentesPage() {
-  const qc = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [methodFilter, setMethodFilter] = useState<string>("all");
 
-  useEffect(() => {
-    const ch = supabase.channel("ventes-rt")
-      .on("postgres_changes", { event: "*", schema: "public", table: "client_sales" }, () => qc.invalidateQueries({ queryKey: ["ventes"] }))
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [qc]);
-
   const { data: sales = [] } = useQuery<Sale[]>({
     queryKey: ["ventes"],
-    queryFn: async () => (await supabase.from("client_sales").select("*").order("created_at", { ascending: false })).data as any || [],
+    queryFn: getClientSales as () => Promise<Sale[]>,
   });
   const { data: profiles = [] } = useQuery({
     queryKey: ["profiles-min"],
-    queryFn: async () => (await supabase.from("profiles").select("id,first_name,last_name,email")).data as any || [],
+    queryFn: getProfiles,
   });
   const { data: plans = [] } = useQuery({
     queryKey: ["plans-min2"],
-    queryFn: async () => (await supabase.from("subscription_plans").select("id,name")).data as any || [],
+    queryFn: getSubscriptionPlans,
   });
   const profById = useMemo(() => Object.fromEntries(profiles.map((p: any) => [p.id, p])), [profiles]);
   const planById = useMemo(() => Object.fromEntries(plans.map((p: any) => [p.id, p])), [plans]);

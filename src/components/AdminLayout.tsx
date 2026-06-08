@@ -1,12 +1,10 @@
-import { useEffect } from "react";
 import { Outlet, Navigate, useLocation, useNavigate } from "react-router-dom";
-import { Droplets, Grid3X3, Users, LogOut, CreditCard, LayoutDashboard, Cpu, Database, FileBarChart, HardDrive, MessageSquare, Wallet, Package, ClipboardList, ShoppingCart } from "lucide-react";
+import { Grid3X3, Users, LogOut, CreditCard, LayoutDashboard, Cpu, Database, FileBarChart, HardDrive, MessageSquare, Wallet, Package, ClipboardList, ShoppingCart } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
 import logoTesla from "@/assets/logo-tesla-energie.png";
 import {
   SidebarProvider, Sidebar, SidebarContent, SidebarGroup, SidebarGroupLabel,
@@ -61,29 +59,14 @@ const pageTitleKeys: Record<string, string> = {
 export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, profile, loading, signOut } = useAuth();
+  const { user, profile, signOut } = useAuth();
   const { t } = useLanguage();
 
+  // L'accès (auth + rôle ADMIN) est déjà garanti par <RoleRoute role="ADMIN"> dans App.tsx ;
+  // ce layout ne s'occupe que de l'affichage.
   const userRole = profile?.user_role ?? "";
   const titleKey = pageTitleKeys[location.pathname];
   const title = titleKey ? t(titleKey) : "Administration";
-  const isClientUser = userRole === "CLIENT";
-
-  useEffect(() => {
-    if (isClientUser) void signOut();
-  }, [isClientUser, signOut]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Droplets className="h-8 w-8 animate-pulse text-primary" />
-      </div>
-    );
-  }
-
-  if (!user) return <Navigate to="/auth/login" replace />;
-  if (!profile) return null;
-  if (isClientUser) return <Navigate to="/auth/login" replace />;
 
   if (location.pathname === "/admin" || location.pathname === "/admin/") {
     return <Navigate to="/admin/dashboard" replace />;
@@ -192,7 +175,6 @@ export default function AdminLayout() {
           <header className="flex h-14 items-center gap-2 border-b px-4">
             <SidebarTrigger />
             <h1 className="text-lg font-semibold text-foreground flex-1">{title}</h1>
-            <LanguageSwitcher />
           </header>
           <div className="p-6">
             <Outlet />

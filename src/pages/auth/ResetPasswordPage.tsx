@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,14 +15,15 @@ export default function ResetPasswordPage() {
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.updateUser({ password });
+    // TODO(backend): brancher sur un endpoint /auth/reset-password côté Ktor.
+    // Pas encore implémenté côté serveur -> on informe l'utilisateur.
     setLoading(false);
-    if (error) {
-      toast({ title: "Erreur", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Succès", description: "Mot de passe mis à jour" });
-      navigate("/admin/travail");
-    }
+    toast({
+      title: "Indisponible",
+      description:
+        "La réinitialisation de mot de passe n'est pas encore disponible côté serveur.",
+      variant: "destructive",
+    });
   };
 
   return (

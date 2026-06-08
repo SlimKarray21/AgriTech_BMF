@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getProfiles, getSurfaces, getVannes, getPlantes, getSols, getClimats, getRapportsEau, getRapportsSol, getTypesPlante, createWizardParcelle, deleteSurface, deleteVanne } from "@/services/data-service";
 import { getAdminUsersApi } from "@/services/auth-api";
 import { DeleteDialog } from "@/components/DeleteDialog";
-import { TOKEN_KEY } from "@/hooks/useAuth";
+import { getToken } from "@/lib/token";
 import { useFilteredProfiles } from "@/hooks/useRoleFilter";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -81,6 +81,14 @@ function SubscriptionStatus({ profile }: { profile: Profile }) {
   );
 }
 
+// Couleur du badge selon le rôle : Admin=rouge, Partenaire=bleu, Client=vert
+const roleBadgeClass = (role?: string): string => {
+  const r = (role ?? "").toUpperCase();
+  if (r === "ADMIN") return "bg-red-100 text-red-700 border-red-300";
+  if (r === "PARTENAIRE") return "bg-blue-100 text-blue-700 border-blue-300";
+  return "bg-emerald-100 text-emerald-700 border-emerald-300"; // CLIENT
+};
+
 export default function BaseDonneesPage() {
   const navigate = useNavigate();
   const { t } = useLanguage();
@@ -125,7 +133,7 @@ export default function BaseDonneesPage() {
     },
   });
 
-  const token = localStorage.getItem(TOKEN_KEY) ?? "";
+  const token = getToken() ?? "";
   const { data: adminUsersData } = useQuery({
     queryKey: ["admin-users"],
     queryFn: () => getAdminUsersApi(token),
@@ -200,7 +208,7 @@ export default function BaseDonneesPage() {
                     <ShieldCheck className="h-4 w-4 mt-0.5 text-muted-foreground" />
                     <div>
                       <p className="text-xs text-muted-foreground">Rôle</p>
-                      <Badge variant={selectedProfile.user_role === "ADMIN" ? "default" : "outline"}>
+                      <Badge variant="outline" className={roleBadgeClass(selectedProfile.user_role)}>
                         {selectedProfile.user_role}
                       </Badge>
                     </div>
@@ -453,7 +461,7 @@ export default function BaseDonneesPage() {
                     <p className="font-semibold text-foreground">{p.first_name} {p.last_name}</p>
                     <p className="text-xs text-muted-foreground">{p.email}</p>
                   </div>
-                  <Badge variant={p.user_role === "ADMIN" ? "default" : "outline"} className="text-[10px]">
+                  <Badge variant="outline" className={`text-[10px] ${roleBadgeClass(p.user_role)}`}>
                     {p.user_role}
                   </Badge>
                 </div>
@@ -537,8 +545,8 @@ function ClientCombobox({ profiles, value, onChange, open, onOpenChange }: {
                     <span className="font-medium truncate">{p.first_name} {p.last_name}</span>
                     <span className="text-xs text-muted-foreground truncate">{p.email}</span>
                   </div>
-                  <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${p.user_role === "ADMIN" ? "bg-red-100 text-red-600" : "bg-secondary text-secondary-foreground"}`}>
-                    {p.user_role === "ADMIN" ? "Admin" : "Client"}
+                  <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${roleBadgeClass(p.user_role)}`}>
+                    {p.user_role}
                   </span>
                 </CommandItem>
               ))}

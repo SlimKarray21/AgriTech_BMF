@@ -1,7 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { getUserProfileApi } from "@/services/auth-api";
-
-export const TOKEN_KEY = "agritech_admin_token";
+import { storeToken, getToken, clearTokens } from "@/lib/token";
 
 interface AuthUser {
   id: string;
@@ -66,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loadFromToken = async (token: string) => {
     const claims = decodeJwt(token);
     if (!claims) {
-      localStorage.removeItem(TOKEN_KEY);
+      clearTokens();
       setUser(null);
       setProfile(null);
       return;
@@ -102,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem(TOKEN_KEY);
+    const token = getToken();
     if (token) {
       loadFromToken(token).finally(() => setLoading(false));
     } else {
@@ -111,14 +110,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setToken = async (token: string) => {
-    localStorage.setItem(TOKEN_KEY, token);
+    storeToken(token);
     setLoading(true);
     await loadFromToken(token);
     setLoading(false);
   };
 
   const signOut = () => {
-    localStorage.removeItem(TOKEN_KEY);
+    clearTokens();
     setUser(null);
     setProfile(null);
   };

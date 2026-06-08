@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth, TOKEN_KEY } from "@/hooks/useAuth";
+import { getToken } from "@/lib/token";
 import { getAdminUsersApi } from "@/services/auth-api";
 import { getProfiles } from "@/services/data-service";
 import { API_BASE_URL } from "@/services/api-config";
@@ -19,7 +19,7 @@ import type { Profile } from "@/types/models";
 export default function PartenaireDetailsPage() {
   const { partenaireId } = useParams<{ partenaireId: string }>();
   const navigate = useNavigate();
-  const token = localStorage.getItem(TOKEN_KEY) ?? "";
+  const token = getToken() ?? "";
   const qc = useQueryClient();
 
   const [assignOpen, setAssignOpen] = useState(false);

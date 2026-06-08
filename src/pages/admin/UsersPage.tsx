@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { useAuth, TOKEN_KEY } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth";
+import { getToken } from "@/lib/token";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,7 +29,7 @@ export default function UsersPage() {
   const { t } = useLanguage();
   const { profile: currentProfile } = useAuth();
   const navigate = useNavigate();
-  const token = localStorage.getItem(TOKEN_KEY) ?? "";
+  const token = getToken() ?? "";
   const qc = useQueryClient();
 
   const [editing, setEditing] = useState<AdminUser | null>(null);

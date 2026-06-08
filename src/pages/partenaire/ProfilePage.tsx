@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { User, Mail, Calendar, Upload, Building2, Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { updateProfile } from "@/services/data-service";
 import { toast } from "@/hooks/use-toast";
 
 export default function ProfilePage() {
@@ -27,41 +27,22 @@ export default function ProfilePage() {
     ? `${profile.first_name[0]}${(profile.last_name?.[0] ?? "")}`.toUpperCase()
     : (user?.email?.[0] ?? "U").toUpperCase();
 
-  const uploadFile = async (file: File, kind: "avatar" | "logo") => {
-    if (!user || !profile) return;
-    setUploading(kind);
-    try {
-      const ext = file.name.split(".").pop();
-      const path = `${user.id}/${kind}-${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage
-        .from("company-logos")
-        .upload(path, file, { upsert: true });
-      if (upErr) throw upErr;
-      const { data: { publicUrl } } = supabase.storage.from("company-logos").getPublicUrl(path);
-      const field = kind === "avatar" ? "avatar_url" : "company_logo";
-      const { error: updErr } = await supabase
-        .from("profiles")
-        .update({ [field]: publicUrl } as any)
-        .eq("id", profile.id);
-      if (updErr) throw updErr;
-      toast({ title: kind === "avatar" ? "Photo mise à jour" : "Logo mis à jour" });
-      window.location.reload();
-    } catch (e: any) {
-      toast({ title: "Erreur", description: e.message, variant: "destructive" });
-    } finally {
-      setUploading(null);
-    }
+  // TODO(backend): l'upload de fichiers (photo de profil / logo entreprise)
+  // passait par Supabase Storage. Désactivé en attendant un endpoint backend
+  // d'upload (ex. /user/avatar). On informe l'utilisateur.
+  const uploadFile = async (_file: File, _kind: "avatar" | "logo") => {
+    toast({
+      title: "Indisponible",
+      description: "L'envoi d'images n'est pas encore disponible côté serveur.",
+      variant: "destructive",
+    });
   };
 
   const saveCompany = async () => {
     if (!profile) return;
     setSavingCompany(true);
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ company_name: companyName } as any)
-        .eq("id", profile.id);
-      if (error) throw error;
+      await updateProfile(profile.id, { company_name: companyName });
       toast({ title: "Entreprise mise à jour" });
       window.location.reload();
     } catch (e: any) {

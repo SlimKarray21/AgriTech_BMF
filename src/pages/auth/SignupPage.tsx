@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { registerUserApi, ApiError } from "@/services/auth-api";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,19 +30,24 @@ export default function SignupPage() {
     e.preventDefault();
     setLoading(true);
     const fullPhone = `${selectedCountry?.dialCode ?? ""}${phone}`;
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: window.location.origin,
-        data: { first_name: firstName, last_name: lastName, phone: fullPhone, country: countryCode, city },
-      },
-    });
-    setLoading(false);
-    if (error) {
-      toast({ title: "Erreur", description: error.message, variant: "destructive" });
-    } else {
+    try {
+      await registerUserApi({
+        email,
+        password,
+        firstName,
+        lastName,
+        phoneNumber: fullPhone,
+      });
       setSent(true);
+    } catch (err: unknown) {
+      const apiErr = err as ApiError;
+      toast({
+        title: "Erreur",
+        description: apiErr.error ?? apiErr.message ?? "Inscription impossible.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 

@@ -1,7 +1,5 @@
-import { useEffect } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { getSols, getClimats, getSurfaces, getProfiles } from "@/services/data-service";
-import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,21 +8,10 @@ import { Mountain, Thermometer, Droplets, Wind, Sun, User, Lock, MapPin } from "
 
 export default function CapteurPage() {
   const { t } = useLanguage();
-  const qc = useQueryClient();
   const { data: sols = [] } = useQuery({ queryKey: ["sols"], queryFn: getSols });
   const { data: climats = [] } = useQuery({ queryKey: ["climats"], queryFn: getClimats });
   const { data: surfaces = [] } = useQuery({ queryKey: ["surfaces"], queryFn: getSurfaces });
   const { data: profiles = [] } = useQuery({ queryKey: ["profiles"], queryFn: getProfiles });
-
-  // Realtime sensor updates
-  useEffect(() => {
-    const ch = supabase
-      .channel("capteurs-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "sols" }, () => qc.invalidateQueries({ queryKey: ["sols"] }))
-      .on("postgres_changes", { event: "*", schema: "public", table: "climats" }, () => qc.invalidateQueries({ queryKey: ["climats"] }))
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [qc]);
 
   const getUserForEntity = (entityId: string, field: "fkSol" | "fkClimat") => {
     const surface = surfaces.find(s => s[field] === entityId);

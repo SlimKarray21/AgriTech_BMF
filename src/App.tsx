@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import AdminLayout from "@/components/AdminLayout";
+import RoleRoute, { HomeRedirect } from "@/components/RoleRoute";
 import DashboardPage from "@/pages/admin/DashboardPage";
 import SurfacesPage from "@/pages/admin/SurfacesPage";
 import DonneesDetailleesPage from "@/pages/admin/DonneesDetailleesPage";
@@ -62,12 +63,19 @@ const App = () => (
         <LanguageProvider>
           <AuthProvider>
             <Routes>
-              <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
+              <Route path="/" element={<HomeRedirect />} />
               <Route path="/auth/login" element={<LoginPage />} />
               <Route path="/auth/signup" element={<Navigate to="/auth/login" replace />} />
               <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
-              <Route path="/admin" element={<AdminLayout />}>
+              <Route
+                path="/admin"
+                element={
+                  <RoleRoute role="ADMIN">
+                    <AdminLayout />
+                  </RoleRoute>
+                }
+              >
                 <Route path="dashboard" element={<DashboardPage />} />
                 <Route path="surfaces" element={<SurfacesPage />} />
                 <Route path="donnees-detaillees" element={<DonneesDetailleesPage />} />
@@ -88,7 +96,14 @@ const App = () => (
                 <Route path="ventes" element={<VentesPage />} />
                 <Route path="partenaire/:partenaireId" element={<PartenaireDetailsPage />} />
               </Route>
-              <Route path="/partenaire" element={<PartenaireLayout />}>
+              <Route
+                path="/partenaire"
+                element={
+                  <RoleRoute role="PARTENAIRE">
+                    <PartenaireLayout />
+                  </RoleRoute>
+                }
+              >
                 <Route path="users" element={<PartenaireUsersPage />} />
                 <Route path="subscriptions" element={<PartenaireSubscriptionsPage />} />
                 <Route path="profile" element={<PartenaireProfilePage />} />

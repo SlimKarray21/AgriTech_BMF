@@ -11,18 +11,24 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CheckCircle2, Clock, Plus, Package } from "lucide-react";
+import { CheckCircle2, Clock, Plus, Package, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+
+type ReqItem = { id: string; qty: number };
 
 export default function DemandeMaterielPage() {
   const { user, profile } = useAuth();
   const qc = useQueryClient();
   const [creating, setCreating] = useState(false);
-  const [stockItemId, setStockItemId] = useState("");
-  const [quantity, setQuantity] = useState(1);
+  const [items, setItems] = useState<ReqItem[]>([]);
+  const [addId, setAddId] = useState("");
+  const [addQty, setAddQty] = useState(1);
+  const [notes, setNotes] = useState("");
 
   const { data: reclamations = [] } = useQuery({ queryKey: ["reclamations"], queryFn: getReclamations, refetchInterval: 10000 });
   const { data: stockItems = [] } = useQuery<any[]>({ queryKey: ["stock-items"], queryFn: getStockItems });
+
+  const stockById = useMemo(() => Object.fromEntries(stockItems.map(s => [String(s.id), s])), [stockItems]);
 
   // Mes demandes = réclamations dont je suis l'auteur (partenaire)
   const myDemandes = useMemo(
@@ -30,32 +36,47 @@ export default function DemandeMaterielPage() {
     [reclamations, profile?.id],
   );
 
+  const resetForm = () => { setItems([]); setAddId(""); setAddQty(1); setNotes(""); };
+
+  const addItem = () => {
+    if (!addId) return;
+    setItems(prev => {
+      const existing = prev.find(i => i.id === addId);
+      if (existing) return prev.map(i => i.id === addId ? { ...i, qty: i.qty + addQty } : i);
+      return [...prev, { id: addId, qty: addQty }];
+    });
+    setAddId("");
+    setAddQty(1);
+  };
+
+  const removeItem = (id: string) => setItems(prev => prev.filter(i => i.id !== id));
+
   const createMut = useMutation({
     mutationFn: createReclamation,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["reclamations"] });
       setCreating(false);
-      setStockItemId("");
-      setQuantity(1);
+      resetForm();
       toast({ title: "Demande envoyée à l'admin" });
     },
     onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
 
-  const handleCreate = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleSubmit = () => {
     if (!user || !profile) return;
-    const item = stockItems.find(s => String(s.id) === stockItemId);
-    if (!item) { toast({ title: "Sélectionnez un matériel", variant: "destructive" }); return; }
-    const fd = new FormData(e.currentTarget);
-    const notes = (fd.get("message") as string) || "";
+    if (items.length === 0) { toast({ title: "Ajoutez au moins un matériel", variant: "destructive" }); return; }
+    const lines = items.map(i => `- ${stockById[i.id]?.name ?? "?"} ×${i.qty}`);
     createMut.mutate({
-      user_id: user.id,
+      // user_id doit être numérique côté backend (le profile.id), pas l'UUID auth
+      user_id: profile.id,
       profile_id: profile.id,
-      sujet: `Demande matériel: ${item.name} ×${quantity}`,
-      message: `Quantité demandée: ${quantity}${notes ? `\n${notes}` : ""}`,
+      sujet: `Demande matériel (${items.length} article${items.length > 1 ? "s" : ""})`,
+      message: `${lines.join("\n")}${notes.trim() ? `\n\n${notes.trim()}` : ""}`,
     });
   };
+
+  // Matériels encore disponibles à ajouter (pas déjà dans la liste)
+  const availableToAdd = stockItems.filter(s => !items.some(i => i.id === String(s.id)));
 
   return (
     <div className="space-y-6">
@@ -108,34 +129,60 @@ export default function DemandeMaterielPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={creating} onOpenChange={setCreating}>
+      <Dialog open={creating} onOpenChange={(o) => { setCreating(o); if (!o) resetForm(); }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Nouvelle demande de matériel</DialogTitle></DialogHeader>
-          <form onSubmit={handleCreate} className="space-y-4">
+          <div className="space-y-4">
             <div>
-              <Label>Matériel *</Label>
-              <Select value={stockItemId} onValueChange={setStockItemId}>
-                <SelectTrigger><SelectValue placeholder="Choisir un matériel..." /></SelectTrigger>
-                <SelectContent>
-                  {stockItems.map(s => (
-                    <SelectItem key={s.id} value={String(s.id)}>{s.name} (stock: {s.quantity})</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Matériel(s)</Label>
+              <div className="flex gap-2 items-end mt-1">
+                <div className="flex-1">
+                  <Select value={addId} onValueChange={setAddId}>
+                    <SelectTrigger><SelectValue placeholder="Choisir un matériel..." /></SelectTrigger>
+                    <SelectContent>
+                      {availableToAdd.map(s => (
+                        <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                      ))}
+                      {availableToAdd.length === 0 && (
+                        <div className="px-2 py-1.5 text-xs text-muted-foreground">Aucun autre matériel</div>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="w-20">
+                  <Input type="number" min="1" value={addQty} onChange={e => setAddQty(Math.max(1, +e.target.value))} />
+                </div>
+                <Button type="button" onClick={addItem} disabled={!addId}><Plus className="h-4 w-4" /></Button>
+              </div>
             </div>
-            <div>
-              <Label>Quantité *</Label>
-              <Input type="number" min="1" value={quantity} onChange={e => setQuantity(Math.max(1, +e.target.value))} required />
-            </div>
+
+            {items.length > 0 && (
+              <div className="border rounded-lg divide-y">
+                {items.map(i => (
+                  <div key={i.id} className="flex items-center justify-between px-3 py-2 text-sm">
+                    <span className="font-medium">{stockById[i.id]?.name ?? "?"}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-muted-foreground">×{i.qty}</span>
+                      <Button type="button" size="sm" variant="ghost" className="text-destructive h-7 w-7 p-0" onClick={() => removeItem(i.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div>
               <Label>Message (optionnel)</Label>
-              <Textarea name="message" rows={4} placeholder="Précisions sur votre demande..." />
+              <Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} placeholder="Précisions sur votre demande..." />
             </div>
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setCreating(false)}>Annuler</Button>
-              <Button type="submit" disabled={createMut.isPending || !stockItemId}>{createMut.isPending ? "..." : "Envoyer"}</Button>
+              <Button type="button" variant="outline" onClick={() => { setCreating(false); resetForm(); }}>Annuler</Button>
+              <Button type="button" onClick={handleSubmit} disabled={createMut.isPending || items.length === 0}>
+                {createMut.isPending ? "..." : "Envoyer"}
+              </Button>
             </div>
-          </form>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

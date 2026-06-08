@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getProfiles } from "@/services/data-service";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { getProfiles, getDeviceSales, getSubscriptionPayments } from "@/services/data-service";
 import { useFilteredProfiles } from "@/hooks/useRoleFilter";
-import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,22 +14,12 @@ const DT = (n: number) => `${Number(n ?? 0).toLocaleString("fr-FR", { maximumFra
 export default function DashboardPage() {
   const { t } = useLanguage();
   const [range, setRange] = useState<Range>("month");
-  const qc = useQueryClient();
-
-  useEffect(() => {
-    const ch = supabase.channel("dashboard-rt")
-      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => qc.invalidateQueries({ queryKey: ["profiles"] }))
-      .on("postgres_changes", { event: "*", schema: "public", table: "device_sales" }, () => qc.invalidateQueries({ queryKey: ["sales"] }))
-      .on("postgres_changes", { event: "*", schema: "public", table: "subscription_payments" }, () => qc.invalidateQueries({ queryKey: ["subpays"] }))
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [qc]);
 
   const { data: allProfiles = [] } = useQuery({ queryKey: ["profiles"], queryFn: getProfiles });
   const allFiltered = useFilteredProfiles(allProfiles);
 
-  const { data: sales = [] } = useQuery<any[]>({ queryKey: ["sales"], queryFn: async () => (await supabase.from("device_sales").select("*").order("created_at")).data || [] });
-  const { data: subpays = [] } = useQuery<any[]>({ queryKey: ["subpays"], queryFn: async () => (await supabase.from("subscription_payments").select("*").order("created_at")).data || [] });
+  const { data: sales = [] } = useQuery<any[]>({ queryKey: ["sales"], queryFn: getDeviceSales });
+  const { data: subpays = [] } = useQuery<any[]>({ queryKey: ["subpays"], queryFn: getSubscriptionPayments });
 
   const validSales = sales.filter(s => s.status === "valide");
   const validSubs = subpays.filter(s => s.status === "valide");
