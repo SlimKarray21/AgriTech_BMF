@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { getUserProfileApi } from "@/services/auth-api";
-import { storeToken, getToken, clearTokens } from "@/lib/token";
+import { storeToken, getToken, clearTokens, markActivity, isSessionExpired } from "@/lib/token";
 
 interface AuthUser {
   id: string;
@@ -107,6 +107,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } else {
       setLoading(false);
     }
+  }, []);
+
+  // Sécurité session : expiration par inactivité (5 min) après fermeture/onglet caché.
+  useEffect(() => {
+    const expireIfNeeded = () => {
+      if (isSessionExpired()) {
+        clearTokens();
+        setUser(null);
+        setProfile(null);
+      }
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        // L'onglet passe en arrière-plan / se ferme : on démarre le cooldown.
+        markActivity();
+      } else {
+        // Retour au premier plan : on expire si > 5 min d'inactivité.
+        expireIfNeeded();
+      }
+    };
+    // pagehide couvre la fermeture de l'onglet/navigateur (record du moment de sortie).
+    const onPageHide = () => markActivity();
+
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", onPageHide);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", onPageHide);
+    };
   }, []);
 
   const setToken = async (token: string) => {
