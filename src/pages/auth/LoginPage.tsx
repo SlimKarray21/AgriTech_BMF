@@ -8,7 +8,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Mail, Lock, KeyRound } from "lucide-react";
 import teslaLogo from "@/assets/logo-tesla-energie.png";
 import { toast } from "@/hooks/use-toast";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { loginApi, verifyEmailApi, resendCodeApi, ApiError } from "@/services/auth-api";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -86,7 +85,6 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="absolute top-4 right-4"><LanguageSwitcher /></div>
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
