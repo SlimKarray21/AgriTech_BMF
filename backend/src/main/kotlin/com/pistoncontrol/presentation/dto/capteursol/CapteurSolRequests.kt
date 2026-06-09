@@ -17,7 +17,7 @@ data class CreateParcelleRequest(
 data class CreateVanneRequest(
     val name: String,
     val parcelId: Long,
-    val userId: Long,
+    val userId: Long? = null,
     val debit: Double = 0.0,
     val isAuto: Boolean = false,
     val isOpen: Boolean = false,
