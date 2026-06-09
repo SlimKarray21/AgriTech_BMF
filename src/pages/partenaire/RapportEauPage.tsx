@@ -1,11 +1,12 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getProfiles, getRapportsEau, createRapportEau, deleteRapportEau } from "@/services/data-service";
+import { getProfiles, getRapportsEau, createRapportEau, deleteRapportEau, getSurfaces } from "@/services/data-service";
 import { useFilteredProfiles } from "@/hooks/useRoleFilter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { DeleteDialog } from "@/components/DeleteDialog";
 import { Search, ArrowLeft, Plus, Eye, FileText, Calendar, Droplets } from "lucide-react";
@@ -73,6 +74,7 @@ export default function RapportEauPage() {
   const qc = useQueryClient();
   const [view, setView] = useState<View>("users");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [selectedParcelId, setSelectedParcelId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [viewing, setViewing] = useState<RapportEau | null>(null);
   const [form, setForm] = useState<Record<string, string>>({});
@@ -80,6 +82,17 @@ export default function RapportEauPage() {
   const { data: allProfiles = [] } = useQuery({ queryKey: ["profiles"], queryFn: getProfiles });
   const profiles = useFilteredProfiles(allProfiles);
   const profById = useMemo(() => Object.fromEntries(profiles.map(p => [p.id, p])), [profiles]);
+
+  const { data: surfaces = [] } = useQuery({ queryKey: ["surfaces"], queryFn: getSurfaces });
+  // Parcelles appartenant à l'utilisateur sélectionné.
+  const userParcelles = useMemo(
+    () => surfaces.filter(s => String(s.fkUser) === selectedUserId),
+    [surfaces, selectedUserId]
+  );
+  const parcelleNameById = useMemo(
+    () => Object.fromEntries(surfaces.map(s => [String(s.id), s.nomSurface])),
+    [surfaces]
+  );
 
   const { data: rawRapports = [], isLoading } = useQuery({
     queryKey: ["rapports-eau"],
@@ -135,7 +148,7 @@ export default function RapportEauPage() {
     const num = (k: string) => { const v = fd.get(k); return v && (v as string).trim() !== "" ? parseFloat(v as string) : 0; };
     createMut.mutate({
       report_name:        fd.get("report_name") as string || `Rapport Eau - ${new Date().toLocaleDateString("fr-FR")}`,
-      parcel_id:          0,
+      parcel_id:          Number(selectedParcelId) || 0,
       user_id:            Number(selectedUserId),
       analysis_date:      fd.get("analysis_date") as string || new Date().toISOString().split("T")[0],
       ph:                 num("ph"),
@@ -196,15 +209,34 @@ export default function RapportEauPage() {
   // ── HISTORY ──────────────────────────────────────────────────────────────────
   if (view === "history") return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <button onClick={() => { setView("users"); setSelectedUserId(null); }}
+      <div className="flex items-center justify-between gap-3">
+        <button onClick={() => { setView("users"); setSelectedUserId(null); setSelectedParcelId(null); }}
           className="flex items-center gap-2 text-sm text-blue-700 hover:underline">
           <ArrowLeft className="h-4 w-4" />Retour
         </button>
-        <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setView("form")}>
-          <Plus className="mr-2 h-4 w-4" />Nouveau rapport
-        </Button>
+        <div className="flex items-center gap-2">
+          <Select value={selectedParcelId ?? ""} onValueChange={setSelectedParcelId}>
+            <SelectTrigger className="w-56">
+              <SelectValue placeholder="Choisir une parcelle" />
+            </SelectTrigger>
+            <SelectContent>
+              {userParcelles.map(p => (
+                <SelectItem key={p.id} value={String(p.id)}>{p.nomSurface}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            className="bg-blue-600 hover:bg-blue-700"
+            disabled={!selectedParcelId}
+            onClick={() => setView("form")}
+          >
+            <Plus className="mr-2 h-4 w-4" />Nouveau rapport
+          </Button>
+        </div>
       </div>
+      {userParcelles.length === 0 && (
+        <p className="text-xs text-orange-500">Ce client n'a aucune parcelle. Créez-en une avant d'ajouter un rapport.</p>
+      )}
       <div className="flex items-center gap-3">
         <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-lg">
           {(selectedProfile?.first_name?.[0] ?? "").toUpperCase()}
@@ -224,9 +256,16 @@ export default function RapportEauPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold">{r.report_name}</p>
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />{r.analysis_date}
-                </p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />{r.analysis_date}
+                  </p>
+                  {r.parcel_id ? (
+                    <Badge variant="outline" className="text-[10px]">
+                      {parcelleNameById[String(r.parcel_id)] ?? `Parcelle #${r.parcel_id}`}
+                    </Badge>
+                  ) : null}
+                </div>
               </div>
               <Eye className="h-5 w-5 text-muted-foreground" />
             </CardContent>

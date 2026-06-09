@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getProfiles, getSurfaces, getVannes, getTypesPlante, updateProfile, updateSurface, createWizardParcelle } from "@/services/data-service";
+import { getProfiles, getSurfaces, getVannes, updateProfile, updateSurface, createWizardParcelle } from "@/services/data-service";
 import { Switch } from "@/components/ui/switch";
 import { useFilteredProfiles } from "@/hooks/useRoleFilter";
 import { useAuth } from "@/hooks/useAuth";
@@ -58,7 +58,6 @@ export default function TravailPage() {
   const { data: allProfiles = [] } = useQuery({ queryKey: ["profiles"], queryFn: getProfiles });
   const { data: surfaces = [] } = useQuery({ queryKey: ["surfaces"], queryFn: getSurfaces });
   const { data: vannes = [] } = useQuery({ queryKey: ["vannes"], queryFn: getVannes });
-  const { data: typesList = [] } = useQuery({ queryKey: ["types-plante"], queryFn: getTypesPlante });
 
   const profiles = useFilteredProfiles(allProfiles.filter(p => p.user_role === "CLIENT"));
 
@@ -202,7 +201,7 @@ export default function TravailPage() {
 
       <EditProfileDialog profile={editingProfile} onClose={() => setEditingProfile(null)} onSave={(id, data) => updateProfileMut.mutate({ id, data })} />
       <EditSurfaceDialog surface={editingSurface} profiles={profiles} onClose={() => setEditingSurface(null)} onSave={(id, data) => updateSurfaceMut.mutate({ id, data })} />
-      <NewProjectDialog open={showWizard} onClose={() => setShowWizard(false)} profiles={allProfiles} typesList={typesList} qc={qc} t={t} />
+      <NewProjectDialog open={showWizard} onClose={() => setShowWizard(false)} profiles={allProfiles} qc={qc} t={t} />
     </div>
   );
 }
@@ -373,9 +372,9 @@ function ClientCombobox({ profiles, value, onChange, open, onOpenChange }: {
   );
 }
 
-interface PlantEntry { name: string; type: string; age: number; count: number; }
+interface PlantEntry { name: string; age: number; count: number; }
 
-function NewProjectDialog({ open, onClose, profiles, typesList, qc, t }: { open: boolean; onClose: () => void; profiles: Profile[]; typesList: any[]; qc: any; t: (k: string) => string }) {
+function NewProjectDialog({ open, onClose, profiles, qc, t }: { open: boolean; onClose: () => void; profiles: Profile[]; qc: any; t: (k: string) => string }) {
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [clientOpen, setClientOpen] = useState(false);
@@ -385,7 +384,7 @@ function NewProjectDialog({ open, onClose, profiles, typesList, qc, t }: { open:
   const [localisation, setLocalisation] = useState("");
   const [fkUser, setFkUser] = useState("");
   const [tailleHa, setTailleHa] = useState<number | undefined>(undefined);
-  const [plantEntries, setPlantEntries] = useState<PlantEntry[]>([{ name: "", type: "", age: 1, count: 100 }]);
+  const [plantEntries, setPlantEntries] = useState<PlantEntry[]>([{ name: "", age: 1, count: 100 }]);
 
   // Étape 2 — Vannes
   const [vannesData, setVannesData] = useState<VanneData[]>([{ nomVanne: "Vanne 1", nbPlantParVanne: 100, debitEauParVanne: 2 }]);
@@ -394,11 +393,11 @@ function NewProjectDialog({ open, onClose, profiles, typesList, qc, t }: { open:
     setStep(0);
     setNomSurface(""); setLocalisation(""); setFkUser(""); setTailleHa(undefined);
     setClientOpen(false);
-    setPlantEntries([{ name: "", type: "", age: 1, count: 100 }]);
+    setPlantEntries([{ name: "", age: 1, count: 100 }]);
     setVannesData([{ nomVanne: "Vanne 1", nbPlantParVanne: 100, debitEauParVanne: 2 }]);
   };
 
-  const addPlant = () => setPlantEntries([...plantEntries, { name: "", type: "", age: 1, count: 50 }]);
+  const addPlant = () => setPlantEntries([...plantEntries, { name: "", age: 1, count: 50 }]);
   const removePlant = (i: number) => setPlantEntries(plantEntries.filter((_, idx) => idx !== i));
   const updatePlant = (i: number, field: keyof PlantEntry, val: string | number) => {
     const arr = [...plantEntries];
@@ -417,14 +416,8 @@ function NewProjectDialog({ open, onClose, profiles, typesList, qc, t }: { open:
     setVannesData(arr);
   };
 
-  const canStep1 = !!(nomSurface && localisation && fkUser && plantEntries.every(p => p.name && p.type));
+  const canStep1 = !!(nomSurface && localisation && fkUser && plantEntries.every(p => p.name));
   const canStep2 = vannesData.every(v => v.nomVanne && v.debitEauParVanne > 0);
-
-  // Cherche le besoin en eau d'un type de plante par son nom
-  const getWaterNeed = (typeName: string) => {
-    const found = typesList.find((tp: any) => tp.nomPlante === typeName);
-    return found?.besoinEauParPlante ?? 2;
-  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -436,10 +429,10 @@ function NewProjectDialog({ open, onClose, profiles, typesList, qc, t }: { open:
         tailleHa,
         plants: plantEntries.map(p => ({
           name: p.name,
-          type: p.type,
+          type: "",
           age: p.age,
           count: p.count,
-          waterNeedPerPlant: getWaterNeed(p.type),
+          waterNeedPerPlant: 2,
         })),
         vannes: vannesData.map(v => ({
           name: v.nomVanne,
@@ -526,19 +519,10 @@ function NewProjectDialog({ open, onClose, profiles, typesList, qc, t }: { open:
                         </Button>
                       )}
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                       <div>
                         <Label className="text-xs">{t("wizard.plantName")}</Label>
                         <Input value={pe.name} onChange={(e) => updatePlant(idx, "name", e.target.value)} placeholder="Nom" className="h-8 text-sm" />
-                      </div>
-                      <div>
-                        <Label className="text-xs">{t("wizard.plantType")}</Label>
-                        <Select value={pe.type} onValueChange={(v) => updatePlant(idx, "type", v)}>
-                          <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Type" /></SelectTrigger>
-                          <SelectContent>
-                            {typesList.map((tp: any) => <SelectItem key={tp.id} value={tp.nomPlante}>{tp.nomPlante}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
                       </div>
                       <div>
                         <Label className="text-xs">{t("wizard.plantAge")} (ans)</Label>

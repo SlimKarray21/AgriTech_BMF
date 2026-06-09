@@ -1,7 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  getTypesPlante, createTypePlante, updateTypePlante, deleteTypePlante,
   getPlantes, createPlante, updatePlante, deletePlante,
   getVannes, createVanne, updateVanne, deleteVanne,
   getSurfaces, getProfiles,
@@ -17,14 +16,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DeleteDialog } from "@/components/DeleteDialog";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Pencil, Leaf, Droplets, Workflow } from "lucide-react";
-import { TypePlante, Plante, Vanne } from "@/types/models";
+import { Plus, Pencil, Leaf, Droplets } from "lucide-react";
+import { Plante, Vanne } from "@/types/models";
 
 export default function DonneesDetailleesPage() {
   const { t } = useLanguage();
   const qc = useQueryClient();
 
-  const { data: types = [] } = useQuery({ queryKey: ["types-plante"], queryFn: getTypesPlante });
   const { data: plantes = [] } = useQuery({ queryKey: ["plantes"], queryFn: getPlantes });
   const { data: vannes = [] } = useQuery({ queryKey: ["vannes"], queryFn: getVannes });
   const { data: surfaces = [] } = useQuery({ queryKey: ["surfaces"], queryFn: getSurfaces });
@@ -71,17 +69,9 @@ export default function DonneesDetailleesPage() {
     return Array.from(byUser.values());
   }, [vannes, surfaces, profiles]);
 
-  // Types CRUD
-  const [showTypeForm, setShowTypeForm] = useState(false);
-  const [editType, setEditType] = useState<TypePlante | null>(null);
-  const createTypeMut = useMutation({ mutationFn: createTypePlante, onSuccess: () => { qc.invalidateQueries({ queryKey: ["types-plante"] }); setShowTypeForm(false); toast({ title: t("donnees.typeCreated") }); } });
-  const updateTypeMut = useMutation({ mutationFn: ({ id, data }: { id: string; data: Partial<TypePlante> }) => updateTypePlante(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ["types-plante"] }); setEditType(null); toast({ title: t("donnees.typeUpdated") }); } });
-  const deleteTypeMut = useMutation({ mutationFn: deleteTypePlante, onSuccess: () => { qc.invalidateQueries({ queryKey: ["types-plante"] }); toast({ title: t("donnees.typeDeleted") }); } });
-
   // Plantes CRUD
   const [showPlanteForm, setShowPlanteForm] = useState(false);
   const [selSurface, setSelSurface] = useState("");
-  const [selType, setSelType] = useState("");
   const [editPlante, setEditPlante] = useState<Plante | null>(null);
   const createPlanteMut = useMutation({ mutationFn: createPlante, onSuccess: () => { qc.invalidateQueries({ queryKey: ["plantes"] }); setShowPlanteForm(false); toast({ title: t("donnees.planteCreated") }); } });
   const updatePlanteMut = useMutation({ mutationFn: ({ id, data }: { id: string; data: Partial<Plante> }) => updatePlante(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ["plantes"] }); setEditPlante(null); toast({ title: t("donnees.planteUpdated") }); } });
@@ -98,70 +88,28 @@ export default function DonneesDetailleesPage() {
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-foreground">{t("nav.donneesDetaillees")}</h2>
-      <Tabs defaultValue="types">
+      <Tabs defaultValue="plantes">
         <TabsList>
-          <TabsTrigger value="types"><Workflow className="mr-1 h-4 w-4" /> {t("donnees.typesPlante")}</TabsTrigger>
           <TabsTrigger value="plantes"><Leaf className="mr-1 h-4 w-4" /> {t("donnees.plantes")}</TabsTrigger>
           <TabsTrigger value="vannes"><Droplets className="mr-1 h-4 w-4" /> {t("donnees.vannes")}</TabsTrigger>
         </TabsList>
-
-        {/* Types de plante */}
-        <TabsContent value="types" className="space-y-4">
-          <div className="flex justify-end"><Button onClick={() => setShowTypeForm(!showTypeForm)}><Plus className="mr-2 h-4 w-4" /> {t("donnees.newType")}</Button></div>
-          {showTypeForm && (
-            <Card><CardContent className="pt-4">
-              <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget); createTypeMut.mutate({ nomPlante: fd.get("nomPlante") as string, typePlante: fd.get("typePlante") as string, besoinEauParPlante: 0 }); }} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div><Label>Nom</Label><Input name="nomPlante" required /></div>
-                <div><Label>Type</Label><Input name="typePlante" required /></div>
-                <div className="md:col-span-2 flex gap-2"><Button type="submit">{t("common.create")}</Button><Button type="button" variant="outline" onClick={() => setShowTypeForm(false)}>{t("common.cancel")}</Button></div>
-              </form>
-            </CardContent></Card>
-          )}
-          <Card><CardContent className="p-0">
-            <Table>
-              <TableHeader><TableRow><TableHead>Nom</TableHead><TableHead>Type</TableHead><TableHead className="w-24">{t("common.actions")}</TableHead></TableRow></TableHeader>
-              <TableBody>
-                {types.map(tp => (
-                  <TableRow key={tp.id}>
-                    <TableCell>{tp.nomPlante}</TableCell>
-                    <TableCell>{tp.typePlante}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => setEditType(tp)}><Pencil className="h-3 w-3" /></Button>
-                        <DeleteDialog onConfirm={() => deleteTypeMut.mutate(tp.id)} itemName={tp.nomPlante} />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {types.length === 0 && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">{t("donnees.noType")}</TableCell></TableRow>}
-              </TableBody>
-            </Table>
-          </CardContent></Card>
-        </TabsContent>
 
         {/* Plantes */}
         <TabsContent value="plantes" className="space-y-4">
           <div className="flex justify-end"><Button onClick={() => setShowPlanteForm(!showPlanteForm)}><Plus className="mr-2 h-4 w-4" /> {t("donnees.newPlante")}</Button></div>
           {showPlanteForm && (
             <Card><CardContent className="pt-4">
-              <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget); createPlanteMut.mutate({ nomPlante: fd.get("nomPlante") as string, age: parseInt(fd.get("age") as string), fkSurface: selSurface, fkTypePlante: selType }); }} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget); createPlanteMut.mutate({ nomPlante: fd.get("nomPlante") as string, age: parseInt(fd.get("age") as string), fkSurface: selSurface }); }} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div><Label>Nom</Label><Input name="nomPlante" required /></div>
                 <div><Label>Âge (ans)</Label><Input name="age" type="number" min="0" required /></div>
-                <div>
+                <div className="md:col-span-2">
                   <Label>Surface</Label>
                   <Select value={selSurface} onValueChange={setSelSurface}>
                     <SelectTrigger><SelectValue placeholder="Surface" /></SelectTrigger>
                     <SelectContent>{surfaces.map(s => <SelectItem key={s.id} value={s.id}>{s.nomSurface}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <Label>Type</Label>
-                  <Select value={selType} onValueChange={setSelType}>
-                    <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
-                    <SelectContent>{types.map(t => <SelectItem key={t.id} value={t.id}>{t.nomPlante}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div className="md:col-span-2 flex gap-2"><Button type="submit" disabled={!selSurface || !selType}>{t("common.create")}</Button><Button type="button" variant="outline" onClick={() => setShowPlanteForm(false)}>{t("common.cancel")}</Button></div>
+                <div className="md:col-span-2 flex gap-2"><Button type="submit" disabled={!selSurface}>{t("common.create")}</Button><Button type="button" variant="outline" onClick={() => setShowPlanteForm(false)}>{t("common.cancel")}</Button></div>
               </form>
             </CardContent></Card>
           )}
@@ -268,18 +216,6 @@ export default function DonneesDetailleesPage() {
           ))}
         </TabsContent>
       </Tabs>
-
-      {/* Edit Type Dialog */}
-      <Dialog open={!!editType} onOpenChange={(o) => !o && setEditType(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>{t("donnees.editType")}</DialogTitle></DialogHeader>
-          <form onSubmit={(e) => { e.preventDefault(); if (!editType) return; const fd = new FormData(e.currentTarget); updateTypeMut.mutate({ id: editType.id, data: { nomPlante: fd.get("nomPlante") as string, typePlante: fd.get("typePlante") as string } }); }} className="space-y-4">
-            <div><Label>Nom</Label><Input name="nomPlante" defaultValue={editType?.nomPlante} required /></div>
-            <div><Label>Type</Label><Input name="typePlante" defaultValue={editType?.typePlante} required /></div>
-            <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setEditType(null)}>{t("common.cancel")}</Button><Button type="submit">{t("common.save")}</Button></div>
-          </form>
-        </DialogContent>
-      </Dialog>
 
       {/* Edit Plante Dialog */}
       <Dialog open={!!editPlante} onOpenChange={(o) => !o && setEditPlante(null)}>

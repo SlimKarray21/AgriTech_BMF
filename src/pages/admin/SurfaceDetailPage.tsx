@@ -100,7 +100,7 @@ export default function SurfaceDetailPage() {
               {surfacePlantes.map((p) => (
                 <div key={p.id} className="border rounded-lg p-3 text-sm">
                   <div className="font-medium">{p.nomPlante}</div>
-                  <div className="text-muted-foreground">Type : {p.typePlanteNom ?? "—"} · Âge : {p.age} ans</div>
+                  <div className="text-muted-foreground">Âge : {p.age} ans</div>
                 </div>
               ))}
             </div>

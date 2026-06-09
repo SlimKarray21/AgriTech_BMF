@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getProfiles, getTypesPlante, createSurface, createPlante, createVanne } from "@/services/data-service";
+import { getProfiles, createSurface, createPlante, createVanne } from "@/services/data-service";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +21,6 @@ interface WizardData {
   fkUser: string;
   nomPlante: string;
   agePlante: number;
-  fkTypePlante: string;
   nbVanne: number;
   nbPlante: number;
   vannes: VanneData[];
@@ -33,7 +32,6 @@ const initialData: WizardData = {
   fkUser: "",
   nomPlante: "",
   agePlante: 0,
-  fkTypePlante: "",
   nbVanne: 1,
   nbPlante: 0,
   vannes: [{ nomVanne: "", nbPlantParVanne: 0, debitEauParVanne: 0 }],
@@ -48,7 +46,6 @@ export default function WizardPage() {
   const qc = useQueryClient();
 
   const { data: profilesList = [] } = useQuery({ queryKey: ["profiles"], queryFn: getProfiles });
-  const { data: typesList = [] } = useQuery({ queryKey: ["types-plante"], queryFn: getTypesPlante });
 
   const updateField = <K extends keyof WizardData>(key: K, value: WizardData[K]) => {
     setData((prev) => {
@@ -71,14 +68,14 @@ export default function WizardPage() {
     });
   };
 
-  const canGoStep1 = data.nomSurface && data.localisation && data.fkUser && data.nomPlante && data.fkTypePlante && data.nbVanne > 0;
+  const canGoStep1 = data.nomSurface && data.localisation && data.fkUser && data.nomPlante && data.nbVanne > 0;
   const canGoStep2 = data.vannes.every((v) => v.nomVanne && v.debitEauParVanne > 0);
 
   const handleSave = async () => {
     setSaving(true);
     try {
       const surface = await createSurface({ nomSurface: data.nomSurface, localisation: data.localisation, fkUser: data.fkUser });
-      await createPlante({ nomPlante: data.nomPlante, age: data.agePlante, fkTypePlante: data.fkTypePlante, fkSurface: surface.id });
+      await createPlante({ nomPlante: data.nomPlante, age: data.agePlante, fkSurface: surface.id });
       for (const v of data.vannes) {
         await createVanne({ nomVanne: v.nomVanne, nbPlantParVanne: v.nbPlantParVanne, debitEauParVanne: v.debitEauParVanne, fkSurface: surface.id });
       }
@@ -96,7 +93,6 @@ export default function WizardPage() {
   };
 
   const userEmail = profilesList.find((p) => p.id === data.fkUser)?.email ?? "—";
-  const typePlanteNom = typesList.find((t) => t.id === data.fkTypePlante)?.nomPlante ?? "—";
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -126,13 +122,6 @@ export default function WizardPage() {
               </div>
               <div><Label>Nom plante</Label><Input value={data.nomPlante} onChange={(e) => updateField("nomPlante", e.target.value)} required /></div>
               <div><Label>Âge plante (ans)</Label><Input type="number" min="0" value={data.agePlante} onChange={(e) => updateField("agePlante", parseInt(e.target.value) || 0)} /></div>
-              <div>
-                <Label>Type de plante</Label>
-                <Select value={data.fkTypePlante} onValueChange={(v) => updateField("fkTypePlante", v)}>
-                  <SelectTrigger><SelectValue placeholder="Sélectionner un type" /></SelectTrigger>
-                  <SelectContent>{typesList.map((t) => <SelectItem key={t.id} value={t.id}>{t.nomPlante}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
               <div><Label>Nombre de vannes</Label><Input type="number" min="1" value={data.nbVanne} onChange={(e) => updateField("nbVanne", Math.max(1, parseInt(e.target.value) || 1))} /></div>
               <div><Label>Nombre de plantes</Label><Input type="number" min="0" value={data.nbPlante} onChange={(e) => updateField("nbPlante", parseInt(e.target.value) || 0)} /></div>
             </div>
@@ -177,7 +166,7 @@ export default function WizardPage() {
                 <div><span className="text-muted-foreground">Nom :</span> {data.nomSurface}</div>
                 <div><span className="text-muted-foreground">Localisation :</span> {data.localisation}</div>
                 <div><span className="text-muted-foreground">Utilisateur :</span> {userEmail}</div>
-                <div><span className="text-muted-foreground">Plante :</span> {data.nomPlante} ({typePlanteNom}, {data.agePlante} ans)</div>
+                <div><span className="text-muted-foreground">Plante :</span> {data.nomPlante} ({data.agePlante} ans)</div>
                 <div><span className="text-muted-foreground">Nb vannes :</span> {data.nbVanne}</div>
                 <div><span className="text-muted-foreground">Nb plantes :</span> {data.nbPlante}</div>
               </div>

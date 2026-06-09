@@ -1,10 +1,11 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getProfiles, getSurfaces, getVannes, getPlantes, getSols, getClimats, getRapportsEau, getRapportsSol, getTypesPlante, createWizardParcelle, deleteSurface, deleteVanne } from "@/services/data-service";
+import { getProfiles, getSurfaces, getVannes, getPlantes, getSols, getClimats, getRapportsEau, getRapportsSol, createWizardParcelle, deleteSurface, deleteVanne } from "@/services/data-service";
 import { getAdminUsersApi } from "@/services/auth-api";
 import { DeleteDialog } from "@/components/DeleteDialog";
 import { getToken } from "@/lib/token";
 import { useFilteredProfiles } from "@/hooks/useRoleFilter";
+import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -109,7 +110,6 @@ export default function BaseDonneesPage() {
   });
 
   const { data: allProfiles = [] } = useQuery({ queryKey: ["profiles"], queryFn: getProfiles });
-  const { data: typesList = [] } = useQuery({ queryKey: ["types-plante"], queryFn: getTypesPlante });
   const profiles = useFilteredProfiles(allProfiles);
   const { data: surfaces = [] } = useQuery({ queryKey: ["surfaces"], queryFn: getSurfaces });
   const { data: vannes = [] } = useQuery({ queryKey: ["vannes"], queryFn: getVannes });
@@ -133,11 +133,16 @@ export default function BaseDonneesPage() {
     },
   });
 
+  const { profile: currentProfile } = useAuth();
+  const isAdmin = currentProfile?.user_role === "ADMIN";
+
   const token = getToken() ?? "";
+  // /api/admin/users est réservé à l'admin : un partenaire reçoit 403.
+  // On ne déclenche donc la requête que pour un admin.
   const { data: adminUsersData } = useQuery({
     queryKey: ["admin-users"],
     queryFn: () => getAdminUsersApi(token),
-    enabled: !!token,
+    enabled: !!token && isAdmin,
   });
   const authUsers = adminUsersData?.users ?? [];
 
@@ -152,7 +157,11 @@ export default function BaseDonneesPage() {
   const selectedProfile = useMemo(() => profiles.find(p => p.id === selectedUserId), [profiles, selectedUserId]);
   const authUser = useMemo(() => {
     if (!selectedProfile) return null;
-    return authUsers.find((u: any) => u.email?.toLowerCase() === selectedProfile.email?.toLowerCase());
+    // Jointure par user_id (UUID) en priorité, fallback par email
+    return authUsers.find((u: any) =>
+      (selectedProfile.user_id && u.id === selectedProfile.user_id) ||
+      u.email?.toLowerCase() === selectedProfile.email?.toLowerCase()
+    );
   }, [authUsers, selectedProfile]);
 
   const userSurfaces = useMemo(() => surfaces.filter(s => s.fkUser === selectedUserId), [surfaces, selectedUserId]);
@@ -180,7 +189,6 @@ export default function BaseDonneesPage() {
           open={showWizard}
           onClose={() => setShowWizard(false)}
           profiles={allProfiles}
-          typesList={typesList}
           preselectedUserId={selectedUserId ?? undefined}
           qc={qc}
           t={t}
@@ -490,7 +498,6 @@ export default function BaseDonneesPage() {
         open={showWizard}
         onClose={() => setShowWizard(false)}
         profiles={allProfiles}
-        typesList={typesList}
         qc={qc}
         t={t}
       />
@@ -502,7 +509,23 @@ export default function BaseDonneesPage() {
 // ── Wizard Nouveau Projet ────────────────────────────────────────────────────
 
 interface VanneData { nomVanne: string; nbPlantParVanne: number; debitEauParVanne: number; }
-interface PlantEntry { name: string; type: string; age: number; count: number; }
+interface PlantEntry { name: string; category: string; type: string; age: number; ageUnit: string; count: number; }
+
+// Reprise du code mobile (formulaire_screen.dart) : catégories -> types
+const PLANT_TYPES_BY_CATEGORY: Record<string, string[]> = {
+  "Cultures maraichères": ["Tomate", "Piment", "Pomme de terre", "Oignon", "Ail", "Carotte", "Laitue", "Courgette", "Aubergine", "Concombre"],
+  "Arbres fruitiers": ["Olivier", "Oranger", "Citronnier", "Mandarinier", "Pommier", "Poirier", "Pêcher", "Abricotier", "Grenadier", "Figuier"],
+  "Grandes cultures": ["Blé", "Orge", "Avoine", "Maïs", "Sorgho"],
+  "Légumineuses": ["Pois chiche", "Lentille", "Fève", "Haricot"],
+  "Cultures spéciales": ["Palmier dattier", "Vigne", "Pastèque", "Melon", "Fraisier"],
+};
+
+// _toYears du mobile : convertit l'âge saisi vers des années
+const ageToYears = (value: number, unit: string): number => {
+  if (unit === "jours") return Math.max(0, Math.min(999, Math.round(value / 365)));
+  if (unit === "mois") return Math.max(0, Math.min(999, Math.round(value / 12)));
+  return value; // ans
+};
 
 function ClientCombobox({ profiles, value, onChange, open, onOpenChange }: {
   profiles: Profile[];
@@ -558,9 +581,9 @@ function ClientCombobox({ profiles, value, onChange, open, onOpenChange }: {
   );
 }
 
-function NewProjectDialog({ open, onClose, profiles, typesList, preselectedUserId, qc, t }: {
+function NewProjectDialog({ open, onClose, profiles, preselectedUserId, qc, t }: {
   open: boolean; onClose: () => void; profiles: Profile[];
-  typesList: any[]; preselectedUserId?: string; qc: any; t: (k: string) => string;
+  preselectedUserId?: string; qc: any; t: (k: string) => string;
 }) {
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -569,7 +592,7 @@ function NewProjectDialog({ open, onClose, profiles, typesList, preselectedUserI
   const [localisation, setLocalisation] = useState("");
   const [fkUser, setFkUser] = useState(preselectedUserId ?? "");
   const [tailleHa, setTailleHa] = useState<number | undefined>(undefined);
-  const [plantEntries, setPlantEntries] = useState<PlantEntry[]>([{ name: "", type: "", age: 1, count: 100 }]);
+  const [plantEntries, setPlantEntries] = useState<PlantEntry[]>([{ name: "", category: "", type: "", age: 1, ageUnit: "ans", count: 100 }]);
   const [vannesData, setVannesData] = useState<VanneData[]>([{ nomVanne: "Vanne 1", nbPlantParVanne: 100, debitEauParVanne: 2 }]);
 
   // Sync preselectedUserId quand le dialog s'ouvre
@@ -580,11 +603,11 @@ function NewProjectDialog({ open, onClose, profiles, typesList, preselectedUserI
   const reset = () => {
     setStep(0); setNomSurface(""); setLocalisation(""); setFkUser(preselectedUserId ?? ""); setTailleHa(undefined);
     setClientOpen(false);
-    setPlantEntries([{ name: "", type: "", age: 1, count: 100 }]);
+    setPlantEntries([{ name: "", category: "", type: "", age: 1, ageUnit: "ans", count: 100 }]);
     setVannesData([{ nomVanne: "Vanne 1", nbPlantParVanne: 100, debitEauParVanne: 2 }]);
   };
 
-  const addPlant = () => setPlantEntries([...plantEntries, { name: "", type: "", age: 1, count: 50 }]);
+  const addPlant = () => setPlantEntries([...plantEntries, { name: "", category: "", type: "", age: 1, ageUnit: "ans", count: 50 }]);
   const removePlant = (i: number) => setPlantEntries(plantEntries.filter((_, idx) => idx !== i));
   const updatePlant = (i: number, field: keyof PlantEntry, val: string | number) => {
     const arr = [...plantEntries]; arr[i] = { ...arr[i], [field]: val }; setPlantEntries(arr);
@@ -598,28 +621,29 @@ function NewProjectDialog({ open, onClose, profiles, typesList, preselectedUserI
     const arr = [...vannesData]; arr[i] = { ...arr[i], [field]: val }; setVannesData(arr);
   };
 
-  const canStep1 = !!(nomSurface && localisation && fkUser && plantEntries.every(p => p.name && p.type));
+  const categories = Object.keys(PLANT_TYPES_BY_CATEGORY);
+
+  const canStep1 = !!(nomSurface && localisation && fkUser && (tailleHa ?? 0) > 0 && plantEntries.every(p => p.name && p.category && p.type));
   const canStep2 = vannesData.every(v => v.nomVanne && v.debitEauParVanne > 0);
-  const getWaterNeed = (typeName: string) => (typesList.find((tp: any) => tp.nomPlante === typeName)?.besoinEauParPlante ?? 2);
 
   const handleSave = async () => {
     setSaving(true);
     try {
       await createWizardParcelle({
         nomSurface, localisation, fkUser, tailleHa,
-        plants: plantEntries.map(p => ({ name: p.name, type: p.type, age: p.age, count: p.count, waterNeedPerPlant: getWaterNeed(p.type) })),
+        plants: plantEntries.map(p => ({ name: p.name, type: p.type, age: ageToYears(p.age, p.ageUnit), count: p.count, waterNeedPerPlant: 2 })),
         vannes: vannesData.map(v => ({ name: v.nomVanne, nbPlants: v.nbPlantParVanne, debit: v.debitEauParVanne })),
       });
       qc.invalidateQueries({ queryKey: ["surfaces"] });
       qc.invalidateQueries({ queryKey: ["vannes"] });
       toast({ title: "Projet créé avec succès" });
       reset(); onClose();
-    } catch {
-      toast({ title: "Erreur lors de la création", variant: "destructive" });
+    } catch (e: any) {
+      toast({ title: "Erreur lors de la création", description: e?.message, variant: "destructive" });
     } finally { setSaving(false); }
   };
 
-  const stepLabels = [t("wizard.step2"), t("wizard.step3")];
+  const stepLabels = [t("wizard.step1"), t("wizard.step2")];
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) { reset(); onClose(); } }}>
@@ -651,7 +675,7 @@ function NewProjectDialog({ open, onClose, profiles, typesList, preselectedUserI
                 <Input value={nomSurface} onChange={(e) => setNomSurface(e.target.value)} placeholder="ex: Parcelle Nord" />
               </div>
               <div>
-                <Label>{t("parcelle.taille")} (ha)</Label>
+                <Label>{t("parcelle.taille")} *</Label>
                 <Input type="number" step="0.01" min="0" value={tailleHa ?? ""} onChange={(e) => setTailleHa(e.target.value ? parseFloat(e.target.value) : undefined)} placeholder="ex: 2.5" />
               </div>
               {!preselectedUserId && (
@@ -693,25 +717,57 @@ function NewProjectDialog({ open, onClose, profiles, typesList, preselectedUserI
                         </Button>
                       )}
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="space-y-3">
                       <div>
                         <Label className="text-xs">{t("wizard.plantName")}</Label>
                         <Input value={pe.name} onChange={(e) => updatePlant(idx, "name", e.target.value)} placeholder="Nom" className="h-8 text-sm" />
                       </div>
-                      <div>
-                        <Label className="text-xs">{t("wizard.plantType")}</Label>
-                        <Select value={pe.type} onValueChange={(v) => updatePlant(idx, "type", v)}>
-                          <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Type" /></SelectTrigger>
-                          <SelectContent>{typesList.map((tp: any) => <SelectItem key={tp.id} value={tp.nomPlante}>{tp.nomPlante}</SelectItem>)}</SelectContent>
-                        </Select>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-xs">Catégorie</Label>
+                          <Select
+                            value={pe.category}
+                            onValueChange={(v) => {
+                              const arr = [...plantEntries];
+                              arr[idx] = { ...arr[idx], category: v, type: "" };
+                              setPlantEntries(arr);
+                            }}
+                          >
+                            <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Choisir une catégorie" /></SelectTrigger>
+                            <SelectContent>{categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-xs">Type</Label>
+                          <Select value={pe.type} onValueChange={(v) => updatePlant(idx, "type", v)} disabled={!pe.category}>
+                            <SelectTrigger className="h-8 text-sm"><SelectValue placeholder={pe.category ? "Type" : "Choisir d'abord une catégorie"} /></SelectTrigger>
+                            <SelectContent>
+                              {(PLANT_TYPES_BY_CATEGORY[pe.category] ?? []).map((tp) => (
+                                <SelectItem key={tp} value={tp}>{tp}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
-                      <div>
-                        <Label className="text-xs">{t("wizard.plantAge")} (ans)</Label>
-                        <Input type="number" min="0" value={pe.age} onChange={(e) => updatePlant(idx, "age", parseInt(e.target.value) || 0)} className="h-8 text-sm" />
-                      </div>
-                      <div>
-                        <Label className="text-xs">Nombre</Label>
-                        <Input type="number" min="1" value={pe.count} onChange={(e) => updatePlant(idx, "count", parseInt(e.target.value) || 1)} className="h-8 text-sm" />
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="col-span-2">
+                          <Label className="text-xs">Âge</Label>
+                          <div className="flex gap-2">
+                            <Input type="number" min="0" value={pe.age} onChange={(e) => updatePlant(idx, "age", parseInt(e.target.value) || 0)} className="h-8 text-sm" />
+                            <Select value={pe.ageUnit} onValueChange={(v) => updatePlant(idx, "ageUnit", v)}>
+                              <SelectTrigger className="h-8 text-sm w-24"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="jours">Jours</SelectItem>
+                                <SelectItem value="mois">Mois</SelectItem>
+                                <SelectItem value="ans">Ans</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-xs">Nombre de plantes</Label>
+                          <Input type="number" min="1" value={pe.count} onChange={(e) => updatePlant(idx, "count", parseInt(e.target.value) || 1)} className="h-8 text-sm" />
+                        </div>
                       </div>
                     </div>
                   </div>

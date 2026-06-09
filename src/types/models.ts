@@ -38,13 +38,6 @@ export interface Reclamation {
   userRole?: string;
 }
 
-export interface TypePlante {
-  id: string;
-  nomPlante: string;
-  typePlante: string;
-  besoinEauParPlante: number;
-}
-
 export interface Climat {
   id: string;
   temperatureC: number;
@@ -82,11 +75,9 @@ export interface Plante {
   id: string;
   nomPlante: string;
   age: number;
-  fkTypePlante: string;
   fkSurface: string;
   // joined
   surfaceNom?: string;
-  typePlanteNom?: string;
 }
 
 export interface Vanne {

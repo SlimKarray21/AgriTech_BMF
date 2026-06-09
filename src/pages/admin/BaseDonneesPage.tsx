@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getProfiles, getSurfaces, getVannes, getPlantes, getSols, getClimats, getRapportsEau, getRapportsSol, getTypesPlante, createWizardParcelle, deleteSurface, deleteVanne } from "@/services/data-service";
+import { getProfiles, getSurfaces, getVannes, getPlantes, getSols, getClimats, getRapportsEau, getRapportsSol, createWizardParcelle, deleteSurface, deleteVanne } from "@/services/data-service";
 import { getAdminUsersApi } from "@/services/auth-api";
 import { DeleteDialog } from "@/components/DeleteDialog";
 import { getToken } from "@/lib/token";
@@ -109,7 +109,6 @@ export default function BaseDonneesPage() {
   });
 
   const { data: allProfiles = [] } = useQuery({ queryKey: ["profiles"], queryFn: getProfiles });
-  const { data: typesList = [] } = useQuery({ queryKey: ["types-plante"], queryFn: getTypesPlante });
   const profiles = useFilteredProfiles(allProfiles);
   const { data: surfaces = [] } = useQuery({ queryKey: ["surfaces"], queryFn: getSurfaces });
   const { data: vannes = [] } = useQuery({ queryKey: ["vannes"], queryFn: getVannes });
@@ -184,7 +183,6 @@ export default function BaseDonneesPage() {
           open={showWizard}
           onClose={() => setShowWizard(false)}
           profiles={allProfiles}
-          typesList={typesList}
           preselectedUserId={selectedUserId ?? undefined}
           qc={qc}
           t={t}
@@ -494,7 +492,6 @@ export default function BaseDonneesPage() {
         open={showWizard}
         onClose={() => setShowWizard(false)}
         profiles={allProfiles}
-        typesList={typesList}
         qc={qc}
         t={t}
       />
@@ -578,9 +575,9 @@ function ClientCombobox({ profiles, value, onChange, open, onOpenChange }: {
   );
 }
 
-function NewProjectDialog({ open, onClose, profiles, typesList, preselectedUserId, qc, t }: {
+function NewProjectDialog({ open, onClose, profiles, preselectedUserId, qc, t }: {
   open: boolean; onClose: () => void; profiles: Profile[];
-  typesList: any[]; preselectedUserId?: string; qc: any; t: (k: string) => string;
+  preselectedUserId?: string; qc: any; t: (k: string) => string;
 }) {
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -622,14 +619,13 @@ function NewProjectDialog({ open, onClose, profiles, typesList, preselectedUserI
 
   const canStep1 = !!(nomSurface && localisation && fkUser && (tailleHa ?? 0) > 0 && plantEntries.every(p => p.name && p.category && p.type));
   const canStep2 = vannesData.every(v => v.nomVanne && v.debitEauParVanne > 0);
-  const getWaterNeed = (typeName: string) => (typesList.find((tp: any) => tp.nomPlante === typeName)?.besoinEauParPlante ?? 2);
 
   const handleSave = async () => {
     setSaving(true);
     try {
       await createWizardParcelle({
         nomSurface, localisation, fkUser, tailleHa,
-        plants: plantEntries.map(p => ({ name: p.name, type: p.type, age: ageToYears(p.age, p.ageUnit), count: p.count, waterNeedPerPlant: getWaterNeed(p.type) })),
+        plants: plantEntries.map(p => ({ name: p.name, type: p.type, age: ageToYears(p.age, p.ageUnit), count: p.count, waterNeedPerPlant: 2 })),
         vannes: vannesData.map(v => ({ name: v.nomVanne, nbPlants: v.nbPlantParVanne, debit: v.debitEauParVanne })),
       });
       qc.invalidateQueries({ queryKey: ["surfaces"] });

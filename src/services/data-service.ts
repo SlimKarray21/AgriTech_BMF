@@ -1,6 +1,6 @@
 import { API_BASE_URL } from "./api-config";
 import { getToken } from "@/lib/token";
-import { Profile, TypePlante, Surface, Plante, Vanne, Sol, Climat, Reclamation } from "@/types/models";
+import { Profile, Surface, Plante, Vanne, Sol, Climat, Reclamation } from "@/types/models";
 
 // ── HTTP helper ──────────────────────────────────────────────────────────────
 
@@ -77,39 +77,6 @@ export const deleteProfile = async (id: string): Promise<void> => {
 export const getClients = getProfiles;
 export const updateClient = updateProfile;
 
-// ── TYPES PLANTE ──────────────────────────────────────────────────────────────
-
-export const getTypesPlante = async (): Promise<TypePlante[]> => {
-  const data: any[] = await apiFetch("/api/agri/type-plante");
-  return data.map((t) => ({
-    id: String(t.id),
-    nomPlante: t.nom_plante,
-    typePlante: t.type_plante,
-    besoinEauParPlante: Number(t.besoin_eau_par_plante),
-  }));
-};
-
-export const createTypePlante = async (d: Omit<TypePlante, "id">): Promise<TypePlante> => {
-  const res: any = await apiFetch("/api/agri/type-plante", {
-    method: "POST",
-    body: JSON.stringify({ nom_plante: d.nomPlante, type_plante: d.typePlante, besoin_eau_par_plante: d.besoinEauParPlante }),
-  });
-  return { id: String(res.id), nomPlante: d.nomPlante, typePlante: d.typePlante, besoinEauParPlante: d.besoinEauParPlante };
-};
-
-export const updateTypePlante = async (id: string, d: Partial<TypePlante>): Promise<TypePlante | null> => {
-  const body: any = {};
-  if (d.nomPlante !== undefined)           body.nom_plante            = d.nomPlante;
-  if (d.typePlante !== undefined)          body.type_plante           = d.typePlante;
-  if (d.besoinEauParPlante !== undefined)  body.besoin_eau_par_plante = d.besoinEauParPlante;
-  await apiFetch(`/api/agri/type-plante/${id}`, { method: "PATCH", body: JSON.stringify(body) });
-  return null;
-};
-
-export const deleteTypePlante = async (id: string): Promise<void> => {
-  await apiFetch(`/api/agri/type-plante/${id}`, { method: "DELETE" });
-};
-
 // ── SURFACES (parcelle) ───────────────────────────────────────────────────────
 
 export const getSurfaces = async (): Promise<Surface[]> => {
@@ -159,12 +126,8 @@ export const deleteSurface = async (id: string): Promise<void> => {
 // ── PLANTES ───────────────────────────────────────────────────────────────────
 
 export const getPlantes = async (): Promise<Plante[]> => {
-  const [parcelles, types]: [any[], any[]] = await Promise.all([
-    apiFetch<any[]>("/parcelles"),
-    apiFetch<any[]>("/api/agri/type-plante"),
-  ]);
+  const parcelles: any[] = await apiFetch<any[]>("/parcelles");
   const surfMap = new Map(parcelles.map((s: any) => [String(s.id), s.nomSurface ?? s.nom_surface]));
-  const typeMap = new Map(types.map((t: any) => [String(t.id), t.nom_plante]));
 
   const allPlantes: Plante[] = [];
   for (const p of parcelles) {
@@ -174,22 +137,20 @@ export const getPlantes = async (): Promise<Plante[]> => {
         id: String(pl.id),
         nomPlante: pl.name ?? pl.nom_plante,
         age: pl.age ?? 0,
-        fkTypePlante: pl.fkTypePlante != null ? String(pl.fkTypePlante) : pl.fk_type_plante != null ? String(pl.fk_type_plante) : "",
         fkSurface: String(p.id),
         surfaceNom: surfMap.get(String(p.id)) ?? "—",
-        typePlanteNom: typeMap.get(pl.fkTypePlante != null ? String(pl.fkTypePlante) : String(pl.fk_type_plante)) ?? "—",
       });
     }
   }
   return allPlantes;
 };
 
-export const createPlante = async (d: Omit<Plante, "id" | "surfaceNom" | "typePlanteNom">): Promise<Plante> => {
+export const createPlante = async (d: Omit<Plante, "id" | "surfaceNom">): Promise<Plante> => {
   const res: any = await apiFetch(`/parcelles/${d.fkSurface}/plants`, {
     method: "POST",
-    body: JSON.stringify({ name: d.nomPlante, age: d.age, fkTypePlante: Number(d.fkTypePlante), count: 1, waterNeedPerPlant: 2 }),
+    body: JSON.stringify({ name: d.nomPlante, age: d.age, count: 1, waterNeedPerPlant: 2 }),
   });
-  return { id: String(res.id ?? ""), nomPlante: d.nomPlante, age: d.age, fkTypePlante: d.fkTypePlante, fkSurface: d.fkSurface };
+  return { id: String(res.id ?? ""), nomPlante: d.nomPlante, age: d.age, fkSurface: d.fkSurface };
 };
 
 export const createWizardParcelle = async (d: {
