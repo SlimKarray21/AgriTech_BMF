@@ -21,14 +21,35 @@ class RapportsListScreen extends ConsumerStatefulWidget {
 
 class _RapportsListScreenState extends ConsumerState<RapportsListScreen> {
   bool _loading = true;
+  // id de parcelle -> nom, pour afficher la parcelle d'un rapport.
+  Map<int, String> _parcelleNames = {};
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      _loadParcelleNames();
       _loadFromBackend();
     });
+  }
+
+  Future<void> _loadParcelleNames() async {
+    try {
+      final api = ref.read(uiEarthApiProvider).capteurSol;
+      final raw = await api.listParcelles();
+      if (raw is List) {
+        final map = <int, String>{};
+        for (final e in raw.whereType<Map>()) {
+          final id = (e['id'] as num?)?.toInt();
+          final name = e['nomSurface']?.toString() ?? e['nom_surface']?.toString();
+          if (id != null && name != null) map[id] = name;
+        }
+        if (mounted) setState(() => _parcelleNames = map);
+      }
+    } catch (_) {
+      // Pas bloquant : on affiche juste sans le nom de parcelle.
+    }
   }
 
   Future<void> _loadFromBackend() async {
@@ -63,6 +84,7 @@ class _RapportsListScreenState extends ConsumerState<RapportsListScreen> {
     final id = (map['id'] ?? '').toString();
     final name = map['reportName']?.toString() ?? 'Rapport';
     final date = _formatDate(map['analysisDate']?.toString());
+    final parcelId = (map['parcelId'] ?? map['parcel_id']) as num?;
     final data = type == RapportType.eau ? _eauDataFromBackend(map) : _solDataFromBackend(map);
     final interpretations = _interpretationsFromBackend(map['interpretations']);
 
@@ -71,6 +93,7 @@ class _RapportsListScreenState extends ConsumerState<RapportsListScreen> {
       type: type,
       name: name,
       date: date,
+      parcelId: parcelId?.toInt(),
       data: data,
       interpretations: interpretations,
     );
@@ -304,9 +327,44 @@ class _RapportsListScreenState extends ConsumerState<RapportsListScreen> {
                                                   .onSurface,
                                             )),
                                         const SizedBox(height: 2),
-                                        Text(r.date,
-                                            style:
-                                                theme.textTheme.bodySmall),
+                                        Row(
+                                          children: [
+                                            Text(r.date,
+                                                style: theme
+                                                    .textTheme.bodySmall),
+                                            if (r.parcelId != null &&
+                                                r.parcelId != 0) ...[
+                                              const SizedBox(width: 8),
+                                              Flexible(
+                                                child: Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    Icon(Icons.place_outlined,
+                                                        size: 12,
+                                                        color: color),
+                                                    const SizedBox(width: 2),
+                                                    Flexible(
+                                                      child: Text(
+                                                        _parcelleNames[r
+                                                                .parcelId] ??
+                                                            'Parcelle ${r.parcelId}',
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                        style: TextStyle(
+                                                          fontSize: 11,
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                          color: color,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
                                       ],
                                     ),
                                   ),

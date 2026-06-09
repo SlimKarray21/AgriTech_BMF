@@ -66,13 +66,43 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
   Future<void> _submit() async {
     if (_mode == 'forgot') {
+      final fEmail = _emailC.text.trim();
+      final fPassword = _passwordC.text;
+      final fConfirm = _confirmPasswordC.text;
+      if (fEmail.isEmpty || fPassword.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Renseignez votre email et un nouveau mot de passe.')),
+        );
+        return;
+      }
+      if (fPassword != fConfirm) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Les mots de passe ne correspondent pas.')),
+        );
+        return;
+      }
       _setLoading(true);
-      await Future<void>.delayed(const Duration(seconds: 1));
-      if (!mounted) return;
-      _setLoading(false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Fonction « mot de passe oublié » : brancher l’API si disponible.')),
-      );
+      final api = ref.read(uiEarthApiProvider);
+      try {
+        await api.auth.resetPassword(<String, dynamic>{'email': fEmail, 'newPassword': fPassword});
+        if (!mounted) return;
+        setState(() {
+          _mode = 'login';
+          _passwordC.clear();
+          _confirmPasswordC.clear();
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Mot de passe réinitialisé. Connectez-vous avec le nouveau.')),
+        );
+      } on ApiException catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur réseau : $e')));
+      } finally {
+        _setLoading(false);
+      }
       return;
     }
 
@@ -428,9 +458,12 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         decoration: const InputDecoration(),
                       ),
                     ],
-                    if (_mode != 'forgot') ...[
+                    if (_mode != 'verify') ...[
                       const SizedBox(height: 16),
-                      Text(t('auth.password'), style: theme.textTheme.labelMedium),
+                      Text(
+                        _mode == 'forgot' ? 'Nouveau mot de passe' : t('auth.password'),
+                        style: theme.textTheme.labelMedium,
+                      ),
                       const SizedBox(height: 4),
                       TextField(
                         controller: _passwordC,
@@ -442,6 +475,21 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                           ),
                         ),
                       ),
+                      if (_mode == 'forgot') ...[
+                        const SizedBox(height: 16),
+                        Text(t('auth.confirm_password'), style: theme.textTheme.labelMedium),
+                        const SizedBox(height: 4),
+                        TextField(
+                          controller: _confirmPasswordC,
+                          obscureText: !_showConfirmPassword,
+                          decoration: InputDecoration(
+                            suffixIcon: GestureDetector(
+                              onTap: () => setState(() => _showConfirmPassword = !_showConfirmPassword),
+                              child: Icon(_showConfirmPassword ? Icons.visibility_off : Icons.visibility, size: 18, color: Colors.grey),
+                            ),
+                          ),
+                        ),
+                      ],
                       if (_mode == 'signup') ...[
                         const SizedBox(height: 16),
                         Text(t('auth.confirm_password'), style: theme.textTheme.labelMedium),

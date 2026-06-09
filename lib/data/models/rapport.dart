@@ -20,6 +20,7 @@ class Rapport {
   final RapportType type;
   final String name;
   final String date;
+  final int? parcelId;
   final Map<String, double> data;
   final Map<String, Interpretation> interpretations;
 
@@ -28,6 +29,7 @@ class Rapport {
     required this.type,
     required this.name,
     required this.date,
+    this.parcelId,
     this.data = const {},
     this.interpretations = const {},
   });

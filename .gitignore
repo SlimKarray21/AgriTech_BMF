@@ -3,6 +3,12 @@
 *.log
 *.pyc
 *.swp
+
+# Dumps de sortie de commandes (flutter analyze/run/doctor, etc.)
+*_output.txt
+analyze_*.txt
+flutter_run*.txt
+pub_get_output.txt
 .DS_Store
 .atom/
 .build/
