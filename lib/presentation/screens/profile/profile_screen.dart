@@ -166,71 +166,88 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   Widget _home(ThemeData theme, String Function(String) t, int parcelCount, String totalHa, bool isRtl) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+      padding: EdgeInsets.zero,
       children: [
-        // Avatar + nom
-        Row(children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Image.asset('assets/images/agritech_logo.png', width: 64, height: 64, fit: BoxFit.cover),
-          ),
-          const SizedBox(width: 16),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(_ownerName, style: theme.textTheme.headlineSmall),
-            Text('$_farmName • $_farmLocation',
-                style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500)),
-          ])),
-        ]),
-        const SizedBox(height: 16),
-
-        // Stats
-        Row(children: [
-          _StatCard('$parcelCount', t('profile.parcelles'), theme),
-          const SizedBox(width: 12),
-          _StatCard(totalHa, t('profile.hectares'), theme),
-          const SizedBox(width: 12),
-          _StatCard('0', t('profile.alerts'), theme),
-        ]),
-        const SizedBox(height: 16),
-
-        // Bandeau partenaire Tesla
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: theme.colorScheme.outline),
-          ),
-          child: Row(children: [
-            Image.asset('assets/images/tesla_logo.png', height: 32),
-            const SizedBox(width: 12),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(t('profile.partner'),      style: theme.textTheme.titleSmall?.copyWith(fontSize: 12)),
-              Text(t('profile.smart_irrig'), style: theme.textTheme.labelSmall),
-            ])),
-          ]),
+        // ── Hero Header ────────────────────────────────────────────────
+        _ProfileHero(
+          ownerName: _ownerName,
+          farmName: _farmName,
+          farmLocation: _farmLocation,
+          parcelCount: parcelCount,
+          totalHa: totalHa,
+          parcellesLabel: t('profile.parcelles'),
+          hectaresLabel: t('profile.hectares'),
+          alertsLabel: t('profile.alerts'),
         ),
-        const Divider(height: 32),
+        const SizedBox(height: 20),
 
-        // Menu
-        _MenuItem(Icons.settings_outlined,           t('profile.settings'),      () => setState(() => _subPage = 'parametres'), theme),
-        _MenuItem(Icons.shield_outlined,             t('profile.privacy'),       () {},                                         theme),
-        _MenuItem(Icons.workspace_premium_outlined,  t('profile.subscription'),  () => setState(() => _subPage = 'abonnement'), theme),
-        _MenuItem(Icons.report_problem_outlined,     t('profile.complaint'),     () => setState(() => _subPage = 'reclamation'), theme),
-        _MenuItem(Icons.help_outline,                t('profile.help'),          () => setState(() => _subPage = 'aide'),       theme),
-        const Divider(height: 32),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Bandeau partenaire Tesla
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.6)),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4)),
+                  ],
+                ),
+                child: Row(children: [
+                  Image.asset('assets/images/tesla_logo.png', height: 32),
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(t('profile.partner'),      style: theme.textTheme.titleSmall?.copyWith(fontSize: 12)),
+                    Text(t('profile.smart_irrig'), style: theme.textTheme.labelSmall),
+                  ])),
+                ]),
+              ),
+              const SizedBox(height: 12),
 
-        // Déconnexion
-        GestureDetector(
-          onTap: () => ref.read(userJwtProvider.notifier).setToken(null),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-            child: Row(children: [
-              const Icon(Icons.logout, size: 20, color: AppColors.farmDanger),
-              const SizedBox(width: 12),
-              Text(t('profile.logout'),
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.farmDanger)),
-            ]),
+              // Menu
+              Container(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.6)),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4)),
+                  ],
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                child: Column(children: [
+                  _MenuItem(Icons.settings_outlined,           t('profile.settings'),      () => setState(() => _subPage = 'parametres'), theme),
+                  _MenuItem(Icons.shield_outlined,             t('profile.privacy'),       () {},                                         theme),
+                  _MenuItem(Icons.workspace_premium_outlined,  t('profile.subscription'),  () => setState(() => _subPage = 'abonnement'), theme),
+                  _MenuItem(Icons.report_problem_outlined,     t('profile.complaint'),     () => setState(() => _subPage = 'reclamation'), theme),
+                  _MenuItem(Icons.help_outline,                t('profile.help'),          () => setState(() => _subPage = 'aide'),       theme),
+                ]),
+              ),
+              const SizedBox(height: 12),
+
+              // Déconnexion
+              GestureDetector(
+                onTap: () => ref.read(userJwtProvider.notifier).setToken(null),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: AppColors.farmDanger.withValues(alpha: 0.07),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.farmDanger.withValues(alpha: 0.25)),
+                  ),
+                  child: Row(children: [
+                    const Icon(Icons.logout, size: 20, color: AppColors.farmDanger),
+                    const SizedBox(width: 12),
+                    Text(t('profile.logout'),
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.farmDanger)),
+                  ]),
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -456,28 +473,153 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   );
 }
 
-// ── Widgets réutilisables ────────────────────────────────────────────────────
+// ── Hero Header (page profil) ─────────────────────────────────────────────────
 
-class _StatCard extends StatelessWidget {
-  final String value, label;
-  final ThemeData theme;
-  const _StatCard(this.value, this.label, this.theme);
+class _ProfileHero extends StatelessWidget {
+  final String ownerName, farmName, farmLocation, totalHa;
+  final int parcelCount;
+  final String parcellesLabel, hectaresLabel, alertsLabel;
+
+  const _ProfileHero({
+    required this.ownerName,
+    required this.farmName,
+    required this.farmLocation,
+    required this.totalHa,
+    required this.parcelCount,
+    required this.parcellesLabel,
+    required this.hectaresLabel,
+    required this.alertsLabel,
+  });
 
   @override
-  Widget build(BuildContext context) => Expanded(
-    child: Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.outline),
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF16a34a), Color(0xFF15803d), Color(0xFF166534)],
+        ),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
       ),
-      child: Column(children: [
-        Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: theme.colorScheme.onSurface)),
-        Text(label, style: theme.textTheme.labelSmall, textAlign: TextAlign.center),
-      ]),
-    ),
-  );
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 2),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Image.asset('assets/images/agritech_logo.png',
+                        width: 60, height: 60, fit: BoxFit.cover),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(ownerName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.5)),
+                      const SizedBox(height: 2),
+                      Text('$farmName • $farmLocation',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                    ],
+                  ),
+                ),
+              ]),
+              const SizedBox(height: 22),
+              Row(children: [
+                _KpiPill(
+                    value: '$parcelCount',
+                    label: parcellesLabel,
+                    icon: Icons.grid_view_rounded,
+                    color: const Color(0xFFbbf7d0)),
+                const SizedBox(width: 10),
+                _KpiPill(
+                    value: totalHa,
+                    label: hectaresLabel,
+                    icon: Icons.square_foot_rounded,
+                    color: const Color(0xFFfef08a)),
+                const SizedBox(width: 10),
+                _KpiPill(
+                    value: '0',
+                    label: alertsLabel,
+                    icon: Icons.notifications_active_rounded,
+                    color: const Color(0xFFfecaca)),
+              ]),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _KpiPill extends StatelessWidget {
+  final String value, label;
+  final IconData icon;
+  final Color color;
+  const _KpiPill(
+      {required this.value,
+      required this.label,
+      required this.icon,
+      required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+        ),
+        child: Row(children: [
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.25),
+                borderRadius: BorderRadius.circular(8)),
+            child: Icon(icon, size: 14, color: color),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+              child:
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(value,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800),
+                overflow: TextOverflow.ellipsis),
+            Text(label,
+                style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.65), fontSize: 9),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
+          ])),
+        ]),
+      ),
+    );
+  }
 }
 
 class _MenuItem extends StatelessWidget {

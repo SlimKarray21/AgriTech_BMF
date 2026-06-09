@@ -25,6 +25,12 @@ class AppShell extends StatelessWidget {
     final index = _currentIndex(context);
     final isAccueil = index == 0;
 
+    // Espace réservé sous le contenu pour la barre flottante (qui flotte au-dessus
+    // grâce à extendBody: true). On l'ajoute ici une seule fois pour TOUS les
+    // écrans du shell, afin qu'aucune carte ne soit jamais masquée par la NavBar.
+    // + la safe area du bas (encoche / barre gestuelle).
+    final bottomInset = MediaQuery.of(context).padding.bottom + 96.0;
+
     return Scaffold(
       body: SafeArea(
         bottom: false,
@@ -32,7 +38,12 @@ class AppShell extends StatelessWidget {
           children: [
             // Masquer le header sur Accueil (il a son propre hero)
             if (!isAccueil) const AppHeader(),
-            Expanded(child: child),
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(bottom: bottomInset),
+                child: child,
+              ),
+            ),
           ],
         ),
       ),

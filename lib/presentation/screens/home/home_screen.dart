@@ -20,7 +20,6 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   String _search = '';
   String _filter = 'all';
-  ParcelleData? _selected;
   bool _didBootstrap = false;
 
   @override
@@ -90,40 +89,74 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final totalArea = parcelles
         .fold<double>(0, (sum, p) => sum + double.tryParse(p.area.replaceAll(' ha', ''))!)
         .toStringAsFixed(1);
+    final connectedCount = parcelles.where((p) => p.isConnected).length;
+    final openVannesTotal = valveState.valves.where((v) => v.isOpen).length;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
+      padding: EdgeInsets.zero,
       children: [
-        // Title + Add button
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(langState.t('index.title'),
-                style: theme.textTheme.headlineMedium),
-            SizedBox(
-              height: 34,
-              child: ElevatedButton.icon(
-                onPressed: () => context.push('/formulaire'),
-                icon: const Icon(Icons.add, size: 16),
-                label: Text(langState.t('index.add_parcelle'),
-                    style: const TextStyle(fontSize: 12)),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+        // ── Hero Header ──────────────────────────────────────────────────
+        Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF16a34a), Color(0xFF15803d), Color(0xFF166534)],
+            ),
+            borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
+          ),
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(langState.t('index.title'),
+                                style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+                            const SizedBox(height: 4),
+                            Text('${parcelles.length} ${langState.t('index.parcelles')} • $totalArea ${langState.t('index.total')}',
+                                style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => context.push('/formulaire'),
+                        child: Container(
+                          width: 48, height: 48,
+                          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(16)),
+                          child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
+                  const SizedBox(height: 20),
+                  // KPI pills
+                  Row(children: [
+                    _HomeKpi(value: '${parcelles.length}', label: langState.t('index.parcelles'), icon: Icons.grid_view_rounded),
+                    const SizedBox(width: 10),
+                    _HomeKpi(value: '$openVannesTotal', label: langState.t('index.electrovalves'), icon: Icons.water_drop_rounded),
+                    const SizedBox(width: 10),
+                    _HomeKpi(value: '$connectedCount/${parcelles.length}', label: langState.t('index.connected'), icon: Icons.wifi_rounded),
+                  ]),
+                ],
               ),
             ),
-          ],
+          ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          '${parcelles.length} ${langState.t('index.parcelles')} • $totalArea ${langState.t('index.total')}',
-          style: theme.textTheme.bodySmall,
-        ),
-        const SizedBox(height: 12),
-
+        const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
         // Reports Icon Button
         GestureDetector(
           onTap: () => context.push('/rapports'),
@@ -218,6 +251,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               style: theme.textTheme.bodySmall,
             ),
           ),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -490,6 +526,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
 
     valveProvider.toggleValve(valve.id);
+  }
+}
+
+class _HomeKpi extends StatelessWidget {
+  final String value, label;
+  final IconData icon;
+  const _HomeKpi({required this.value, required this.label, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+        ),
+        child: Row(children: [
+          Container(
+            width: 28, height: 28,
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(8)),
+            child: Icon(icon, size: 14, color: Colors.white),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(value, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800), overflow: TextOverflow.ellipsis),
+              Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 9), overflow: TextOverflow.ellipsis),
+            ]),
+          ),
+        ]),
+      ),
+    );
   }
 }
 

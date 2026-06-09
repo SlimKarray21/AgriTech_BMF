@@ -232,44 +232,59 @@ class _RapportFormScreenState extends ConsumerState<RapportFormScreen> {
     final langState = ref.watch(languageProvider);
     final t = langState.t;
 
+    final headerColor = isEau ? const Color(0xFF0284c7) : const Color(0xFF92400e);
+    final headerColor2 = isEau ? const Color(0xFF0369a1) : const Color(0xFF78350f);
+
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
-                children: [
-                  // Back button
-                  GestureDetector(
-                    onTap: () => context.go('/rapports/$typePath'),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.arrow_back_ios, size: 16,
-                            color: theme.textTheme.bodySmall?.color),
+      body: Column(
+        children: [
+          // ── Hero header ──────────────────────────────────────────────────
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [headerColor, headerColor2],
+              ),
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    GestureDetector(
+                      onTap: () => context.go('/rapports/$typePath'),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        const Icon(Icons.arrow_back_ios_rounded, size: 16, color: Colors.white70),
                         const SizedBox(width: 4),
-                        Text('Retour', style: theme.textTheme.bodySmall),
-                      ],
+                        Text(t('rapports.back'), style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                      ]),
                     ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Title
-                  Row(children: [
-                    Container(
-                      width: 40, height: 40,
-                      decoration: BoxDecoration(
-                        color: accentColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
+                    const SizedBox(height: 16),
+                    Row(children: [
+                      Container(
+                        width: 48, height: 48,
+                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(14)),
+                        child: Icon(typeIcon, size: 24, color: Colors.white),
                       ),
-                      child: Icon(typeIcon, size: 20, color: accentColor),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(isEau ? t('rapports.new_eau') : t('rapports.new_sol'), style: theme.textTheme.headlineMedium),
-                  ]),
-                  const SizedBox(height: 20),
-
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(isEau ? t('rapports.new_eau') : t('rapports.new_sol'),
+                            style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
+                      ),
+                    ]),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+                children: [
                   // Report name
                   Text(t('rapports.report_name'),
                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
@@ -344,39 +359,41 @@ class _RapportFormScreenState extends ConsumerState<RapportFormScreen> {
             ),
 
             // Save button
-            Container(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
-                border: Border(top: BorderSide(color: theme.colorScheme.outline, width: 0.5)),
-              ),
-              child: SizedBox(
-                width: double.infinity,
-                height: 44,
-                child: ElevatedButton.icon(
-                  onPressed: _isSaving ? null : _handleSave,
-                  icon: _isSaving
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Icon(Icons.save, size: 16),
-                  label: Text(
-                    _isSaving ? t('rapports.saving') : t('rapports.save_btn'),
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.farmLeaf,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            SafeArea(
+              top: false,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  border: Border(top: BorderSide(color: theme.colorScheme.outline, width: 0.5)),
+                ),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: _isSaving ? null : _handleSave,
+                    icon: _isSaving
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.save, size: 16),
+                    label: Text(
+                      _isSaving ? t('rapports.saving') : t('rapports.save_btn'),
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.farmLeaf,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
                   ),
                 ),
               ),
             ),
           ],
         ),
-      ),
     );
   }
 

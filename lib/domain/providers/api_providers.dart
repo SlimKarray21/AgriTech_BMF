@@ -12,6 +12,10 @@ import '../../data/api/telemetry_api.dart';
 import '../../data/api/user_api.dart';
 
 const _jwtPrefsKey = 'user_jwt';
+const _jwtLastActiveKey = 'user_jwt_last_active';
+
+/// Délai d'inactivité (app fermée/arrière-plan) au-delà duquel le token expire.
+const Duration kJwtInactivityTimeout = Duration(minutes: 5);
 
 /// Fourni depuis [main] via [ProviderScope.overrides].
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
@@ -25,10 +29,24 @@ final _httpClientProvider = Provider<http.Client>((ref) {
 });
 
 class UserJwtNotifier extends Notifier<String?> {
+  int get _nowMs => DateTime.now().millisecondsSinceEpoch;
+
   @override
   String? build() {
     final prefs = ref.watch(sharedPreferencesProvider);
-    return prefs.getString(_jwtPrefsKey);
+    final token = prefs.getString(_jwtPrefsKey);
+    if (token == null || token.isEmpty) return null;
+
+    // Expiration par inactivité : si l'app est restée fermée > 5 min, on efface.
+    final lastActive = prefs.getInt(_jwtLastActiveKey);
+    if (lastActive != null && (_nowMs - lastActive) > kJwtInactivityTimeout.inMilliseconds) {
+      prefs.remove(_jwtPrefsKey);
+      prefs.remove(_jwtLastActiveKey);
+      return null;
+    }
+    // Session encore valide : on rafraîchit l'horodatage d'activité.
+    prefs.setInt(_jwtLastActiveKey, _nowMs);
+    return token;
   }
 
   Future<void> setToken(String? token) async {
@@ -37,11 +55,39 @@ class UserJwtNotifier extends Notifier<String?> {
         ?.replaceFirst(RegExp(r'^Bearer\s+', caseSensitive: false), '')
         .trim();
     if (normalized == null || normalized.isEmpty) {
+      // Déconnexion : on efface immédiatement token + horodatage.
       await prefs.remove(_jwtPrefsKey);
+      await prefs.remove(_jwtLastActiveKey);
       state = null;
     } else {
       await prefs.setString(_jwtPrefsKey, normalized);
+      await prefs.setInt(_jwtLastActiveKey, _nowMs);
       state = normalized;
+    }
+  }
+
+  /// Enregistre l'instant courant comme dernière activité.
+  /// À appeler quand l'app passe en arrière-plan : démarre le cooldown de 5 min.
+  Future<void> markActivity() async {
+    if (state == null || state!.isEmpty) return;
+    final prefs = ref.read(sharedPreferencesProvider);
+    await prefs.setInt(_jwtLastActiveKey, _nowMs);
+  }
+
+  /// Vérifie l'expiration (à appeler au retour au premier plan).
+  /// Si l'app est restée en arrière-plan > 5 min, efface le token (re-login requis).
+  Future<void> enforceExpiry() async {
+    final prefs = ref.read(sharedPreferencesProvider);
+    final token = prefs.getString(_jwtPrefsKey);
+    if (token == null || token.isEmpty) return;
+
+    final lastActive = prefs.getInt(_jwtLastActiveKey);
+    if (lastActive != null && (_nowMs - lastActive) > kJwtInactivityTimeout.inMilliseconds) {
+      await prefs.remove(_jwtPrefsKey);
+      await prefs.remove(_jwtLastActiveKey);
+      state = null;
+    } else {
+      await prefs.setInt(_jwtLastActiveKey, _nowMs);
     }
   }
 }

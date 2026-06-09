@@ -191,248 +191,288 @@ class _RapportsListScreenState extends ConsumerState<RapportsListScreen> {
     final icon = isEau ? Icons.water_drop : Icons.terrain;
     final title = isEau ? t('rapports.type_eau') : t('rapports.type_sol');
 
+    final total = rapports.length;
+    final alertCount = rapports
+        .where((r) => r.interpretations.values.any((i) => i.level == InterpLevel.danger))
+        .length;
+    final okCount = total - alertCount;
+    final headerColor = isEau ? const Color(0xFF0284c7) : const Color(0xFF92400e);
+    final headerColor2 = isEau ? const Color(0xFF0369a1) : const Color(0xFF78350f);
+
     return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 24),
-
-              // Back button
-              GestureDetector(
-                onTap: () => context.go('/rapports'),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.arrow_back_ios, size: 16,
-                        color: theme.textTheme.bodySmall?.color),
-                    const SizedBox(width: 4),
-                    Text(t('rapports.back'), style: theme.textTheme.bodySmall),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Title + Nouveau button
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(title, style: theme.textTheme.headlineMedium),
-                  GestureDetector(
-                    onTap: () => context.go('/rapports/$typePath/nouveau'),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: AppColors.farmLeaf,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.add, size: 14, color: Colors.white),
-                          const SizedBox(width: 6),
-                          Text(t('rapport.new'),
-                              style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white)),
-                        ],
-                      ),
-                    ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => context.go('/rapports/$typePath/nouveau'),
+        backgroundColor: AppColors.farmLeaf,
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: Text(t('rapport.new'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+      ),
+      body: RefreshIndicator(
+        color: AppColors.farmLeaf,
+        onRefresh: () async {
+          await _loadParcelleNames();
+          await _loadFromBackend();
+        },
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            // ── Hero Header ────────────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [headerColor, headerColor2],
                   ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Content
-              Expanded(
-                child: _loading
-                    ? const Center(child: CircularProgressIndicator())
-                    : rapports.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.description_outlined,
-                                size: 40,
-                                color: theme.textTheme.bodySmall?.color
-                                    ?.withValues(alpha: 0.4)),
-                            const SizedBox(height: 12),
-                            Text(t('rapports.no_rapport'),
-                                style: theme.textTheme.bodySmall),
-                          ],
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(32)),
+                ),
+                child: SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        GestureDetector(
+                          onTap: () => context.go('/rapports'),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.arrow_back_ios_rounded, size: 16, color: Colors.white70),
+                              const SizedBox(width: 4),
+                              Text(t('rapports.back'), style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                            ],
+                          ),
                         ),
-                      )
-                    : ListView.separated(
-                        itemCount: rapports.length,
-                        separatorBuilder: (_, __) =>
-                            const SizedBox(height: 12),
-                        itemBuilder: (ctx, i) {
-                          final r = rapports[i];
-                          final dangerCount = r.interpretations.values
-                              .where((interp) =>
-                                  interp.level == InterpLevel.danger)
-                              .length;
-
-                          return GestureDetector(
-                            onTap: () => context
-                                .go('/rapports/$typePath/${r.id}'),
-                            child: Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.surface,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                    color: theme.colorScheme.outline),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black
-                                        .withValues(alpha: 0.04),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Row(
+                        const SizedBox(height: 18),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // Icon
-                                  Container(
-                                    width: 40,
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                      color:
-                                          color.withValues(alpha: 0.1),
-                                      borderRadius:
-                                          BorderRadius.circular(12),
-                                    ),
-                                    child: Icon(icon,
-                                        size: 18, color: color),
-                                  ),
-                                  const SizedBox(width: 12),
-
-                                  // Name + Date
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(r.name,
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w700,
-                                              color: theme.colorScheme
-                                                  .onSurface,
-                                            )),
-                                        const SizedBox(height: 2),
-                                        Row(
-                                          children: [
-                                            Text(r.date,
-                                                style: theme
-                                                    .textTheme.bodySmall),
-                                            if (r.parcelId != null &&
-                                                r.parcelId != 0) ...[
-                                              const SizedBox(width: 8),
-                                              Flexible(
-                                                child: Row(
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
-                                                  children: [
-                                                    Icon(Icons.place_outlined,
-                                                        size: 12,
-                                                        color: color),
-                                                    const SizedBox(width: 2),
-                                                    Flexible(
-                                                      child: Text(
-                                                        _parcelleNames[r
-                                                                .parcelId] ??
-                                                            'Parcelle ${r.parcelId}',
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
-                                                        style: TextStyle(
-                                                          fontSize: 11,
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                          color: color,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-
-                                  // Badges
-                                  if (dangerCount > 0)
-                                    _InterpBadge(
-                                      text: '$dangerCount alertes',
-                                      bgColor: AppColors.lightDestructive
-                                          .withValues(alpha: 0.1),
-                                      textColor:
-                                          AppColors.lightDestructive,
-                                      borderColor:
-                                          AppColors.lightDestructive
-                                              .withValues(alpha: 0.3),
-                                    )
-                                  else
-                                    _InterpBadge(
-                                      text: 'OK',
-                                      bgColor: AppColors.lightPrimary
-                                          .withValues(alpha: 0.1),
-                                      textColor: AppColors.lightPrimary,
-                                      borderColor: AppColors.lightPrimary
-                                          .withValues(alpha: 0.3),
-                                    ),
+                                  Text(title,
+                                      style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+                                  const SizedBox(height: 4),
+                                  Text(isEau ? "Analyses de la qualité de l'eau" : 'Analyses pédologiques du sol',
+                                      style: const TextStyle(color: Colors.white70, fontSize: 12)),
                                 ],
                               ),
                             ),
-                          );
-                        },
-                      ),
+                            Container(
+                              width: 48, height: 48,
+                              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(16)),
+                              child: Icon(isEau ? Icons.water_drop_rounded : Icons.terrain_rounded, color: Colors.white, size: 26),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        // Stats row
+                        Row(children: [
+                          _StatPill(value: '$total', label: 'Rapports', icon: Icons.description_rounded),
+                          const SizedBox(width: 10),
+                          _StatPill(value: '$okCount', label: 'Conformes', icon: Icons.check_circle_rounded),
+                          const SizedBox(width: 10),
+                          _StatPill(value: '$alertCount', label: 'Alertes', icon: Icons.warning_amber_rounded),
+                        ]),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-            ],
-          ),
+            ),
+
+            // ── Content ────────────────────────────────────────────────────
+            if (_loading)
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: CircularProgressIndicator(color: AppColors.farmLeaf)),
+              )
+            else if (rapports.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(icon, size: 56, color: color.withValues(alpha: 0.3)),
+                      const SizedBox(height: 12),
+                      Text(t('rapports.no_rapport'), style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.outline)),
+                      const SizedBox(height: 8),
+                      Text('Appuyez sur + pour créer un rapport',
+                          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline)),
+                    ],
+                  ),
+                ),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (ctx, i) {
+                      final r = rapports[i];
+                      final dangerCount = r.interpretations.values
+                          .where((interp) => interp.level == InterpLevel.danger)
+                          .length;
+                      final parcelleName = (r.parcelId != null && r.parcelId != 0)
+                          ? (_parcelleNames[r.parcelId] ?? 'Parcelle ${r.parcelId}')
+                          : null;
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _RapportCard(
+                          name: r.name,
+                          date: r.date,
+                          parcelleName: parcelleName,
+                          icon: icon,
+                          color: color,
+                          dangerCount: dangerCount,
+                          onTap: () => context.go('/rapports/$typePath/${r.id}'),
+                        ),
+                      );
+                    },
+                    childCount: rapports.length,
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _InterpBadge extends StatelessWidget {
-  final String text;
-  final Color bgColor;
-  final Color textColor;
-  final Color borderColor;
+// ── Stat pill (hero header) ──────────────────────────────────────────────────
+class _StatPill extends StatelessWidget {
+  final String value, label;
+  final IconData icon;
+  const _StatPill({required this.value, required this.label, required this.icon});
 
-  const _InterpBadge({
-    required this.text,
-    required this.bgColor,
-    required this.textColor,
-    required this.borderColor,
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+        ),
+        child: Column(children: [
+          Icon(icon, size: 18, color: Colors.white),
+          const SizedBox(height: 4),
+          Text(value, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
+          Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 10)),
+        ]),
+      ),
+    );
+  }
+}
+
+// ── Rapport card ─────────────────────────────────────────────────────────────
+class _RapportCard extends StatelessWidget {
+  final String name, date;
+  final String? parcelleName;
+  final IconData icon;
+  final Color color;
+  final int dangerCount;
+  final VoidCallback onTap;
+
+  const _RapportCard({
+    required this.name,
+    required this.date,
+    required this.parcelleName,
+    required this.icon,
+    required this.color,
+    required this.dangerCount,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: borderColor),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 9,
-          fontWeight: FontWeight.w600,
-          color: textColor,
+    final theme = Theme.of(context);
+    final hasAlert = dangerCount > 0;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.6)),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4))],
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48, height: 48,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: color.withValues(alpha: 0.2)),
+                    ),
+                    child: Icon(icon, size: 24, color: color),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(name,
+                            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                        const SizedBox(height: 4),
+                        Row(children: [
+                          Icon(Icons.calendar_today_rounded, size: 11, color: theme.colorScheme.outline),
+                          const SizedBox(width: 4),
+                          Text(date, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline)),
+                        ]),
+                      ],
+                    ),
+                  ),
+                  // Status badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: (hasAlert ? AppColors.farmDanger : AppColors.farmLeaf).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(hasAlert ? Icons.warning_amber_rounded : Icons.check_circle_rounded,
+                          size: 13, color: hasAlert ? AppColors.farmDanger : AppColors.farmLeaf),
+                      const SizedBox(width: 4),
+                      Text(hasAlert ? '$dangerCount' : 'OK',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800,
+                              color: hasAlert ? AppColors.farmDanger : AppColors.farmLeaf)),
+                    ]),
+                  ),
+                ],
+              ),
+            ),
+            // Parcelle footer
+            if (parcelleName != null) ...[
+              Divider(height: 1, color: theme.colorScheme.outline.withValues(alpha: 0.4)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: Row(children: [
+                  Icon(Icons.place_rounded, size: 14, color: color),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(parcelleName!,
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color),
+                        overflow: TextOverflow.ellipsis),
+                  ),
+                  Icon(Icons.arrow_forward_ios_rounded, size: 12, color: theme.colorScheme.outline),
+                ]),
+              ),
+            ],
+          ],
         ),
       ),
     );

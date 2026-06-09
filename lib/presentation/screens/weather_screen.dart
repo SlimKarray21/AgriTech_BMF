@@ -229,66 +229,13 @@ class _WeatherScreenState extends ConsumerState<WeatherScreen> {
       textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
       child: Scaffold(
         backgroundColor: Colors.white,
-        body: SafeArea(
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Barre de recherche
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(t('weather.title'),
-                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Colors.black)),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Container(
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[100],
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: TextField(
-                                controller: _searchController,
-                                textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-                                onChanged: (v) => _searchQuery = v,
-                                onSubmitted: (_) => _handleSearch(lang),
-                                decoration: InputDecoration(
-                                  prefixIcon: const Icon(Icons.search, color: Colors.grey, size: 20),
-                                  hintText: t('weather.search'),
-                                  border: InputBorder.none,
-                                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          SizedBox(
-                            height: 48,
-                            child: ElevatedButton(
-                              onPressed: _searching ? null : () => _handleSearch(lang),
-                              style: ElevatedButton.styleFrom(
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                elevation: 0,
-                                backgroundColor: Colors.black,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
-                              ),
-                              child: _searching
-                                  ? const SizedBox(width: 16, height: 16,
-                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                  : const Icon(Icons.search, size: 20),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+        body: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+                // ── Hero Header ──────────────────────────────────────────
+                _buildHero(t, lang, isRtl),
+                const SizedBox(height: 16),
 
                 // Carte localisation
                 Padding(
@@ -306,6 +253,147 @@ class _WeatherScreenState extends ConsumerState<WeatherScreen> {
                   _buildWeatherContent(t, isRtl),
               ],
             ),
+          ),
+        ),
+    );
+  }
+
+  // ── Hero Header ──────────────────────────────────────────────────────────
+
+  Widget _buildHero(String Function(String) t, String lang, bool isRtl) {
+    final w = _weather;
+    final kmh = isRtl ? 'كم/س' : 'km/h';
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF16a34a), Color(0xFF15803d), Color(0xFF166534)],
+        ),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(t('weather.title'),
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 28,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.5)),
+                        const SizedBox(height: 2),
+                        Text(_locationName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                color: Colors.white70, fontSize: 14)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(16)),
+                    child: const Icon(Icons.cloud_rounded,
+                        color: Colors.white, size: 26),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              // Barre de recherche
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.18)),
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        textDirection:
+                            isRtl ? TextDirection.rtl : TextDirection.ltr,
+                        style: const TextStyle(color: Colors.white),
+                        cursorColor: Colors.white,
+                        onChanged: (v) => _searchQuery = v,
+                        onSubmitted: (_) => _handleSearch(lang),
+                        decoration: InputDecoration(
+                          prefixIcon: const Icon(Icons.search,
+                              color: Colors.white70, size: 20),
+                          hintText: t('weather.search'),
+                          hintStyle: const TextStyle(color: Colors.white70),
+                          border: InputBorder.none,
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: _searching ? null : () => _handleSearch(lang),
+                      style: ElevatedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16)),
+                        elevation: 0,
+                        backgroundColor: Colors.white,
+                        foregroundColor: const Color(0xFF15803d),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                      ),
+                      child: _searching
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Color(0xFF15803d)))
+                          : const Icon(Icons.search, size: 20),
+                    ),
+                  ),
+                ],
+              ),
+              if (w != null) ...[
+                const SizedBox(height: 18),
+                Row(children: [
+                  _WeatherKpiPill(
+                      value: '${w.temp}°C',
+                      label: _desc(w.weatherCode, t),
+                      icon: Icons.thermostat_rounded,
+                      color: const Color(0xFFfed7aa)),
+                  const SizedBox(width: 10),
+                  _WeatherKpiPill(
+                      value: '${w.humidity}%',
+                      label: t('weather.real'),
+                      icon: Icons.water_drop_rounded,
+                      color: const Color(0xFFbae6fd)),
+                  const SizedBox(width: 10),
+                  _WeatherKpiPill(
+                      value: '${w.windSpeed} $kmh',
+                      label: t('weather.wind_chart'),
+                      icon: Icons.air_rounded,
+                      color: const Color(0xFFbbf7d0)),
+                ]),
+              ],
+            ],
           ),
         ),
       ),
@@ -621,6 +709,59 @@ class _WeatherScreenState extends ConsumerState<WeatherScreen> {
           const SizedBox(height: 12),
           SizedBox(height: 180, child: chart),
         ],
+      ),
+    );
+  }
+}
+
+// ── KPI pill (hero météo) ─────────────────────────────────────────────────────
+
+class _WeatherKpiPill extends StatelessWidget {
+  final String value, label;
+  final IconData icon;
+  final Color color;
+  const _WeatherKpiPill(
+      {required this.value,
+      required this.label,
+      required this.icon,
+      required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+        ),
+        child: Row(children: [
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.25),
+                borderRadius: BorderRadius.circular(8)),
+            child: Icon(icon, size: 14, color: color),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+              child:
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(value,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800),
+                overflow: TextOverflow.ellipsis),
+            Text(label,
+                style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.65), fontSize: 9),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
+          ])),
+        ]),
       ),
     );
   }

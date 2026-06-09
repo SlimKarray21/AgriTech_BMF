@@ -211,7 +211,6 @@ class _RapportDetailScreenState extends ConsumerState<RapportDetailScreen> {
 
     final isEau = rapport.type == RapportType.eau;
     final labels = isEau ? eauLabels : solLabels;
-    final color = rapport.color;
     final icon = rapport.icon;
     final typePath = isEau ? 'eau' : 'sol';
     final langState = ref.watch(languageProvider);
@@ -246,115 +245,102 @@ class _RapportDetailScreenState extends ConsumerState<RapportDetailScreen> {
     final successCount = rapport.interpretations.values
         .where((i) => i.level == InterpLevel.success).length;
 
+    final headerColor = isEau ? const Color(0xFF0284c7) : const Color(0xFF92400e);
+    final headerColor2 = isEau ? const Color(0xFF0369a1) : const Color(0xFF78350f);
+
     return Scaffold(
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
-          children: [
-            // Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                GestureDetector(
-                  onTap: () => context.go('/rapports/$typePath'),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.arrow_back_ios, size: 16,
-                          color: theme.textTheme.bodySmall?.color),
-                      const SizedBox(width: 4),
-                      Text('Retour', style: theme.textTheme.bodySmall),
-                    ],
-                  ),
-                ),
-                GestureDetector(
-                  onTap: _deleting ? null : () => _confirmDelete(context, rapport),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: AppColors.farmDanger.withValues(alpha: 0.3)),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+      body: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          // ── Hero header ──────────────────────────────────────────────────
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [headerColor, headerColor2],
+              ),
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(32)),
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Icon(Icons.delete_outline, size: 14, color: AppColors.farmDanger),
-                        const SizedBox(width: 6),
-                        Text(_deleting ? t('rapports.deleting') : t('rapports.delete'),
-                            style: TextStyle(fontSize: 12, color: AppColors.farmDanger)),
+                        GestureDetector(
+                          onTap: () => context.go('/rapports/$typePath'),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            const Icon(Icons.arrow_back_ios_rounded, size: 16, color: Colors.white70),
+                            const SizedBox(width: 4),
+                            Text(t('rapports.back'), style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                          ]),
+                        ),
+                        GestureDetector(
+                          onTap: _deleting ? null : () => _confirmDelete(context, rapport),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.15),
+                              border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              const Icon(Icons.delete_outline_rounded, size: 14, color: Colors.white),
+                              const SizedBox(width: 6),
+                              Text(_deleting ? t('rapports.deleting') : t('rapports.delete'),
+                                  style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600)),
+                            ]),
+                          ),
+                        ),
                       ],
                     ),
-                  ),
+                    const SizedBox(height: 18),
+                    Row(children: [
+                      Container(
+                        width: 52, height: 52,
+                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(16)),
+                        child: Icon(icon, size: 26, color: Colors.white),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(rapport.name,
+                                style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
+                                maxLines: 2, overflow: TextOverflow.ellipsis),
+                            const SizedBox(height: 4),
+                            Text('${rapport.date} • ${isEau ? t('rapports.type_eau') : t('rapports.type_sol')}',
+                                style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                    ]),
+                    const SizedBox(height: 16),
+                    // Summary badges (sur fond clair)
+                    Wrap(spacing: 8, runSpacing: 8, children: [
+                      if (dangerCount > 0)
+                        _HeroBadge(icon: Icons.warning_amber_rounded, text: '$dangerCount alerte${dangerCount > 1 ? 's' : ''}'),
+                      if (warningCount > 0)
+                        _HeroBadge(icon: Icons.info_outline_rounded, text: '$warningCount attention'),
+                      if (successCount > 0)
+                        _HeroBadge(icon: Icons.check_circle_rounded, text: '$successCount optimal'),
+                    ]),
+                  ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Title card
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: theme.colorScheme.outline),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(children: [
-                    Container(
-                      width: 48, height: 48,
-                      decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(icon, size: 24, color: color),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(rapport.name,
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800,
-                                  color: theme.colorScheme.onSurface)),
-                          const SizedBox(height: 2),
-                          Text('${rapport.date} • ${isEau ? t('rapports.type_eau') : t('rapports.type_sol')}',
-                              style: theme.textTheme.bodySmall),
-                        ],
-                      ),
-                    ),
-                  ]),
-                  const SizedBox(height: 12),
-                  Wrap(spacing: 6, runSpacing: 6, children: [
-                    if (dangerCount > 0)
-                      _SummaryBadge(
-                        text: '$dangerCount alerte${dangerCount > 1 ? 's' : ''}',
-                        color: AppColors.lightDestructive,
-                      ),
-                    if (warningCount > 0)
-                      _SummaryBadge(
-                        text: '$warningCount attention',
-                        color: AppColors.lightAccent,
-                      ),
-                    if (successCount > 0)
-                      _SummaryBadge(
-                        text: '$successCount optimal',
-                        color: AppColors.lightPrimary,
-                      ),
-                  ]),
-                ],
               ),
             ),
-            const SizedBox(height: 20),
-
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
             // Data by category
             ...categories.entries.map((catEntry) {
               final categoryName = catEntry.key;
@@ -452,8 +438,10 @@ class _RapportDetailScreenState extends ConsumerState<RapportDetailScreen> {
                 ),
               ),
             ],
-          ],
-        ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -522,22 +510,26 @@ class _CategoryItem {
   _CategoryItem({required this.key, required this.label, required this.unit, required this.value});
 }
 
-class _SummaryBadge extends StatelessWidget {
+// Badge affiché sur le hero header coloré (texte blanc sur verre dépoli).
+class _HeroBadge extends StatelessWidget {
+  final IconData icon;
   final String text;
-  final Color color;
-  const _SummaryBadge({required this.text, required this.color});
+  const _HeroBadge({required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        color: Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
       ),
-      child: Text(text,
-          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 13, color: Colors.white),
+        const SizedBox(width: 5),
+        Text(text, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white)),
+      ]),
     );
   }
 }

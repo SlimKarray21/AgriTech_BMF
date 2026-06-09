@@ -36,8 +36,38 @@ class AgriTechApp extends ConsumerStatefulWidget {
   ConsumerState<AgriTechApp> createState() => _AgriTechAppState();
 }
 
-class _AgriTechAppState extends ConsumerState<AgriTechApp> {
+class _AgriTechAppState extends ConsumerState<AgriTechApp> with WidgetsBindingObserver {
   static const bool _bypassAuthForDev = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final notifier = ref.read(userJwtProvider.notifier);
+    switch (state) {
+      // L'app passe en arrière-plan / se ferme : on démarre le cooldown de 5 min.
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        notifier.markActivity();
+        break;
+      // Retour au premier plan : on expire le token si > 5 min d'inactivité.
+      case AppLifecycleState.resumed:
+        notifier.enforceExpiry();
+        break;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

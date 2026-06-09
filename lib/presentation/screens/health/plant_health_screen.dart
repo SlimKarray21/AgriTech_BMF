@@ -57,17 +57,20 @@ class _PlantHealthScreenState extends ConsumerState<PlantHealthScreen> {
     final theme = Theme.of(context);
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+      padding: EdgeInsets.zero,
       children: [
-        Row(children: [
-          const Icon(Icons.eco, size: 22, color: AppColors.farmLeaf),
-          const SizedBox(width: 8),
-          Text(langState.t('health.title'), style: theme.textTheme.headlineMedium),
-        ]),
-        const SizedBox(height: 4),
-        Text(langState.t('health.subtitle'), style: theme.textTheme.bodySmall),
+        _HeroHeader(
+          title: langState.t('health.title'),
+          subtitle: langState.t('health.subtitle'),
+          diagnostic: _diagnostic,
+          isAnalyzing: _isAnalyzing,
+        ),
         const SizedBox(height: 20),
-
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
         if (!_hasImage) ...[
           // Upload zone
           Container(
@@ -115,11 +118,14 @@ class _PlantHealthScreenState extends ConsumerState<PlantHealthScreen> {
             {'step': '3', 'text': langState.t('health.step3')},
           ].map((item) => Container(
                 margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surface,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: theme.colorScheme.outline),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.6)),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4)),
+                  ],
                 ),
                 child: Row(children: [
                   Container(
@@ -180,8 +186,11 @@ class _PlantHealthScreenState extends ConsumerState<PlantHealthScreen> {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: theme.colorScheme.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: theme.colorScheme.outline),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.6)),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4)),
+              ],
             ),
             child: Column(
               children: [
@@ -252,11 +261,14 @@ class _PlantHealthScreenState extends ConsumerState<PlantHealthScreen> {
                     : AppColors.farmSun;
             return Container(
               margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: theme.colorScheme.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: theme.colorScheme.outline),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.6)),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4)),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -308,7 +320,189 @@ class _PlantHealthScreenState extends ConsumerState<PlantHealthScreen> {
                 ),
               )),
         ],
+            ],
+          ),
+        ),
       ],
+    );
+  }
+}
+
+// ── Hero Header ─────────────────────────────────────────────────────────────
+
+class _HeroHeader extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final Map<String, dynamic>? diagnostic;
+  final bool isAnalyzing;
+
+  const _HeroHeader({
+    required this.title,
+    required this.subtitle,
+    required this.diagnostic,
+    required this.isAnalyzing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final score = diagnostic != null ? (diagnostic!['healthScore'] as num).toInt() : null;
+    final problemCount =
+        diagnostic != null ? (diagnostic!['problems'] as List).length : null;
+    final recoCount =
+        diagnostic != null ? (diagnostic!['recommendations'] as List).length : null;
+
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF16a34a), Color(0xFF15803d), Color(0xFF166534)],
+        ),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(title,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 26,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.5)),
+                        const SizedBox(height: 4),
+                        Text(subtitle,
+                            style: const TextStyle(
+                                color: Colors.white70, fontSize: 14)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(16)),
+                    child: const Icon(Icons.eco_rounded,
+                        color: Colors.white, size: 26),
+                  ),
+                ],
+              ),
+              if (score != null) ...[
+                const SizedBox(height: 22),
+                Row(children: [
+                  _KpiPill(
+                      value: '$score%',
+                      label: 'Score santé',
+                      icon: Icons.favorite_rounded,
+                      color: const Color(0xFFbbf7d0)),
+                  const SizedBox(width: 10),
+                  _KpiPill(
+                      value: '$problemCount',
+                      label: 'Problèmes',
+                      icon: Icons.warning_amber_rounded,
+                      color: const Color(0xFFfecaca)),
+                  const SizedBox(width: 10),
+                  _KpiPill(
+                      value: '$recoCount',
+                      label: 'Conseils',
+                      icon: Icons.task_alt_rounded,
+                      color: const Color(0xFFbae6fd)),
+                ]),
+              ] else if (isAnalyzing) ...[
+                const SizedBox(height: 22),
+                Row(children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(16),
+                      border:
+                          Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                    ),
+                    child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                      SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white)),
+                      SizedBox(width: 10),
+                      Text('Analyse en cours...',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700)),
+                    ]),
+                  ),
+                ]),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _KpiPill extends StatelessWidget {
+  final String value, label;
+  final IconData icon;
+  final Color color;
+  const _KpiPill(
+      {required this.value,
+      required this.label,
+      required this.icon,
+      required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+        ),
+        child: Row(children: [
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.25),
+                borderRadius: BorderRadius.circular(8)),
+            child: Icon(icon, size: 14, color: color),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+              child:
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(value,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800),
+                overflow: TextOverflow.ellipsis),
+            Text(label,
+                style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.65), fontSize: 9),
+                overflow: TextOverflow.ellipsis),
+          ])),
+        ]),
+      ),
     );
   }
 }

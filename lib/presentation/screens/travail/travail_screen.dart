@@ -58,7 +58,7 @@ class _TravailScreenState extends ConsumerState<TravailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final langState = ref.watch(languageProvider);
+    ref.watch(languageProvider); // rebuild au changement de langue
     final parcelles = ref.watch(parcellesProvider);
     final valveState = p.Provider.of<ValveProvider>(context);
     final theme = Theme.of(context);
@@ -71,39 +71,37 @@ class _TravailScreenState extends ConsumerState<TravailScreen> {
                 p.culture.toLowerCase().contains(_search.toLowerCase()))
             .toList();
 
+    final allVannes = valveState.valves;
+    final openVannes = allVannes.where((v) => v.isOpen).length;
+    final connectedCount = parcelles.where((pc) => pc.isConnected).length;
+    final totalHa = parcelles.fold<double>(
+      0,
+      (s, pc) => s + (double.tryParse(pc.area.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0),
+    );
+
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: _refresh,
         color: AppColors.farmLeaf,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 100),
+          padding: EdgeInsets.zero,
           children: [
-            // En-tête
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Travail', style: theme.textTheme.headlineMedium),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${parcelles.length} projet${parcelles.length > 1 ? 's' : ''}',
-                      style: theme.textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-                if (_isLoading)
-                  const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: AppColors.farmLeaf),
-                  ),
-              ],
+            // ── Hero Header ──────────────────────────────────────────────
+            _HeroHeader(
+              parcelleCount: parcelles.length,
+              openVannes: openVannes,
+              totalVannes: allVannes.length,
+              connectedCount: connectedCount,
+              totalHa: totalHa,
+              loading: _isLoading,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
 
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
             // Barre de recherche
             Container(
               height: 42,
@@ -156,6 +154,10 @@ class _TravailScreenState extends ConsumerState<TravailScreen> {
                   onToggleVanne: (v) => _toggleVanne(context, v, valveState),
                 );
               }),
+                  const SizedBox(height: 100),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -226,6 +228,164 @@ class _TravailScreenState extends ConsumerState<TravailScreen> {
   }
 }
 
+// ── Hero Header ─────────────────────────────────────────────────────────────
+
+class _HeroHeader extends StatelessWidget {
+  final int parcelleCount;
+  final int openVannes;
+  final int totalVannes;
+  final int connectedCount;
+  final double totalHa;
+  final bool loading;
+
+  const _HeroHeader({
+    required this.parcelleCount,
+    required this.openVannes,
+    required this.totalVannes,
+    required this.connectedCount,
+    required this.totalHa,
+    required this.loading,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF16a34a), Color(0xFF15803d), Color(0xFF166534)],
+        ),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Travail',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 28,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.5)),
+                      const SizedBox(height: 2),
+                      Text(
+                        '$parcelleCount projet${parcelleCount > 1 ? 's' : ''} agricole${parcelleCount > 1 ? 's' : ''}',
+                        style: const TextStyle(color: Colors.white70, fontSize: 14),
+                      ),
+                    ],
+                  ),
+                  loading
+                      ? Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(16)),
+                          child: const Center(
+                            child: SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white),
+                            ),
+                          ),
+                        )
+                      : Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(16)),
+                          child: const Icon(Icons.agriculture_rounded,
+                              color: Colors.white, size: 26),
+                        ),
+                ],
+              ),
+              const SizedBox(height: 22),
+              Row(children: [
+                _KpiPill(
+                    value: '$parcelleCount',
+                    label: 'Parcelles',
+                    icon: Icons.grid_view_rounded,
+                    color: const Color(0xFFbbf7d0)),
+                const SizedBox(width: 10),
+                _KpiPill(
+                    value: '$openVannes/$totalVannes',
+                    label: 'Vannes ouvertes',
+                    icon: Icons.water_drop_rounded,
+                    color: const Color(0xFFbae6fd)),
+                const SizedBox(width: 10),
+                _KpiPill(
+                    value: '$connectedCount/$parcelleCount',
+                    label: 'Connectées',
+                    icon: Icons.wifi_rounded,
+                    color: const Color(0xFFfef08a)),
+              ]),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _KpiPill extends StatelessWidget {
+  final String value, label;
+  final IconData icon;
+  final Color color;
+  const _KpiPill(
+      {required this.value,
+      required this.label,
+      required this.icon,
+      required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+        ),
+        child: Row(children: [
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.25),
+                borderRadius: BorderRadius.circular(8)),
+            child: Icon(icon, size: 14, color: color),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(value,
+                style: const TextStyle(
+                    color: Colors.white, fontSize: 12, fontWeight: FontWeight.w800),
+                overflow: TextOverflow.ellipsis),
+            Text(label,
+                style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.65), fontSize: 9),
+                overflow: TextOverflow.ellipsis),
+          ])),
+        ]),
+      ),
+    );
+  }
+}
+
 class _ProjetCard extends StatefulWidget {
   final ParcelleData parcelle;
   final List<ValveModel> vannes;
@@ -257,13 +417,13 @@ class _ProjetCardState extends State<_ProjetCard> {
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.outline),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.6)),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 8,
-              offset: const Offset(0, 2)),
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 4)),
         ],
       ),
       child: Column(
@@ -271,7 +431,7 @@ class _ProjetCardState extends State<_ProjetCard> {
           // En-tête parcelle
           InkWell(
             onTap: () => setState(() => _expanded = !_expanded),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
             child: Padding(
               padding: const EdgeInsets.all(14),
               child: Row(
@@ -413,7 +573,7 @@ class _VanneRow extends StatelessWidget {
             ? AppColors.farmWater.withValues(alpha: 0.04)
             : Colors.transparent,
         borderRadius: isLast
-            ? const BorderRadius.vertical(bottom: Radius.circular(16))
+            ? const BorderRadius.vertical(bottom: Radius.circular(20))
             : BorderRadius.zero,
       ),
       child: Padding(

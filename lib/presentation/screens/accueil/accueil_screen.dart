@@ -184,7 +184,7 @@ class _AccueilScreenState extends ConsumerState<AccueilScreen> {
 
           // ── Chatbot section ──────────────────────────────────────────────
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
             sliver: SliverToBoxAdapter(child: _ChatbotWidget()),
           ),
         ],

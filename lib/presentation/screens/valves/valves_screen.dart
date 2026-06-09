@@ -22,23 +22,26 @@ class ValvesScreen extends ConsumerWidget {
     final autoCount = allVannes.where((v) => v.isAuto).length;
 
     return ListView(
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+        padding: EdgeInsets.zero,
         children: [
-          Text(langState.t('vannes.title'), style: theme.textTheme.headlineMedium),
-          const SizedBox(height: 4),
-          Text(langState.t('vannes.subtitle'), style: theme.textTheme.bodySmall),
-          const SizedBox(height: 16),
+          // ── Hero Header ────────────────────────────────────────────────
+          _HeroHeader(
+            title: langState.t('vannes.title'),
+            subtitle: langState.t('vannes.subtitle'),
+            totalLabel: langState.t('vannes.total'),
+            openLabel: langState.t('vannes.open'),
+            autoLabel: langState.t('vannes.auto'),
+            total: allVannes.length,
+            open: openCount,
+            auto: autoCount,
+          ),
+          const SizedBox(height: 20),
 
-          // Stats
-          Row(children: [
-            _StatMini(langState.t('vannes.total'), '${allVannes.length}', Icons.radio_button_checked, AppColors.farmLeaf, theme),
-            const SizedBox(width: 12),
-            _StatMini(langState.t('vannes.open'), '$openCount', Icons.power_settings_new, AppColors.farmWater, theme),
-            const SizedBox(width: 12),
-            _StatMini(langState.t('vannes.auto'), '$autoCount', Icons.flash_on, AppColors.farmSun, theme),
-          ]),
-          const SizedBox(height: 16),
-
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
           // Tab-like buttons: Vannes | Historique
           Container(
             height: 40,
@@ -97,8 +100,11 @@ class ValvesScreen extends ConsumerWidget {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: theme.colorScheme.outline),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.6)),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4)),
+                  ],
                 ),
                 child: Column(
                   children: [
@@ -153,6 +159,9 @@ class ValvesScreen extends ConsumerWidget {
               ),
             );
           }),
+              ],
+            ),
+          ),
         ],
       );
   }
@@ -668,6 +677,152 @@ class ValvesScreen extends ConsumerWidget {
   }
 }
 
+// ── Hero Header ───────────────────────────────────────────────────────────────
+
+class _HeroHeader extends StatelessWidget {
+  final String title, subtitle, totalLabel, openLabel, autoLabel;
+  final int total, open, auto;
+
+  const _HeroHeader({
+    required this.title,
+    required this.subtitle,
+    required this.totalLabel,
+    required this.openLabel,
+    required this.autoLabel,
+    required this.total,
+    required this.open,
+    required this.auto,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF16a34a), Color(0xFF15803d), Color(0xFF166534)],
+        ),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(title,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 28,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.5)),
+                        const SizedBox(height: 4),
+                        Text(subtitle,
+                            style: const TextStyle(
+                                color: Colors.white70, fontSize: 14)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(16)),
+                    child: const Icon(Icons.water_drop_rounded,
+                        color: Colors.white, size: 26),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 22),
+              Row(children: [
+                _KpiPill(
+                    value: '$total',
+                    label: totalLabel,
+                    icon: Icons.radio_button_checked_rounded,
+                    color: const Color(0xFFbbf7d0)),
+                const SizedBox(width: 10),
+                _KpiPill(
+                    value: '$open',
+                    label: openLabel,
+                    icon: Icons.power_settings_new_rounded,
+                    color: const Color(0xFFbae6fd)),
+                const SizedBox(width: 10),
+                _KpiPill(
+                    value: '$auto',
+                    label: autoLabel,
+                    icon: Icons.flash_on_rounded,
+                    color: const Color(0xFFfef08a)),
+              ]),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _KpiPill extends StatelessWidget {
+  final String value, label;
+  final IconData icon;
+  final Color color;
+  const _KpiPill(
+      {required this.value,
+      required this.label,
+      required this.icon,
+      required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+        ),
+        child: Row(children: [
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.25),
+                borderRadius: BorderRadius.circular(8)),
+            child: Icon(icon, size: 14, color: color),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+              child:
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(value,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800),
+                overflow: TextOverflow.ellipsis),
+            Text(label,
+                style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.65), fontSize: 9),
+                overflow: TextOverflow.ellipsis),
+          ])),
+        ]),
+      ),
+    );
+  }
+}
+
 // ── Barre débit capteur ───────────────────────────────────────────────────────
 
 class _DebitBar extends StatelessWidget {
@@ -882,30 +1037,3 @@ class _StatRow extends StatelessWidget {
   }
 }
 
-class _StatMini extends StatelessWidget {
-  final String label, value;
-  final IconData icon;
-  final Color color;
-  final ThemeData theme;
-  const _StatMini(this.label, this.value, this.icon, this.color, this.theme);
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: theme.colorScheme.outline),
-        ),
-        child: Column(children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(height: 4),
-          Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: color)),
-          Text(label, style: theme.textTheme.labelSmall),
-        ]),
-      ),
-    );
-  }
-}

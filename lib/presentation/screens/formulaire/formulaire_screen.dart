@@ -446,77 +446,84 @@ class _FormulaireScreenState extends ConsumerState<FormulaireScreen> {
     final stepTitles = [langState.t('wizard.step2'), langState.t('wizard.step3')];
 
     return Scaffold(
-      appBar: AppBar(
-        title: Row(children: [
-          const Icon(Icons.add_circle_outline, size: 22),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              langState.t('wizard.title'),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ]),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-            child: Row(
-              children: List.generate(2, (i) {
-                final isActive = i == _step;
-                final isDone = i < _step;
-                return Expanded(
-                  child: Row(children: [
-                    Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: isDone
-                            ? AppColors.farmLeaf
-                            : isActive
-                                ? AppColors.farmLeaf.withValues(alpha: 0.15)
-                                : theme.colorScheme.secondary,
-                        shape: BoxShape.circle,
+          // ── Hero header avec stepper intégré ─────────────────────────────
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF16a34a), Color(0xFF15803d), Color(0xFF166534)],
+              ),
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          width: 40, height: 40,
+                          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(12)),
+                          child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 22),
+                        ),
                       ),
-                      child: Center(
-                        child: isDone
-                            ? const Icon(Icons.check, size: 14, color: Colors.white)
-                            : Text('${i + 1}',
-                                style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: isActive
-                                        ? AppColors.farmLeaf
-                                        : theme.colorScheme.onSurface
-                                            .withValues(alpha: 0.4))),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          langState.t('wizard.title'),
+                          style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
+                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                        ),
                       ),
+                    ]),
+                    const SizedBox(height: 18),
+                    // Stepper (sur fond vert)
+                    Row(
+                      children: List.generate(2, (i) {
+                        final isActive = i == _step;
+                        final isDone = i < _step;
+                        return Expanded(
+                          child: Row(children: [
+                            Container(
+                              width: 28, height: 28,
+                              decoration: BoxDecoration(
+                                color: isDone || isActive ? Colors.white : Colors.white.withValues(alpha: 0.25),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: isDone
+                                    ? const Icon(Icons.check, size: 14, color: Color(0xFF16a34a))
+                                    : Text('${i + 1}',
+                                        style: TextStyle(
+                                            fontSize: 12, fontWeight: FontWeight.w800,
+                                            color: isActive ? const Color(0xFF16a34a) : Colors.white70)),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(stepTitles[i],
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
+                                      color: isActive ? Colors.white : Colors.white.withValues(alpha: 0.6)),
+                                  maxLines: 1, overflow: TextOverflow.ellipsis),
+                            ),
+                          ]),
+                        );
+                      }),
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(stepTitles[i],
-                          style: TextStyle(
-                              fontSize: 11,
-                              fontWeight:
-                                  isActive ? FontWeight.w700 : FontWeight.w500,
-                              color: isActive
-                                  ? theme.colorScheme.onSurface
-                                  : theme.colorScheme.onSurface
-                                      .withValues(alpha: 0.4)),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis),
-                    ),
-                  ]),
-                );
-              }),
+                  ],
+                ),
+              ),
             ),
           ),
-          const Divider(height: 1),
 
           Expanded(
             child: ListView(
