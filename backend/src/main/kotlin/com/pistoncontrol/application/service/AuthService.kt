@@ -3,14 +3,11 @@ package com.pistoncontrol.application.service
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.pistoncontrol.infrastructure.persistence.DatabaseFactory.dbQuery
-import com.pistoncontrol.infrastructure.persistence.EmailVerificationCodes
-import com.pistoncontrol.infrastructure.persistence.Profiles
-import com.pistoncontrol.infrastructure.persistence.Users
+import com.pistoncontrol.infrastructure.persistence.Utilisateur
 import mu.KotlinLogging
 import org.jetbrains.exposed.sql.*
 import org.mindrot.jbcrypt.BCrypt
 import java.security.MessageDigest
-import java.security.SecureRandom
 import java.time.Instant
 import java.util.Date
 import java.util.UUID
@@ -61,83 +58,43 @@ class AuthService(
 
         val hashedPassword = hashPassword(password)
 
+        // FUSION users+profiles : une SEULE ligne dans "Utilisateur".
+        // On génère l'UUID applicatif (identité d'auth) et on insère tout d'un coup.
+        val newUuid = UUID.randomUUID()
         val userId = dbQuery {
             val existingUser = findUserByEmail(email)
             if (existingUser != null) {
                 return@dbQuery null
             }
 
-            Users.insert {
-                it[Users.email] = email
-                it[Users.passwordHash] = hashedPassword
-                it[Users.firstName] = firstName
-                it[Users.lastName] = lastName
-                it[Users.emailVerified] = false
-                it[Users.createdAt] = Instant.now()
-                it[Users.updatedAt] = Instant.now()
-            } get Users.id
+            Utilisateur.insert {
+                it[Utilisateur.userId] = newUuid
+                it[Utilisateur.email] = email
+                it[Utilisateur.passwordHash] = hashedPassword
+                it[Utilisateur.emailVerified] = true // OTP désactivé : compte actif directement
+                it[Utilisateur.firstName] = firstName
+                it[Utilisateur.lastName] = lastName
+                it[Utilisateur.phoneNumber] = phoneNumber
+                it[Utilisateur.userRole] = "CLIENT"
+                it[Utilisateur.createdBy] = createdBy
+                it[Utilisateur.createdAt] = Instant.now()
+                it[Utilisateur.updatedAt] = Instant.now()
+            }
+            newUuid
         }
 
         if (userId == null) {
             return AuthResult.Failure("Email already registered", statusCode = 409)
         }
 
-        // Créer le profil AgriTech avec le vrai UUID
-        dbQuery {
-            val existingProfile = Profiles.select { Profiles.email eq email }.singleOrNull()
-            if (existingProfile == null) {
-                Profiles.insert {
-                    it[Profiles.userId] = userId
-                    it[Profiles.email] = email
-                    it[Profiles.firstName] = firstName
-                    it[Profiles.lastName] = lastName
-                    it[Profiles.phoneNumber] = phoneNumber
-                    it[Profiles.userRole] = "CLIENT"
-                    it[Profiles.createdBy] = createdBy
-                    it[Profiles.createdAt] = Instant.now()
-                    it[Profiles.updatedAt] = Instant.now()
-                }
-            } else {
-                Profiles.update({ Profiles.email eq email }) {
-                    it[Profiles.userId] = userId
-                    if (createdBy != null) it[Profiles.createdBy] = createdBy
-                }
-            }
+        // OTP désactivé (table email_verification_codes supprimée) :
+        // le compte est créé déjà vérifié, on émet directement un token de session.
+        val (role, profileId) = dbQuery {
+            val p = Utilisateur.select { Utilisateur.userId eq userId }.singleOrNull()
+            Pair(p?.get(Utilisateur.userRole) ?: "CLIENT", p?.get(Utilisateur.id))
         }
-
-        val otpCode = generateOtpCode()
-        storeVerificationCode(userId, otpCode)
-
-        try {
-            emailService.sendVerificationCode(
-                toEmail = email,
-                code = otpCode,
-                firstName = firstName,
-                expiresInMinutes = otpExpiryMinutes,
-            )
-        } catch (e: Exception) {
-            logger.error(e) { "Failed to send verification email to $email" }
-            dbQuery {
-                EmailVerificationCodes.deleteWhere {
-                    SqlExpressionBuilder.run { EmailVerificationCodes.userId eq userId }
-                }
-                Users.deleteWhere {
-                    SqlExpressionBuilder.run { Users.id eq userId }
-                }
-            }
-            return AuthResult.Failure(
-                "Failed to send verification email. Please check SMTP settings and try again.",
-                statusCode = 500,
-            )
-        }
-
-        return AuthResult.VerificationRequired(
-            userId.toString(),
-            "Registration successful. Please verify your email with the code sent to $email. Code expires in $otpExpiryMinutes minutes.",
-            otpLength,
-            otpExpiryMinutes,
-            otpCode = if (createdBy != null) otpCode else null,
-        )
+        val token = generateToken(userId, role, email, profileId)
+        return AuthResult.Success(token, userId.toString(), role)
     }
 
     suspend fun login(email: String, password: String): AuthResult {
@@ -145,13 +102,14 @@ class AuthService(
             findUserByEmail(email)
         }
 
-        if (user == null || !verifyPassword(password, user[Users.passwordHash])) {
+        val storedHash = user?.get(Utilisateur.passwordHash)
+        if (user == null || storedHash == null || !verifyPassword(password, storedHash)) {
             return AuthResult.Failure("Invalid credentials", statusCode = 401)
         }
 
-        val userId = user[Users.id]
+        val userId = user[Utilisateur.userId]
 
-        if (!user[Users.emailVerified]) {
+        if (!user[Utilisateur.emailVerified]) {
             return AuthResult.VerificationRequired(
                 userId.toString(),
                 "Email not verified. Please verify your email before logging in.",
@@ -161,153 +119,78 @@ class AuthService(
         }
 
         val (role, profileId) = dbQuery {
-            val p = Profiles.select { Profiles.userId eq userId }.singleOrNull()
-            Pair(p?.get(Profiles.userRole) ?: "CLIENT", p?.get(Profiles.id))
+            val p = Utilisateur.select { Utilisateur.userId eq userId }.singleOrNull()
+            Pair(p?.get(Utilisateur.userRole) ?: "CLIENT", p?.get(Utilisateur.id))
         }
-        val token = generateToken(userId, role, user[Users.email], profileId)
+        val token = generateToken(userId, role, user[Utilisateur.email], profileId)
         return AuthResult.Success(token, userId.toString(), role)
     }
 
+    /**
+     * Réinitialisation directe du mot de passe (sans email/OTP).
+     * Si l'email existe, le mot de passe est remplacé. Pour ne pas révéler
+     * l'existence d'un compte, on renvoie un message générique en cas d'email inconnu.
+     */
+    suspend fun resetPassword(email: String, newPassword: String): AuthResult {
+        if (!isValidEmail(email)) {
+            return AuthResult.Failure("Invalid email format", statusCode = 400)
+        }
+        val passwordError = validatePassword(newPassword)
+        if (passwordError != null) {
+            return AuthResult.Failure(passwordError, statusCode = 400)
+        }
+
+        val hashed = hashPassword(newPassword)
+        val updated = dbQuery {
+            Utilisateur.update({ Utilisateur.email eq email }) {
+                it[passwordHash] = hashed
+                it[updatedAt] = Instant.now()
+            }
+        }
+
+        if (updated == 0) {
+            return AuthResult.Failure("Aucun compte associé à cet email.", statusCode = 404)
+        }
+        // Succès : on réutilise VerificationRequired comme simple porteur de message
+        // (pas de token émis : l'utilisateur se reconnecte avec son nouveau mot de passe).
+        return AuthResult.VerificationRequired(
+            userId = "",
+            message = "Mot de passe réinitialisé avec succès.",
+            otpLength = 0,
+            expiresInMinutes = 0,
+        )
+    }
+
+    // OTP désactivé (table email_verification_codes supprimée).
+    // verifyEmail renvoie succès idempotent : on régénère simplement un token.
     suspend fun verifyEmail(userId: String, code: String): AuthResult {
-        val userUuid: UUID
-        try {
-            userUuid = UUID.fromString(userId)
+        val userUuid: UUID = try {
+            UUID.fromString(userId)
         } catch (e: IllegalArgumentException) {
             return AuthResult.Failure("Invalid user ID format", statusCode = 400)
         }
 
-        if (!code.matches(Regex("^\\d{$otpLength}$"))) {
-            return AuthResult.Failure("Invalid verification code format. Please enter a $otpLength-digit code.", statusCode = 400)
-        }
-
         return dbQuery {
-            val user = Users.select { Users.id eq userUuid }.singleOrNull()
+            val user = Utilisateur.select { Utilisateur.userId eq userUuid }.singleOrNull()
                 ?: return@dbQuery AuthResult.Failure("User not found", statusCode = 404)
 
-            if (user[Users.emailVerified]) {
-                return@dbQuery AuthResult.Failure("Email already verified", statusCode = 409)
-            }
-
-            val verificationCode = EmailVerificationCodes
-                .select { EmailVerificationCodes.userId eq userUuid }
-                .orderBy(EmailVerificationCodes.createdAt, SortOrder.DESC)
-                .limit(1)
-                .singleOrNull()
-                ?: return@dbQuery AuthResult.Failure("No verification code found. Please request a new one.", statusCode = 404)
-
-            if (verificationCode[EmailVerificationCodes.expiresAt].isBefore(Instant.now())) {
-                EmailVerificationCodes.deleteWhere { SqlExpressionBuilder.run { EmailVerificationCodes.userId eq userUuid } }
-                return@dbQuery AuthResult.Failure("Verification code expired. Please request a new one.", statusCode = 410)
-            }
-
-            val currentAttempts = verificationCode[EmailVerificationCodes.attempts]
-            if (currentAttempts >= maxVerifyAttempts) {
-                EmailVerificationCodes.deleteWhere { SqlExpressionBuilder.run { EmailVerificationCodes.userId eq userUuid } }
-                return@dbQuery AuthResult.Failure("Too many failed attempts. Please request a new code.", statusCode = 429)
-            }
-
-            EmailVerificationCodes.update({ EmailVerificationCodes.id eq verificationCode[EmailVerificationCodes.id] }) {
-                it[attempts] = currentAttempts + 1
-            }
-
-            val codeHash = hashCode(code)
-            if (codeHash != verificationCode[EmailVerificationCodes.codeHash]) {
-                val remaining = (maxVerifyAttempts - (currentAttempts + 1)).coerceAtLeast(0)
-                return@dbQuery AuthResult.Failure("Invalid verification code. $remaining attempts remaining.", statusCode = 400)
-            }
-
-            Users.update({ Users.id eq userUuid }) {
+            // S'assure que le compte est marqué vérifié (no-op si déjà le cas)
+            Utilisateur.update({ Utilisateur.userId eq userUuid }) {
                 it[emailVerified] = true
                 it[updatedAt] = Instant.now()
             }
 
-            EmailVerificationCodes.deleteWhere { SqlExpressionBuilder.run { EmailVerificationCodes.userId eq userUuid } }
-
-            val p = Profiles.select { Profiles.userId eq userUuid }.singleOrNull()
-            val role = p?.get(Profiles.userRole) ?: "CLIENT"
-            val profileId = p?.get(Profiles.id)
-            val token = generateToken(userUuid, role, user[Users.email], profileId)
+            val p = Utilisateur.select { Utilisateur.userId eq userUuid }.singleOrNull()
+            val role = p?.get(Utilisateur.userRole) ?: "CLIENT"
+            val profileId = p?.get(Utilisateur.id)
+            val token = generateToken(userUuid, role, user[Utilisateur.email], profileId)
             AuthResult.Success(token, userId, role)
         }
     }
 
+    // OTP désactivé : plus de renvoi de code.
     suspend fun resendVerificationCode(userId: String): AuthResult {
-        val userUuid: UUID
-        try {
-            userUuid = UUID.fromString(userId)
-        } catch (e: IllegalArgumentException) {
-            return AuthResult.Failure("Invalid user ID format", statusCode = 400)
-        }
-
-        val user = dbQuery {
-            Users.select { Users.id eq userUuid }.singleOrNull()
-        } ?: return AuthResult.Failure("User not found", statusCode = 404)
-
-        if (user[Users.emailVerified]) {
-            return AuthResult.Failure("Email already verified", statusCode = 409)
-        }
-
-        val recentCodesCount = dbQuery {
-            val oneHourAgo = Instant.now().minusSeconds(3600)
-            EmailVerificationCodes
-                .select { (EmailVerificationCodes.userId eq userUuid) and (EmailVerificationCodes.createdAt greaterEq oneHourAgo) }
-                .count()
-        }
-
-        if (recentCodesCount >= maxResendPerHour) {
-            return AuthResult.Failure("Too many code requests. Please wait before requesting a new code.", statusCode = 429)
-        }
-
-        val otpCode = generateOtpCode()
-        storeVerificationCode(userUuid, otpCode)
-
-        val email = user[Users.email]
-        val firstName = user[Users.firstName]
-
-        try {
-            emailService.sendVerificationCode(
-                toEmail = email,
-                code = otpCode,
-                firstName = firstName,
-                expiresInMinutes = otpExpiryMinutes,
-            )
-        } catch (e: Exception) {
-            logger.error(e) { "Failed to send verification email to $email" }
-            return AuthResult.Failure("Failed to send verification email. Please try again later.", statusCode = 500)
-        }
-
-        return AuthResult.VerificationRequired(
-            userId,
-            "Verification code sent to $email. It expires in $otpExpiryMinutes minutes.",
-            otpLength,
-            otpExpiryMinutes,
-        )
-    }
-
-    private fun generateOtpCode(): String {
-        val min = Math.pow(10.0, (otpLength - 1).toDouble()).toInt()
-        val max = Math.pow(10.0, otpLength.toDouble()).toInt() - 1
-        val code = SecureRandom().nextInt(max - min + 1) + min
-        return code.toString()
-    }
-
-    private fun hashCode(code: String): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        val hashBytes = digest.digest(code.toByteArray())
-        return hashBytes.joinToString("") { "%02x".format(it) }
-    }
-
-    private suspend fun storeVerificationCode(userId: UUID, code: String) {
-        val codeHash = hashCode(code)
-        dbQuery {
-            EmailVerificationCodes.insert {
-                it[EmailVerificationCodes.userId] = userId
-                it[EmailVerificationCodes.codeHash] = codeHash
-                it[EmailVerificationCodes.attempts] = 0
-                it[EmailVerificationCodes.expiresAt] = Instant.now().plusSeconds(otpExpiryMinutes * 60)
-                it[EmailVerificationCodes.createdAt] = Instant.now()
-            }
-        }
+        return AuthResult.Failure("Email verification is disabled.", statusCode = 410)
     }
 
     private fun generateToken(userId: UUID, role: String, email: String? = null, profileId: Long? = null): String {
@@ -332,7 +215,7 @@ class AuthService(
     }
 
     private fun findUserByEmail(email: String): ResultRow? {
-        return Users.select { Users.email eq email }.singleOrNull()
+        return Utilisateur.select { Utilisateur.email eq email }.singleOrNull()
     }
 
     private fun isValidEmail(email: String): Boolean {

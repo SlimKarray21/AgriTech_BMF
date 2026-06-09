@@ -9,7 +9,7 @@ fun Route.agriAdminRoutes() {
 
             // ── Agriculture ──────────────────────────────────────────────────
             profilesRoutes()
-            typePlanteRoutes()
+            // typePlanteRoutes() supprimé (table type_plante retirée)
             solsRoutes()
             climatsRoutes()
 

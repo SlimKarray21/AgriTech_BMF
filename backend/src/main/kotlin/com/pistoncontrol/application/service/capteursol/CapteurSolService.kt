@@ -9,10 +9,8 @@ import com.pistoncontrol.infrastructure.persistence.Parcelle as ParcelleTable
 import com.pistoncontrol.infrastructure.persistence.Plantes as PlantesTable
 import com.pistoncontrol.infrastructure.persistence.RapportEau as RapportEauTable
 import com.pistoncontrol.infrastructure.persistence.RapportSol as RapportSolTable
-import com.pistoncontrol.infrastructure.persistence.TypePlante as TypePlanteTable
 import com.pistoncontrol.infrastructure.persistence.Vannes as VannesTable
-import com.pistoncontrol.infrastructure.persistence.Users as UsersTable
-import com.pistoncontrol.infrastructure.persistence.Profiles as ProfilesTable
+import com.pistoncontrol.infrastructure.persistence.Utilisateur as UtilisateurTable
 import com.pistoncontrol.infrastructure.persistence.DatabaseFactory
 import kotlinx.serialization.Serializable
 import mu.KotlinLogging
@@ -175,7 +173,7 @@ class CapteurSolService {
 
         // Step 1: Look up the auth user in the 'users' table by UUID
         val authUser = try {
-            UsersTable.select { UsersTable.id eq authUserId }.singleOrNull()
+            UtilisateurTable.select { UtilisateurTable.userId eq authUserId }.singleOrNull()
         } catch (e: Exception) {
             logger.error(e) { "[resolveUser] FAILED to query users table for authUserId=$authUserId" }
             null
@@ -183,8 +181,8 @@ class CapteurSolService {
         logger.info { "[resolveUser] users table lookup: found=${authUser != null}" }
 
         // Step 2: Resolve email — prefer DB value, fall back to JWT claim
-        val email = authUser?.get(UsersTable.email) ?: authEmail
-        logger.info { "[resolveUser] resolved email=$email (fromDB=${authUser?.get(UsersTable.email)}, fromJWT=$authEmail)" }
+        val email = authUser?.get(UtilisateurTable.email) ?: authEmail
+        logger.info { "[resolveUser] resolved email=$email (fromDB=${authUser?.get(UtilisateurTable.email)}, fromJWT=$authEmail)" }
 
         if (email.isNullOrBlank()) {
             logger.warn { "[resolveUser] ABORT: email is null/blank – cannot resolve CapteurSol user" }
@@ -193,9 +191,9 @@ class CapteurSolService {
 
         // Step 3: Look up existing profile by email
         val existingProfile = try {
-            ProfilesTable
-                .slice(ProfilesTable.id)
-                .select { ProfilesTable.email eq email }
+            UtilisateurTable
+                .slice(UtilisateurTable.id)
+                .select { UtilisateurTable.email eq email }
                 .singleOrNull()
         } catch (e: Exception) {
             logger.error(e) { "[resolveUser] FAILED to query profiles table for email=$email" }
@@ -203,7 +201,7 @@ class CapteurSolService {
         }
 
         if (existingProfile != null) {
-            val profileId = existingProfile[ProfilesTable.id]
+            val profileId = existingProfile[UtilisateurTable.id]
             logger.info { "[resolveUser] OK: found existing profile id=$profileId for email=$email" }
             return@dbQuery profileId
         }
@@ -224,12 +222,25 @@ class CapteurSolService {
 
     // Parcelles visibles par un partenaire : les siennes + celles de ses clients (profiles.created_by = partenaire).
     suspend fun listParcellesForPartenaire(partenaireProfileId: Long): List<Parcelle> = DatabaseFactory.dbQuery {
-        val clientIds = ProfilesTable
-            .slice(ProfilesTable.id)
-            .select { ProfilesTable.createdBy eq partenaireProfileId }
-            .map { it[ProfilesTable.id] }
-        val visibleIds = (clientIds + partenaireProfileId).distinct()
-        ParcelleTable.select { ParcelleTable.fkUser inList visibleIds }.map(::toParcelle)
+        ParcelleTable.select { ParcelleTable.fkUser inList partenaireScopeIds(partenaireProfileId) }.map(::toParcelle)
+    }
+
+    // IDs des profils gérés par un partenaire : lui-même + ses clients (profiles.created_by = partenaire).
+    private fun partenaireScopeIds(partenaireProfileId: Long): List<Long> {
+        val clientIds = UtilisateurTable
+            .slice(UtilisateurTable.id)
+            .select { UtilisateurTable.createdBy eq partenaireProfileId }
+            .map { it[UtilisateurTable.id] }
+        return (clientIds + partenaireProfileId).distinct()
+    }
+
+    // Vrai si la parcelle appartient au périmètre du partenaire (lui ou un de ses clients).
+    suspend fun isParcelleInPartenaireScope(parcelId: Long, partenaireProfileId: Long): Boolean = DatabaseFactory.dbQuery {
+        val scope = partenaireScopeIds(partenaireProfileId)
+        ParcelleTable
+            .select { (ParcelleTable.id eq parcelId) and (ParcelleTable.fkUser inList scope) }
+            .limit(1)
+            .any()
     }
 
     suspend fun createParcelle(input: CreateParcelleInput): Parcelle = DatabaseFactory.dbQuery {
@@ -563,14 +574,7 @@ class CapteurSolService {
 
         var createdPlants = 0
         for (plant in input.plants) {
-            // Keep type_plante filled for reporting/catalog use-cases.
-            TypePlanteTable.insert {
-                it[nomPlante] = plant.name
-                it[typePlante] = plant.type
-                it[besoinEauParPlante] = plant.waterNeedPerPlant
-                it[createdAt] = now
-            }
-
+            // (table type_plante supprimée : la plante est stockée uniquement dans `plantes`)
             val planteId = PlantesTable.insert {
                 it[name] = plant.name
                 it[type] = plant.type

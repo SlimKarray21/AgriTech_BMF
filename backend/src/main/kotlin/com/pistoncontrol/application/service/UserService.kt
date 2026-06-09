@@ -1,8 +1,7 @@
 package com.pistoncontrol.application.service
 
 import com.pistoncontrol.infrastructure.persistence.DatabaseFactory.dbQuery
-import com.pistoncontrol.infrastructure.persistence.Profiles
-import com.pistoncontrol.infrastructure.persistence.Users
+import com.pistoncontrol.infrastructure.persistence.Utilisateur
 import com.pistoncontrol.domain.model.*
 import org.jetbrains.exposed.sql.*
 import mu.KotlinLogging
@@ -46,8 +45,8 @@ class UserService {
             return UserResult.Failure("Invalid user ID", statusCode = 400)
         }
         val profile = dbQuery {
-            Users.join(Profiles, org.jetbrains.exposed.sql.JoinType.LEFT, onColumn = Users.id, otherColumn = Profiles.userId)
-                .select { Users.id eq userUuid }
+            // users + profiles fusionnés dans "Utilisateur" -> sélection directe
+            Utilisateur.select { Utilisateur.userId eq userUuid }
                 .singleOrNull()
                 ?.let { rowToUserProfile(it) }
         }
@@ -89,28 +88,24 @@ class UserService {
         val updatedProfile = dbQuery {
             val userUuid = UUID.fromString(userId)
 
-            val existingUser = Users.select { Users.id eq userUuid }.singleOrNull()
+            val existingUser = Utilisateur.select { Utilisateur.userId eq userUuid }.singleOrNull()
             if (existingUser == null) return@dbQuery null
 
-            Users.update({ Users.id eq userUuid }) {
-                request.firstName?.let { value -> it[firstName] = value }
-                request.lastName?.let { value -> it[lastName] = value }
-                it[updatedAt] = java.time.Instant.now()
-            }
-
-            Profiles.update({ Profiles.userId eq userUuid }) {
-                request.phoneNumber?.let { value -> it[Profiles.phoneNumber] = value }
+            // Une seule table "Utilisateur" : un seul UPDATE pour tous les champs
+            Utilisateur.update({ Utilisateur.userId eq userUuid }) {
+                request.firstName?.let { value -> it[Utilisateur.firstName] = value }
+                request.lastName?.let { value -> it[Utilisateur.lastName] = value }
+                request.phoneNumber?.let { value -> it[Utilisateur.phoneNumber] = value }
                 request.dateOfBirth?.let { value ->
-                    it[Profiles.dateOfBirth] = LocalDate.parse(value, dateFormatter)
+                    it[Utilisateur.dateOfBirth] = LocalDate.parse(value, dateFormatter)
                 }
-                request.avatarUrl?.let { value -> it[Profiles.avatarUrl] = value }
-                it[Profiles.updatedAt] = java.time.Instant.now()
+                request.avatarUrl?.let { value -> it[Utilisateur.avatarUrl] = value }
+                it[Utilisateur.updatedAt] = java.time.Instant.now()
             }
 
             logger.info { "Updated profile for user $userId" }
 
-            Users.join(Profiles, org.jetbrains.exposed.sql.JoinType.LEFT, onColumn = Users.id, otherColumn = Profiles.userId)
-                .select { Users.id eq userUuid }
+            Utilisateur.select { Utilisateur.userId eq userUuid }
                 .singleOrNull()
                 ?.let { rowToUserProfile(it) }
         }
@@ -124,18 +119,18 @@ class UserService {
 
     private fun rowToUserProfile(row: ResultRow): UserProfileResponse {
         return UserProfileResponse(
-            id = row[Users.id].toString(),
-            email = row[Users.email],
-            userRole = row.getOrNull(Profiles.userRole) ?: "CLIENT",
-            profileId = row.getOrNull(Profiles.id),
-            firstName = row[Users.firstName],
-            lastName = row[Users.lastName],
-            phoneNumber = row.getOrNull(Profiles.phoneNumber),
-            dateOfBirth = row.getOrNull(Profiles.dateOfBirth)?.format(dateFormatter),
-            typeAbo = row.getOrNull(Profiles.typeAbo),
-            dateDebAbo = row.getOrNull(Profiles.dateDebAbo)?.format(dateFormatter),
-            dateExpAbo = row.getOrNull(Profiles.dateExpAbo)?.format(dateFormatter),
-            avatarUrl = row.getOrNull(Profiles.avatarUrl)
+            id = row[Utilisateur.userId].toString(),
+            email = row[Utilisateur.email],
+            userRole = row.getOrNull(Utilisateur.userRole) ?: "CLIENT",
+            profileId = row.getOrNull(Utilisateur.id),
+            firstName = row[Utilisateur.firstName],
+            lastName = row[Utilisateur.lastName],
+            phoneNumber = row.getOrNull(Utilisateur.phoneNumber),
+            dateOfBirth = row.getOrNull(Utilisateur.dateOfBirth)?.format(dateFormatter),
+            typeAbo = row.getOrNull(Utilisateur.typeAbo),
+            dateDebAbo = row.getOrNull(Utilisateur.dateDebAbo)?.format(dateFormatter),
+            dateExpAbo = row.getOrNull(Utilisateur.dateExpAbo)?.format(dateFormatter),
+            avatarUrl = row.getOrNull(Utilisateur.avatarUrl)
         )
     }
 }

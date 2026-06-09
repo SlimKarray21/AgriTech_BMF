@@ -1,8 +1,7 @@
 package com.pistoncontrol.application.service
 
 import com.pistoncontrol.infrastructure.persistence.DatabaseFactory.dbQuery
-import com.pistoncontrol.infrastructure.persistence.Users
-import com.pistoncontrol.infrastructure.persistence.Profiles
+import com.pistoncontrol.infrastructure.persistence.Utilisateur
 import com.pistoncontrol.infrastructure.persistence.Devices
 import com.pistoncontrol.infrastructure.persistence.Schedules
 import com.pistoncontrol.infrastructure.persistence.Telemetry
@@ -49,27 +48,26 @@ class AdminService(
      */
     suspend fun getAllUsers(limit: Int = 100, offset: Long = 0): List<User> {
         return dbQuery {
-            Users.join(Profiles, org.jetbrains.exposed.sql.JoinType.LEFT, onColumn = Users.id, otherColumn = Profiles.userId)
-                .selectAll()
+            Utilisateur.selectAll()
                 .limit(limit, offset)
-                .orderBy(Users.createdAt to SortOrder.DESC)
+                .orderBy(Utilisateur.createdAt to SortOrder.DESC)
                 .map { row ->
                     User(
-                        id = row[Users.id].toString(),
-                        email = row[Users.email],
-                        firstName = row[Users.firstName],
-                        lastName = row[Users.lastName],
-                        createdAt = row[Users.createdAt].toString(),
-                        userRole = row.getOrNull(Profiles.userRole) ?: "CLIENT",
-                        phoneNumber = row.getOrNull(Profiles.phoneNumber),
-                        dateOfBirth = row.getOrNull(Profiles.dateOfBirth)?.toString(),
-                        typeAbo = row.getOrNull(Profiles.typeAbo),
-                        createdBy = row.getOrNull(Profiles.createdBy),
-                        companyName = row.getOrNull(Profiles.companyName),
-                        companyLogo = row.getOrNull(Profiles.companyLogo),
-                        avatarUrl = row.getOrNull(Profiles.avatarUrl),
-                        emailVerified = row[Users.emailVerified],
-                        profileId = row.getOrNull(Profiles.id)
+                        id = row[Utilisateur.userId].toString(),
+                        email = row[Utilisateur.email],
+                        firstName = row[Utilisateur.firstName],
+                        lastName = row[Utilisateur.lastName],
+                        createdAt = row[Utilisateur.createdAt].toString(),
+                        userRole = row.getOrNull(Utilisateur.userRole) ?: "CLIENT",
+                        phoneNumber = row.getOrNull(Utilisateur.phoneNumber),
+                        dateOfBirth = row.getOrNull(Utilisateur.dateOfBirth)?.toString(),
+                        typeAbo = row.getOrNull(Utilisateur.typeAbo),
+                        createdBy = row.getOrNull(Utilisateur.createdBy),
+                        companyName = row.getOrNull(Utilisateur.companyName),
+                        companyLogo = row.getOrNull(Utilisateur.companyLogo),
+                        avatarUrl = row.getOrNull(Utilisateur.avatarUrl),
+                        emailVerified = row[Utilisateur.emailVerified],
+                        profileId = row.getOrNull(Utilisateur.id)
                     )
                 }
         }
@@ -83,26 +81,25 @@ class AdminService(
      */
     suspend fun getUserById(userId: UUID): User? {
         return dbQuery {
-            Users.join(Profiles, org.jetbrains.exposed.sql.JoinType.LEFT, onColumn = Users.id, otherColumn = Profiles.userId)
-                .select { Users.id eq userId }
+            Utilisateur.select { Utilisateur.userId eq userId }
                 .singleOrNull()
                 ?.let { row ->
                     User(
-                        id = row[Users.id].toString(),
-                        email = row[Users.email],
-                        firstName = row[Users.firstName],
-                        lastName = row[Users.lastName],
-                        createdAt = row[Users.createdAt].toString(),
-                        userRole = row.getOrNull(Profiles.userRole) ?: "CLIENT",
-                        phoneNumber = row.getOrNull(Profiles.phoneNumber),
-                        dateOfBirth = row.getOrNull(Profiles.dateOfBirth)?.toString(),
-                        typeAbo = row.getOrNull(Profiles.typeAbo),
-                        createdBy = row.getOrNull(Profiles.createdBy),
-                        companyName = row.getOrNull(Profiles.companyName),
-                        companyLogo = row.getOrNull(Profiles.companyLogo),
-                        avatarUrl = row.getOrNull(Profiles.avatarUrl),
-                        emailVerified = row[Users.emailVerified],
-                        profileId = row.getOrNull(Profiles.id)
+                        id = row[Utilisateur.userId].toString(),
+                        email = row[Utilisateur.email],
+                        firstName = row[Utilisateur.firstName],
+                        lastName = row[Utilisateur.lastName],
+                        createdAt = row[Utilisateur.createdAt].toString(),
+                        userRole = row.getOrNull(Utilisateur.userRole) ?: "CLIENT",
+                        phoneNumber = row.getOrNull(Utilisateur.phoneNumber),
+                        dateOfBirth = row.getOrNull(Utilisateur.dateOfBirth)?.toString(),
+                        typeAbo = row.getOrNull(Utilisateur.typeAbo),
+                        createdBy = row.getOrNull(Utilisateur.createdBy),
+                        companyName = row.getOrNull(Utilisateur.companyName),
+                        companyLogo = row.getOrNull(Utilisateur.companyLogo),
+                        avatarUrl = row.getOrNull(Utilisateur.avatarUrl),
+                        emailVerified = row[Utilisateur.emailVerified],
+                        profileId = row.getOrNull(Utilisateur.id)
                     )
                 }
         }
@@ -129,7 +126,7 @@ class AdminService(
         }
 
         val oldRole = dbQuery {
-            Profiles.select { Profiles.userId eq targetUserId }.singleOrNull()?.get(Profiles.userRole)
+            Utilisateur.select { Utilisateur.userId eq targetUserId }.singleOrNull()?.get(Utilisateur.userRole)
         }
 
         if (oldRole == null) {
@@ -137,9 +134,9 @@ class AdminService(
         }
 
         val updated = dbQuery {
-            Profiles.update({ Profiles.userId eq targetUserId }) {
-                it[Profiles.userRole] = normalizedRole
-                it[Profiles.updatedAt] = Instant.now()
+            Utilisateur.update({ Utilisateur.userId eq targetUserId }) {
+                it[Utilisateur.userRole] = normalizedRole
+                it[Utilisateur.updatedAt] = Instant.now()
             }
         }
 
@@ -181,7 +178,7 @@ class AdminService(
 
         // Get user details for audit log
         val user = dbQuery {
-            Users.select { Users.id eq targetUserId }
+            Utilisateur.select { Utilisateur.userId eq targetUserId }
                 .singleOrNull()
         }
 
@@ -189,7 +186,7 @@ class AdminService(
             return AdminResult.Failure("User not found", statusCode = 404)
         }
 
-        val userEmail = user[Users.email]
+        val userEmail = user[Utilisateur.email]
 
         // Log the action BEFORE deleting the user
         // This is critical because audit_logs.target_user_id has a foreign key constraint
@@ -206,7 +203,7 @@ class AdminService(
 
         // Delete user
         val deleted = dbQuery {
-            Users.deleteWhere { Users.id eq targetUserId }
+            Utilisateur.deleteWhere { Utilisateur.userId eq targetUserId }
         }
 
         if (deleted == 0) {
@@ -230,8 +227,8 @@ class AdminService(
         )
 
         val stats = dbQuery {
-            val totalUsers = Users.selectAll().count()
-            val totalAdmins = Profiles.select { Profiles.userRole eq "ADMIN" }.count()
+            val totalUsers = Utilisateur.selectAll().count()
+            val totalAdmins = Utilisateur.select { Utilisateur.userRole eq "ADMIN" }.count()
             val totalDevices = Devices.selectAll().count()
             val totalSchedules = Schedules.selectAll().count()
 
@@ -255,7 +252,7 @@ class AdminService(
      */
     suspend fun getUserCount(): Long {
         return dbQuery {
-            Users.selectAll().count()
+            Utilisateur.selectAll().count()
         }
     }
 
@@ -520,7 +517,7 @@ class AdminService(
 
         // Verify target user exists
         val targetUser = dbQuery {
-            Users.select { Users.id eq targetUserId }
+            Utilisateur.select { Utilisateur.userId eq targetUserId }
                 .singleOrNull()
         }
 
@@ -572,7 +569,7 @@ class AdminService(
 
         // Verify target user exists
         val targetUser = dbQuery {
-            Users.select { Users.id eq targetUserId }
+            Utilisateur.select { Utilisateur.userId eq targetUserId }
                 .singleOrNull()
         }
 
@@ -580,7 +577,7 @@ class AdminService(
             return AdminResult.Failure("User not found", statusCode = 404)
         }
 
-        val userEmail = targetUser[Users.email]
+        val userEmail = targetUser[Utilisateur.email]
 
         // Get all device IDs for the user
         val userDeviceIds = dbQuery {

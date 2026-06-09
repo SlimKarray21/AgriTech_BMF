@@ -147,6 +147,26 @@ fun Route.authRoutes(jwtSecret: String, jwtIssuer: String, jwtAudience: String, 
             }
         }
 
+        // Mot de passe oublié : réinitialisation directe (sans email/OTP).
+        post("/reset-password") {
+            try {
+                val request = call.receive<ResetPasswordRequest>()
+                when (val result = authService.resetPassword(request.email, request.newPassword)) {
+                    is AuthService.AuthResult.VerificationRequired -> {
+                        call.respond(HttpStatusCode.OK, mapOf("message" to result.message))
+                    }
+                    is AuthService.AuthResult.Failure -> {
+                        call.respond(HttpStatusCode.fromValue(result.statusCode), ErrorResponse(result.error))
+                    }
+                    is AuthService.AuthResult.Success -> {
+                        call.respond(HttpStatusCode.OK, mapOf("message" to "Mot de passe réinitialisé avec succès."))
+                    }
+                }
+            } catch (e: Exception) {
+                call.respond(HttpStatusCode.InternalServerError, ErrorResponse("Reset failed: ${e.message}"))
+            }
+        }
+
         post("/verify-email") {
             try {
                 val request = call.receive<VerifyEmailRequest>()

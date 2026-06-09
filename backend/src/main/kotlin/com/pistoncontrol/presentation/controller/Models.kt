@@ -38,6 +38,9 @@ data class ErrorResponse(
 }
 
 @Serializable
+data class ResetPasswordRequest(val email: String, val newPassword: String)
+
+@Serializable
 data class VerifyEmailRequest(val userId: String, val code: String)
 
 @Serializable

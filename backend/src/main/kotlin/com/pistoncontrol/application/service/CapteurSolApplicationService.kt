@@ -29,6 +29,9 @@ class CapteurSolApplicationService(
     suspend fun listParcellesForPartenaire(partenaireProfileId: Long): List<Parcelle> =
         delegate.listParcellesForPartenaire(partenaireProfileId)
 
+    suspend fun isParcelleInPartenaireScope(parcelId: Long, partenaireProfileId: Long): Boolean =
+        delegate.isParcelleInPartenaireScope(parcelId, partenaireProfileId)
+
     suspend fun createParcelle(input: CreateParcelleInput): Parcelle = delegate.createParcelle(input)
 
     suspend fun getParcelleDetails(id: Long, userId: Long? = null): ParcelleDetails? =

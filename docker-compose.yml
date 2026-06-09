@@ -2,7 +2,7 @@ services:
   # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
-    container_name: piston-postgres
+    container_name: agritech-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: piston_control
@@ -27,7 +27,7 @@ services:
   # Mosquitto MQTT Broker
   mosquitto:
     image: eclipse-mosquitto:2.0.18
-    container_name: piston-mosquitto
+    container_name: agritech-mosquitto
     restart: unless-stopped
     user: "1883:1883"
     volumes:
@@ -56,7 +56,7 @@ services:
         - BUILD_DATE=${BUILD_DATE:-now}
         - VCS_REF=${VCS_REF:-dev}
     image: zizyp/vannecontrol-backend:latest
-    container_name: piston-backend
+    container_name: agritech-backend
     restart: unless-stopped
     environment:
       DATABASE_URL: jdbc:postgresql://postgres:5432/piston_control
@@ -99,7 +99,7 @@ services:
   # Nginx Reverse Proxy
   nginx:
     image: nginx:1.25-alpine
-    container_name: piston-nginx
+    container_name: agritech-nginx
     restart: unless-stopped
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
@@ -122,7 +122,7 @@ services:
   # Mailpit (local SMTP server for development)
   mailpit:
     image: axllent/mailpit:latest
-    container_name: piston-mailpit
+    container_name: agritech-mailpit
     restart: unless-stopped
     ports:
       - "8025:8025"   # Web UI
@@ -133,7 +133,7 @@ services:
   # Redis Cache
   redis:
     image: redis:7.2-alpine
-    container_name: piston-redis
+    container_name: agritech-redis
     restart: unless-stopped
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     volumes:
@@ -157,7 +157,7 @@ services:
         # Figée au build (Vite). URL du backend appelée depuis le navigateur.
         - VITE_API_BASE_URL=${ADMIN_API_BASE_URL:-http://localhost:8080}
     image: zizyp/vannecontrol-admin:latest
-    container_name: piston-admin
+    container_name: agritech-admin
     restart: unless-stopped
     ports:
       # Port hôte configurable (défaut 8082) pour éviter les conflits :

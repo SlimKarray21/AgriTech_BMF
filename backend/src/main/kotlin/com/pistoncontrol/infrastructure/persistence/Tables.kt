@@ -4,15 +4,35 @@ import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.date
 import org.jetbrains.exposed.sql.javatime.timestamp
 
-object Users : Table("users") {
-    val id = uuid("id").autoGenerate()
+// ─────────────────────────────────────────────────────────────────────────────
+// Table UNIQUE "Utilisateur" = fusion des anciennes tables users + profiles.
+//   - id        : bigint  (PK physique, ancienne profiles.id)
+//   - userId    : uuid    (identité d'authentification, ancienne users.id)
+//   - colonnes d'auth (password_hash, email_verified) + colonnes de profil
+//     (user_role, abonnement, entreprise, coordonnées) sur la MÊME ligne.
+// ─────────────────────────────────────────────────────────────────────────────
+object Utilisateur : Table("utilisateur") {
+    val id = long("id").autoIncrement()                 // PK bigint (ex-profiles.id)
+    val userId = uuid("user_id")                        // identité auth (ex-users.id)
     val email = text("email")
-    val passwordHash = text("password_hash")
+    val passwordHash = text("password_hash").nullable()
+    val emailVerified = bool("email_verified").default(false)
     val firstName = text("first_name")
     val lastName = text("last_name")
+    val avatarUrl = text("avatar_url").nullable()
+    val userRole = text("user_role")
+    val phoneNumber = text("phone_number").nullable()
+    val country = text("country").nullable()
+    val city = text("city").nullable()
+    val dateOfBirth = date("date_of_birth").nullable()
+    val dateDebAbo = date("date_deb_abo").nullable()
+    val dateExpAbo = date("date_exp_abo").nullable()
+    val typeAbo = text("type_abo").nullable()
+    val createdBy = long("created_by").nullable()
+    val companyName = text("company_name").nullable()
+    val companyLogo = text("company_logo").nullable()
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at")
-    val emailVerified = bool("email_verified").default(false)
 
     override val primaryKey = PrimaryKey(id)
 }
@@ -106,11 +126,8 @@ object EmailVerificationCodes : Table("email_verification_codes") {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CapteurSol tables (intégrées ici pour avoir un seul fichier Tables.kt)
+// CapteurSol tables
 // ─────────────────────────────────────────────────────────────────────────────
-// NOTE:
-// - Ces tables existaient déjà dans `com.pistoncontrol.infrastructure.persistence.capteursol.Tables`.
-// - On les copie ici dans `com.pistoncontrol.infrastructure.persistence` pour faciliter l’intégration.
 
 object RapportSol : Table("rapport_sol") {
     val id = long("id").autoIncrement()
@@ -208,30 +225,6 @@ object ClimatsExpo : Table("climats_expo") {
     val vitesseVent = double("vitesse_vent")
     val puissanceEnsoleillement = double("puissance_ensoleillement")
     val createdAt = timestamp("created_at")
-
-    override val primaryKey = PrimaryKey(id)
-}
-
-object Profiles : Table("profiles") {
-    val id = long("id").autoIncrement()
-    val userId = uuid("user_id").references(Users.id)
-    val firstName = text("first_name")
-    val lastName = text("last_name")
-    val avatarUrl = text("avatar_url").nullable()
-    val createdAt = timestamp("created_at")
-    val updatedAt = timestamp("updated_at")
-    val userRole = text("user_role")
-    val phoneNumber = text("phone_number").nullable()
-    val country = text("country").nullable()
-    val city = text("city").nullable()
-    val dateOfBirth = date("date_of_birth").nullable()
-    val dateDebAbo = date("date_deb_abo").nullable()
-    val dateExpAbo = date("date_exp_abo").nullable()
-    val typeAbo = text("type_abo").nullable()
-    val email = text("email")
-    val createdBy = long("created_by").nullable()
-    val companyName = text("company_name").nullable()
-    val companyLogo = text("company_logo").nullable()
 
     override val primaryKey = PrimaryKey(id)
 }

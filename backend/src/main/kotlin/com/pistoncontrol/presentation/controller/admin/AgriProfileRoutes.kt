@@ -1,9 +1,8 @@
 package com.pistoncontrol.presentation.controller.admin
 
 import com.pistoncontrol.infrastructure.persistence.ClimatsExpo
-import com.pistoncontrol.infrastructure.persistence.Profiles
+import com.pistoncontrol.infrastructure.persistence.Utilisateur
 import com.pistoncontrol.infrastructure.persistence.SolExpo
-import com.pistoncontrol.infrastructure.persistence.TypePlante
 import com.pistoncontrol.presentation.controller.ErrorResponse
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -24,10 +23,10 @@ fun Route.profilesRoutes() {
             val email = body["email"]?.jsonPrimitive?.contentOrNull
                 ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("email required"))
             transaction {
-                val existing = Profiles.select { Profiles.email eq email }.singleOrNull()
+                val existing = Utilisateur.select { Utilisateur.email eq email }.singleOrNull()
                 if (existing != null) {
                     body["created_by"]?.jsonPrimitive?.longOrNull?.let { cb ->
-                        Profiles.update({ Profiles.email eq email }) { it[Profiles.createdBy] = cb }
+                        Utilisateur.update({ Utilisateur.email eq email }) { it[Utilisateur.createdBy] = cb }
                     }
                     call.response.status(HttpStatusCode.OK)
                 } else {
@@ -38,27 +37,27 @@ fun Route.profilesRoutes() {
         }
         get {
             val rows = transaction {
-                Profiles.selectAll().map {
+                Utilisateur.selectAll().map {
                     buildJsonObject {
-                        put("id",            it[Profiles.id])
-                        put("user_id",       it[Profiles.userId].toString())
-                        put("email",         it[Profiles.email])
-                        put("first_name",    it[Profiles.firstName])
-                        put("last_name",     it[Profiles.lastName])
-                        put("user_role",     it[Profiles.userRole])
-                        put("phone_number",  it[Profiles.phoneNumber])
-                        put("country",       it[Profiles.country])
-                        put("city",          it[Profiles.city])
-                        put("avatar_url",    it[Profiles.avatarUrl])
-                        put("date_of_birth", it[Profiles.dateOfBirth]?.toString())
-                        put("date_deb_abo",  it[Profiles.dateDebAbo]?.toString())
-                        put("date_exp_abo",  it[Profiles.dateExpAbo]?.toString())
-                        put("type_abo",      it[Profiles.typeAbo])
-                        put("company_name",  it[Profiles.companyName])
-                        put("company_logo",  it[Profiles.companyLogo])
-                        put("created_by",    it[Profiles.createdBy])
-                        put("created_at",    it[Profiles.createdAt].toString())
-                        put("updated_at",    it[Profiles.updatedAt].toString())
+                        put("id",            it[Utilisateur.id])
+                        put("user_id",       it[Utilisateur.userId].toString())
+                        put("email",         it[Utilisateur.email])
+                        put("first_name",    it[Utilisateur.firstName])
+                        put("last_name",     it[Utilisateur.lastName])
+                        put("user_role",     it[Utilisateur.userRole])
+                        put("phone_number",  it[Utilisateur.phoneNumber])
+                        put("country",       it[Utilisateur.country])
+                        put("city",          it[Utilisateur.city])
+                        put("avatar_url",    it[Utilisateur.avatarUrl])
+                        put("date_of_birth", it[Utilisateur.dateOfBirth]?.toString())
+                        put("date_deb_abo",  it[Utilisateur.dateDebAbo]?.toString())
+                        put("date_exp_abo",  it[Utilisateur.dateExpAbo]?.toString())
+                        put("type_abo",      it[Utilisateur.typeAbo])
+                        put("company_name",  it[Utilisateur.companyName])
+                        put("company_logo",  it[Utilisateur.companyLogo])
+                        put("created_by",    it[Utilisateur.createdBy])
+                        put("created_at",    it[Utilisateur.createdAt].toString())
+                        put("updated_at",    it[Utilisateur.updatedAt].toString())
                     }
                 }
             }
@@ -68,15 +67,15 @@ fun Route.profilesRoutes() {
             val id = call.parameters["id"]?.toLongOrNull()
                 ?: return@get call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid id"))
             val row = transaction {
-                Profiles.select { Profiles.id eq id }.firstOrNull()?.let {
+                Utilisateur.select { Utilisateur.id eq id }.firstOrNull()?.let {
                     buildJsonObject {
-                        put("id",         it[Profiles.id])
-                        put("user_id",    it[Profiles.userId].toString())
-                        put("email",      it[Profiles.email])
-                        put("first_name", it[Profiles.firstName])
-                        put("last_name",  it[Profiles.lastName])
-                        put("user_role",  it[Profiles.userRole])
-                        put("type_abo",   it[Profiles.typeAbo])
+                        put("id",         it[Utilisateur.id])
+                        put("user_id",    it[Utilisateur.userId].toString())
+                        put("email",      it[Utilisateur.email])
+                        put("first_name", it[Utilisateur.firstName])
+                        put("last_name",  it[Utilisateur.lastName])
+                        put("user_role",  it[Utilisateur.userRole])
+                        put("type_abo",   it[Utilisateur.typeAbo])
                     }
                 }
             }
@@ -88,29 +87,29 @@ fun Route.profilesRoutes() {
                 ?: return@patch call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid id"))
             val body = call.receive<JsonObject>()
             transaction {
-                Profiles.update({ Profiles.id eq id }) {
-                    body["first_name"]?.jsonPrimitive?.contentOrNull?.let    { v -> it[Profiles.firstName]   = v }
-                    body["last_name"]?.jsonPrimitive?.contentOrNull?.let     { v -> it[Profiles.lastName]    = v }
-                    body["user_role"]?.jsonPrimitive?.contentOrNull?.let     { v -> it[Profiles.userRole]    = v }
-                    body["phone_number"]?.jsonPrimitive?.contentOrNull?.let  { v -> it[Profiles.phoneNumber] = v }
-                    body["country"]?.jsonPrimitive?.contentOrNull?.let       { v -> it[Profiles.country]     = v }
-                    body["city"]?.jsonPrimitive?.contentOrNull?.let          { v -> it[Profiles.city]        = v }
-                    body["email"]?.jsonPrimitive?.contentOrNull?.let         { v -> it[Profiles.email]       = v }
+                Utilisateur.update({ Utilisateur.id eq id }) {
+                    body["first_name"]?.jsonPrimitive?.contentOrNull?.let    { v -> it[Utilisateur.firstName]   = v }
+                    body["last_name"]?.jsonPrimitive?.contentOrNull?.let     { v -> it[Utilisateur.lastName]    = v }
+                    body["user_role"]?.jsonPrimitive?.contentOrNull?.let     { v -> it[Utilisateur.userRole]    = v }
+                    body["phone_number"]?.jsonPrimitive?.contentOrNull?.let  { v -> it[Utilisateur.phoneNumber] = v }
+                    body["country"]?.jsonPrimitive?.contentOrNull?.let       { v -> it[Utilisateur.country]     = v }
+                    body["city"]?.jsonPrimitive?.contentOrNull?.let          { v -> it[Utilisateur.city]        = v }
+                    body["email"]?.jsonPrimitive?.contentOrNull?.let         { v -> it[Utilisateur.email]       = v }
                     if (body.containsKey("type_abo"))
-                        it[Profiles.typeAbo] = body["type_abo"]?.jsonPrimitive?.contentOrNull
-                    body["company_name"]?.jsonPrimitive?.contentOrNull?.let  { v -> it[Profiles.companyName] = v }
-                    body["company_logo"]?.jsonPrimitive?.contentOrNull?.let  { v -> it[Profiles.companyLogo] = v }
-                    body["avatar_url"]?.jsonPrimitive?.contentOrNull?.let    { v -> it[Profiles.avatarUrl]   = v }
+                        it[Utilisateur.typeAbo] = body["type_abo"]?.jsonPrimitive?.contentOrNull
+                    body["company_name"]?.jsonPrimitive?.contentOrNull?.let  { v -> it[Utilisateur.companyName] = v }
+                    body["company_logo"]?.jsonPrimitive?.contentOrNull?.let  { v -> it[Utilisateur.companyLogo] = v }
+                    body["avatar_url"]?.jsonPrimitive?.contentOrNull?.let    { v -> it[Utilisateur.avatarUrl]   = v }
                     if (body.containsKey("date_deb_abo"))
-                        it[Profiles.dateDebAbo] = body["date_deb_abo"]?.jsonPrimitive?.contentOrNull
+                        it[Utilisateur.dateDebAbo] = body["date_deb_abo"]?.jsonPrimitive?.contentOrNull
                             ?.let { v -> runCatching { LocalDate.parse(v) }.getOrNull() }
                     if (body.containsKey("date_exp_abo"))
-                        it[Profiles.dateExpAbo] = body["date_exp_abo"]?.jsonPrimitive?.contentOrNull
+                        it[Utilisateur.dateExpAbo] = body["date_exp_abo"]?.jsonPrimitive?.contentOrNull
                             ?.let { v -> runCatching { LocalDate.parse(v) }.getOrNull() }
                     if (body.containsKey("created_by")) {
-                        it[Profiles.createdBy] = body["created_by"]?.jsonPrimitive?.longOrNull
+                        it[Utilisateur.createdBy] = body["created_by"]?.jsonPrimitive?.longOrNull
                     }
-                    it[Profiles.updatedAt] = Instant.now()
+                    it[Utilisateur.updatedAt] = Instant.now()
                 }
             }
             call.respond(HttpStatusCode.OK, mapOf("message" to "Updated"))
@@ -118,63 +117,14 @@ fun Route.profilesRoutes() {
         delete("/{id}") {
             val id = call.parameters["id"]?.toLongOrNull()
                 ?: return@delete call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid id"))
-            val count = transaction { Profiles.deleteWhere { Profiles.id eq id } }
+            val count = transaction { Utilisateur.deleteWhere { Utilisateur.id eq id } }
             if (count == 0) call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
             else call.respond(HttpStatusCode.OK, mapOf("message" to "Deleted"))
         }
     }
 }
 
-fun Route.typePlanteRoutes() {
-    route("/type-plante") {
-        get {
-            val rows = transaction {
-                TypePlante.selectAll().map {
-                    buildJsonObject {
-                        put("id",                    it[TypePlante.id])
-                        put("nom_plante",            it[TypePlante.nomPlante])
-                        put("type_plante",           it[TypePlante.typePlante])
-                        put("besoin_eau_par_plante", it[TypePlante.besoinEauParPlante])
-                        put("created_at",            it[TypePlante.createdAt].toString())
-                    }
-                }
-            }
-            call.respond(HttpStatusCode.OK, buildJsonArray { rows.forEach { add(it) } })
-        }
-        post {
-            val body = call.receive<JsonObject>()
-            val newId = transaction {
-                TypePlante.insert {
-                    it[nomPlante]          = body["nom_plante"]?.jsonPrimitive?.content ?: ""
-                    it[typePlante]         = body["type_plante"]?.jsonPrimitive?.content ?: ""
-                    it[besoinEauParPlante] = body["besoin_eau_par_plante"]?.jsonPrimitive?.double ?: 0.0
-                    it[createdAt]          = Instant.now()
-                }[TypePlante.id]
-            }
-            call.respond(HttpStatusCode.Created, buildJsonObject { put("id", newId) })
-        }
-        patch("/{id}") {
-            val id = call.parameters["id"]?.toLongOrNull()
-                ?: return@patch call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid id"))
-            val body = call.receive<JsonObject>()
-            transaction {
-                TypePlante.update({ TypePlante.id eq id }) {
-                    body["nom_plante"]?.jsonPrimitive?.contentOrNull?.let           { v -> it[TypePlante.nomPlante]          = v }
-                    body["type_plante"]?.jsonPrimitive?.contentOrNull?.let          { v -> it[TypePlante.typePlante]         = v }
-                    body["besoin_eau_par_plante"]?.jsonPrimitive?.doubleOrNull?.let { v -> it[TypePlante.besoinEauParPlante] = v }
-                }
-            }
-            call.respond(HttpStatusCode.OK, mapOf("message" to "Updated"))
-        }
-        delete("/{id}") {
-            val id = call.parameters["id"]?.toLongOrNull()
-                ?: return@delete call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid id"))
-            val count = transaction { TypePlante.deleteWhere { TypePlante.id eq id } }
-            if (count == 0) call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
-            else call.respond(HttpStatusCode.OK, mapOf("message" to "Deleted"))
-        }
-    }
-}
+// typePlanteRoutes() supprimé : table type_plante retirée du schéma.
 
 fun Route.solsRoutes() {
     route("/sols") {

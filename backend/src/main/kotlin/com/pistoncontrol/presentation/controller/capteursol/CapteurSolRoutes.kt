@@ -215,7 +215,15 @@ fun Route.capteurSolRoutes(service: CapteurSolApplicationService = CapteurSolApp
                     ?: return@get call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid parcelle id"))
                 val capteurUserId = authenticatedCapteurUserId(call, service) ?: return@get
                 val isAdmin = call.isAdminJwt()
-                val data = service.getParcelleDetails(parcelId, if (isAdmin) null else capteurUserId)
+                val role = call.jwtPrincipal()?.payload?.getClaim("role")?.asString()?.uppercase()
+                // Cohérent avec GET /parcelles : admin voit tout, partenaire voit ses
+                // parcelles + celles de ses clients, client voit uniquement les siennes.
+                val ownerFilter = when {
+                    isAdmin -> null
+                    role == "PARTENAIRE" && service.isParcelleInPartenaireScope(parcelId, capteurUserId) -> null
+                    else -> capteurUserId
+                }
+                val data = service.getParcelleDetails(parcelId, ownerFilter)
                 if (data == null) {
                     call.respond(HttpStatusCode.NotFound, ErrorResponse("Parcelle not found"))
                 } else {
@@ -228,10 +236,16 @@ fun Route.capteurSolRoutes(service: CapteurSolApplicationService = CapteurSolApp
                     ?: return@patch call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid parcelle id"))
                 val capteurUserId = authenticatedCapteurUserId(call, service) ?: return@patch
                 val isAdmin = call.isAdminJwt()
+                val role = call.jwtPrincipal()?.payload?.getClaim("role")?.asString()?.uppercase()
+                val ownerFilter = when {
+                    isAdmin -> null
+                    role == "PARTENAIRE" && service.isParcelleInPartenaireScope(parcelId, capteurUserId) -> null
+                    else -> capteurUserId
+                }
                 val body = call.receive<UpdateParcelleRequest>()
                 val updated = service.updateParcelle(
                     id = parcelId,
-                    ownerUserId = if (isAdmin) null else capteurUserId,
+                    ownerUserId = ownerFilter,
                     input = UpdateParcelleInput(
                         nomSurface = body.nomSurface,
                         localisation = body.localisation,
@@ -254,7 +268,15 @@ fun Route.capteurSolRoutes(service: CapteurSolApplicationService = CapteurSolApp
                     ?: return@delete call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid parcelle id"))
                 val capteurUserId = authenticatedCapteurUserId(call, service) ?: return@delete
                 val isAdmin = call.isAdminJwt()
-                val deleted = service.deleteParcelle(parcelId, if (isAdmin) null else capteurUserId)
+                val role = call.jwtPrincipal()?.payload?.getClaim("role")?.asString()?.uppercase()
+                // Admin : toutes les parcelles. Partenaire : ses parcelles + celles de ses clients.
+                // Client : uniquement les siennes (filtre par capteurUserId).
+                val ownerFilter = when {
+                    isAdmin -> null
+                    role == "PARTENAIRE" && service.isParcelleInPartenaireScope(parcelId, capteurUserId) -> null
+                    else -> capteurUserId
+                }
+                val deleted = service.deleteParcelle(parcelId, ownerFilter)
                 if (!deleted) {
                     call.respond(HttpStatusCode.NotFound, ErrorResponse("Parcelle not found"))
                 } else {
@@ -267,7 +289,13 @@ fun Route.capteurSolRoutes(service: CapteurSolApplicationService = CapteurSolApp
                     ?: return@get call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid parcelle id"))
                 val capteurUserId = authenticatedCapteurUserId(call, service) ?: return@get
                 val isAdmin = call.isAdminJwt()
-                val data = service.listVannes(parcelId = parcelId, userId = if (isAdmin) null else capteurUserId)
+                val role = call.jwtPrincipal()?.payload?.getClaim("role")?.asString()?.uppercase()
+                val ownerFilter = when {
+                    isAdmin -> null
+                    role == "PARTENAIRE" && service.isParcelleInPartenaireScope(parcelId, capteurUserId) -> null
+                    else -> capteurUserId
+                }
+                val data = service.listVannes(parcelId = parcelId, userId = ownerFilter)
                 call.respond(HttpStatusCode.OK, data)
             }
 
@@ -276,7 +304,14 @@ fun Route.capteurSolRoutes(service: CapteurSolApplicationService = CapteurSolApp
                     ?: return@get call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid parcelle id"))
                 val capteurUserId = authenticatedCapteurUserId(call, service) ?: return@get
                 val isAdmin = call.isAdminJwt()
-                val ownedParcelle = service.getParcelleDetails(parcelId, if (isAdmin) null else capteurUserId)
+                val role = call.jwtPrincipal()?.payload?.getClaim("role")?.asString()?.uppercase()
+                // Admin : toutes les parcelles. Partenaire : ses parcelles + celles de ses clients.
+                val ownerFilter = when {
+                    isAdmin -> null
+                    role == "PARTENAIRE" && service.isParcelleInPartenaireScope(parcelId, capteurUserId) -> null
+                    else -> capteurUserId
+                }
+                val ownedParcelle = service.getParcelleDetails(parcelId, ownerFilter)
                 if (ownedParcelle == null) {
                     call.respond(HttpStatusCode.NotFound, ErrorResponse("Parcelle not found"))
                 } else {
