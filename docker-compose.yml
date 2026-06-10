@@ -55,7 +55,7 @@ services:
       args:
         - BUILD_DATE=${BUILD_DATE:-now}
         - VCS_REF=${VCS_REF:-dev}
-    image: zizyp/vannecontrol-backend:latest
+    image: slimkarray01/vannecontrol-backend:latest
     container_name: agritech-backend
     restart: unless-stopped
     environment:
@@ -156,7 +156,7 @@ services:
       args:
         # Figée au build (Vite). URL du backend appelée depuis le navigateur.
         - VITE_API_BASE_URL=${ADMIN_API_BASE_URL:-http://localhost:8080}
-    image: zizyp/vannecontrol-admin:latest
+    image: slimkarray01/vannecontrol-admin:latest
     container_name: agritech-admin
     restart: unless-stopped
     ports:
