@@ -1,6 +1,7 @@
 package com.pistoncontrol.presentation.controller.capteursol
 
 import com.pistoncontrol.application.service.CapteurSolApplicationService
+import com.pistoncontrol.infrastructure.messaging.mqtt.MqttManager
 import com.pistoncontrol.application.service.capteursol.CreateParcelleInput
 import com.pistoncontrol.application.service.capteursol.CreateParcelleWizardInput
 import com.pistoncontrol.application.service.capteursol.CreateRapportEauInput
@@ -94,7 +95,7 @@ private suspend fun authenticatedCapteurUserId(call: ApplicationCall, service: C
     return capteurUserId
 }
 
-fun Route.capteurSolRoutes(service: CapteurSolApplicationService = CapteurSolApplicationService()) {
+fun Route.capteurSolRoutes(mqttManager: MqttManager? = null, service: CapteurSolApplicationService = CapteurSolApplicationService(mqttManager)) {
     authenticate("auth-jwt") {
         route("/wizard") {
             post("/parcelles") {
@@ -350,6 +351,8 @@ fun Route.capteurSolRoutes(service: CapteurSolApplicationService = CapteurSolApp
                         scheduleDays = body.scheduleDays,
                         scheduleStart = body.scheduleStart,
                         scheduleEnd = body.scheduleEnd,
+                        deviceId = body.deviceId?.let { runCatching { java.util.UUID.fromString(it) }.getOrNull() },
+                        pistonNumber = body.pistonNumber,
                     ),
                     skipOwnerCheck = isAdmin,
                 )
@@ -380,6 +383,8 @@ fun Route.capteurSolRoutes(service: CapteurSolApplicationService = CapteurSolApp
                         scheduleDays = body.scheduleDays,
                         scheduleStart = body.scheduleStart,
                         scheduleEnd = body.scheduleEnd,
+                        deviceId = body.deviceId?.let { runCatching { java.util.UUID.fromString(it) }.getOrNull() },
+                        pistonNumber = body.pistonNumber,
                     )
                 )
                 if (updated == null) {

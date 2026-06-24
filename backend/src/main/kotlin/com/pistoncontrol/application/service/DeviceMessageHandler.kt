@@ -54,49 +54,37 @@ class DeviceMessageHandler {
         
         dbQuery {
             val deviceUuid = UUID.fromString(message.deviceId)
-            
-            // Find existing piston
-            val pistonRecord = Pistons.select {
-                (Pistons.deviceId eq deviceUuid) and
-                (Pistons.pistonNumber eq payload.pistonNumber)
-            }.singleOrNull()
-            
-            if (pistonRecord == null) {
-                // Create new piston
-                Pistons.insert {
-                    it[deviceId] = deviceUuid
-                    it[pistonNumber] = payload.pistonNumber
-                    it[state] = if (payload.isActive) "active" else "inactive"
-                    it[lastTriggered] = Instant.ofEpochMilli(payload.timestamp)
-                }
-                logger.info { "Created piston ${payload.pistonNumber} for device ${message.deviceId}" }
+            val isOpenValue = payload.isActive
+            val ts = Instant.ofEpochMilli(payload.timestamp)
+
+            // Synchroniser la vanne correspondante (device + numéro de piston)
+            val updated = Vannes.update({
+                (Vannes.deviceId eq deviceUuid) and
+                (Vannes.pistonNumber eq payload.pistonNumber)
+            }) {
+                it[Vannes.isOpen] = isOpenValue
+                it[Vannes.lastAction] = if (isOpenValue) "activated" else "deactivated"
+                it[Vannes.updatedAt] = ts
+            }
+
+            if (updated == 0) {
+                logger.warn { "Aucune vanne mappée pour device ${message.deviceId} piston ${payload.pistonNumber}" }
             } else {
-                // Update existing piston
-                val pistonUuid = pistonRecord[Pistons.id]
-                
-                Pistons.update({ Pistons.id eq pistonUuid }) {
-                    it[state] = if (payload.isActive) "active" else "inactive"
-                    it[lastTriggered] = Instant.ofEpochMilli(payload.timestamp)
-                }
-                
-                logger.info { 
-                    "Updated piston ${payload.pistonNumber}: ${if (payload.isActive) "ACTIVE" else "INACTIVE"}" 
-                }
-                
-                // ✅ FIX: Build proper JSON string using kotlinx.serialization
-                val jsonPayload = buildJsonObject {
-                    put("piston_number", payload.pistonNumber)
-                    put("timestamp", payload.timestamp)
-                }.toString()
-                
-                // Log telemetry event
-                Telemetry.insert {
-                    it[deviceId] = deviceUuid
-                    it[Telemetry.pistonId] = pistonUuid
-                    it[eventType] = if (payload.isActive) "activated" else "deactivated"
-                    it[Telemetry.payload] = jsonPayload  // PostgreSQL will auto-cast to JSONB
-                    it[createdAt] = Instant.ofEpochMilli(payload.timestamp)
-                }
+                logger.info { "Vanne sync piston ${payload.pistonNumber}: ${if (isOpenValue) "ACTIVE" else "INACTIVE"}" }
+            }
+
+            // Historiser l'événement
+            val jsonPayload = buildJsonObject {
+                put("piston_number", payload.pistonNumber)
+                put("timestamp", payload.timestamp)
+            }.toString()
+
+            Telemetry.insert {
+                it[deviceId] = deviceUuid
+                it[Telemetry.pistonNumber] = payload.pistonNumber
+                it[eventType] = if (payload.isActive) "activated" else "deactivated"
+                it[Telemetry.payload] = jsonPayload  // PostgreSQL will auto-cast to JSONB
+                it[createdAt] = ts
             }
         }
     }
@@ -129,7 +117,7 @@ class DeviceMessageHandler {
             // Log status update to telemetry
             Telemetry.insert {
                 it[deviceId] = deviceUuid
-                it[Telemetry.pistonId] = null
+                it[Telemetry.pistonNumber] = null
                 it[eventType] = "status_update"
                 it[Telemetry.payload] = jsonPayload
                 it[createdAt] = Instant.now()
@@ -157,7 +145,7 @@ class DeviceMessageHandler {
             
             Telemetry.insert {
                 it[deviceId] = deviceUuid
-                it[Telemetry.pistonId] = null
+                it[Telemetry.pistonNumber] = null
                 it[eventType] = "sensor_reading"
                 it[Telemetry.payload] = jsonPayload
                 it[createdAt] = Instant.ofEpochMilli(payload.timestamp)
@@ -190,7 +178,7 @@ class DeviceMessageHandler {
             
             Telemetry.insert {
                 it[deviceId] = deviceUuid
-                it[Telemetry.pistonId] = null
+                it[Telemetry.pistonNumber] = null
                 it[eventType] = "error"
                 it[Telemetry.payload] = jsonPayload
                 it[createdAt] = Instant.now()
@@ -215,7 +203,7 @@ class DeviceMessageHandler {
             
             Telemetry.insert {
                 it[deviceId] = deviceUuid
-                it[Telemetry.pistonId] = null
+                it[Telemetry.pistonNumber] = null
                 it[eventType] = "unknown"
                 it[Telemetry.payload] = payload.rawData  // Already a JSON string
                 it[createdAt] = Instant.now()
@@ -235,8 +223,9 @@ class DeviceMessageHandler {
             val device = Devices.select { Devices.id eq deviceUuid }
                 .singleOrNull() ?: return@dbQuery null
             
-            val pistonStates = Pistons.select { Pistons.deviceId eq deviceUuid }
-                .associate { it[Pistons.pistonNumber] to it[Pistons.state] }
+            val pistonStates = Vannes.select { Vannes.deviceId eq deviceUuid }
+                .filter { it[Vannes.pistonNumber] != null }
+                .associate { it[Vannes.pistonNumber]!! to if (it[Vannes.isOpen]) "active" else "inactive" }
             
             val telemetryCount = Telemetry.select { 
                 Telemetry.deviceId eq deviceUuid 

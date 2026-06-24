@@ -117,7 +117,7 @@ fun Application.configureRouting(
         adminRoutes(deviceService)
         adminWebRoutes(deviceService)  // Admin web dashboard (HTML pages)
         avatarRoutes(baseUrl)  // Avatar upload and serving routes
-        capteurSolRoutes() // Parcelles/Vannes domain used by UIEarth screens
+        capteurSolRoutes(mqttManager) // Parcelles/Vannes domain used by UIEarth screens
         agriAdminRoutes()  // Full admin CRUD — all piston_control tables for Admin panel
 
         authenticate("auth-jwt") {

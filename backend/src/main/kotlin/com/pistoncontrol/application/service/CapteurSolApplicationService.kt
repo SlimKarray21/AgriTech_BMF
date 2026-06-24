@@ -13,14 +13,14 @@ import com.pistoncontrol.application.service.capteursol.UpdateParcelleInput
 import com.pistoncontrol.application.service.capteursol.UpdateVanneInput
 import com.pistoncontrol.application.service.capteursol.WizardCreateResult
 import com.pistoncontrol.application.usecase.ResolveCapteurSolUserUseCase
+import com.pistoncontrol.infrastructure.messaging.mqtt.MqttManager
 import com.pistoncontrol.infrastructure.persistence.repository.ExposedCapteurSolRepository
 import java.util.UUID
 
-class CapteurSolApplicationService(
-    private val delegate: CapteurSolService = CapteurSolService(),
+class CapteurSolApplicationService(mqttManager: MqttManager? = null) {
+    private val delegate: CapteurSolService = CapteurSolService(mqttManager)
     private val resolveCapteurSolUserUseCase: ResolveCapteurSolUserUseCase =
-        ResolveCapteurSolUserUseCase(ExposedCapteurSolRepository(delegate)),
-) {
+        ResolveCapteurSolUserUseCase(ExposedCapteurSolRepository(delegate))
     suspend fun resolveOrCreateCapteurUserId(authUserId: UUID, authEmail: String? = null): Long? =
         resolveCapteurSolUserUseCase(authUserId, authEmail)
 

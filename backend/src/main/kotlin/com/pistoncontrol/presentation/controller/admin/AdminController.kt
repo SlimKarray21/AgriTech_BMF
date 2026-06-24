@@ -15,14 +15,11 @@ fun Route.agriAdminRoutes() {
 
             // ── Support & Notifications ──────────────────────────────────────
             reclamationsRoutes()
-            supportNotificationsRoutes()
-            subscripNotifRoutes()
 
             // ── Ventes & Abonnements ─────────────────────────────────────────
             subscriptionPlansRoutes()
             subscriptionPaymentsRoutes()
             clientSalesRoutes()
-            deviceCatalogRoutes()
             deviceSalesRoutes()
 
             // ── Stock & Réservations ─────────────────────────────────────────

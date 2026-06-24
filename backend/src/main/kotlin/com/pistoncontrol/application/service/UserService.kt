@@ -1,9 +1,14 @@
 package com.pistoncontrol.application.service
 
 import com.pistoncontrol.infrastructure.persistence.DatabaseFactory.dbQuery
+import com.pistoncontrol.infrastructure.persistence.SubscriptionPlans
 import com.pistoncontrol.infrastructure.persistence.Utilisateur
 import com.pistoncontrol.domain.model.*
 import org.jetbrains.exposed.sql.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 import mu.KotlinLogging
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -118,6 +123,7 @@ class UserService {
     }
 
     private fun rowToUserProfile(row: ResultRow): UserProfileResponse {
+        val typeAbo = row.getOrNull(Utilisateur.typeAbo)
         return UserProfileResponse(
             id = row[Utilisateur.userId].toString(),
             email = row[Utilisateur.email],
@@ -127,10 +133,31 @@ class UserService {
             lastName = row[Utilisateur.lastName],
             phoneNumber = row.getOrNull(Utilisateur.phoneNumber),
             dateOfBirth = row.getOrNull(Utilisateur.dateOfBirth)?.format(dateFormatter),
-            typeAbo = row.getOrNull(Utilisateur.typeAbo),
+            typeAbo = typeAbo,
             dateDebAbo = row.getOrNull(Utilisateur.dateDebAbo)?.format(dateFormatter),
             dateExpAbo = row.getOrNull(Utilisateur.dateExpAbo)?.format(dateFormatter),
-            avatarUrl = row.getOrNull(Utilisateur.avatarUrl)
+            avatarUrl = row.getOrNull(Utilisateur.avatarUrl),
+            pageAccess = pageAccessForPlan(typeAbo)
         )
+    }
+
+    /**
+     * Résout la liste des pages mobiles autorisées pour un plan donné (par son nom,
+     * tel que stocké dans Utilisateur.typeAbo). Renvoie une liste vide si le plan est
+     * introuvable ou si la colonne page_access n'est pas un tableau JSON valide.
+     *
+     * NB : appelée à l'intérieur de [dbQuery] (contexte transactionnel déjà ouvert).
+     */
+    private fun pageAccessForPlan(planName: String?): List<String> {
+        if (planName.isNullOrBlank()) return emptyList()
+        val raw = SubscriptionPlans
+            .select { SubscriptionPlans.name eq planName }
+            .limit(1)
+            .firstOrNull()
+            ?.get(SubscriptionPlans.pageAccess)
+            ?: return emptyList()
+        return runCatching {
+            Json.parseToJsonElement(raw).jsonArray.mapNotNull { it.jsonPrimitive.contentOrNull }
+        }.getOrDefault(emptyList())
     }
 }

@@ -12,6 +12,7 @@ import com.pistoncontrol.infrastructure.persistence.RapportSol as RapportSolTabl
 import com.pistoncontrol.infrastructure.persistence.Vannes as VannesTable
 import com.pistoncontrol.infrastructure.persistence.Utilisateur as UtilisateurTable
 import com.pistoncontrol.infrastructure.persistence.DatabaseFactory
+import com.pistoncontrol.infrastructure.messaging.mqtt.MqttManager
 import kotlinx.serialization.Serializable
 import mu.KotlinLogging
 import org.jetbrains.exposed.sql.ResultRow
@@ -60,6 +61,8 @@ data class CreateVanneInput(
     val scheduleDays: List<String>? = null,
     val scheduleStart: String? = null,
     val scheduleEnd: String? = null,
+    val deviceId: UUID? = null,
+    val pistonNumber: Int? = null,
 )
 
 data class UpdateVanneInput(
@@ -74,6 +77,8 @@ data class UpdateVanneInput(
     val scheduleDays: List<String>? = null,
     val scheduleStart: String? = null,
     val scheduleEnd: String? = null,
+    val deviceId: UUID? = null,
+    val pistonNumber: Int? = null,
 )
 
 data class WizardPlantInput(
@@ -167,7 +172,7 @@ data class ParcelleDetails(
     val vannes: List<Vanne>,
 )
 
-class CapteurSolService {
+class CapteurSolService(private val mqttManager: MqttManager? = null) {
     suspend fun resolveOrCreateCapteurUserId(authUserId: UUID, authEmail: String? = null): Long? = DatabaseFactory.dbQuery {
         logger.info { "[resolveUser] START authUserId=$authUserId, authEmail=$authEmail" }
 
@@ -397,6 +402,8 @@ class CapteurSolService {
             it[scheduleDays] = input.scheduleDays?.joinToString(",")
             it[scheduleStart] = input.scheduleStart
             it[scheduleEnd] = input.scheduleEnd
+            it[deviceId] = input.deviceId
+            it[pistonNumber] = input.pistonNumber
             it[createdAt] = now
             it[updatedAt] = now
         } get VannesTable.id
@@ -406,34 +413,58 @@ class CapteurSolService {
         )
     }
 
-    suspend fun updateVanne(id: Long, ownerUserId: Long?, input: UpdateVanneInput): Vanne? = DatabaseFactory.dbQuery {
+    suspend fun updateVanne(id: Long, ownerUserId: Long?, input: UpdateVanneInput): Vanne? {
         val now = Instant.now()
         val uid = ownerUserId
-        val condition = if (uid != null)
-            (VannesTable.id eq id) and (VannesTable.userId eq uid)
-        else
-            VannesTable.id eq id
-        val updatedRows = VannesTable.update({ condition }) {
-            input.name?.let { value -> it[name] = value }
-            input.parcelId?.let { value -> it[parcelId] = value }
-            if (uid != null) it[userId] = uid
-            input.debit?.let { value -> it[debit] = value }
-            input.isAuto?.let { value -> it[isAuto] = value }
-            input.isOpen?.let { value -> it[isOpen] = value }
-            input.lastAction?.let { value -> it[lastAction] = value }
-            input.nbPlants?.let { value -> it[nbPlants] = value }
-            if (input.scheduleDays != null) it[scheduleDays] = input.scheduleDays.joinToString(",")
-            input.scheduleStart?.let { value -> it[scheduleStart] = value }
-            input.scheduleEnd?.let { value -> it[scheduleEnd] = value }
-            it[updatedAt] = now
+
+        // Lire l'état actuel avant mise à jour (pour détecter changement isOpen)
+        val currentRow = DatabaseFactory.dbQuery {
+            val cond = if (uid != null) (VannesTable.id eq id) and (VannesTable.userId eq uid) else VannesTable.id eq id
+            VannesTable.select { cond }.singleOrNull()
+        } ?: return null
+
+        val updated = DatabaseFactory.dbQuery {
+            val condition = if (uid != null)
+                (VannesTable.id eq id) and (VannesTable.userId eq uid)
+            else
+                VannesTable.id eq id
+            val updatedRows = VannesTable.update({ condition }) {
+                input.name?.let { value -> it[name] = value }
+                input.parcelId?.let { value -> it[parcelId] = value }
+                if (uid != null) it[userId] = uid
+                input.debit?.let { value -> it[debit] = value }
+                input.isAuto?.let { value -> it[isAuto] = value }
+                input.isOpen?.let { value -> it[isOpen] = value }
+                input.lastAction?.let { value -> it[lastAction] = value }
+                input.nbPlants?.let { value -> it[nbPlants] = value }
+                if (input.scheduleDays != null) it[scheduleDays] = input.scheduleDays.joinToString(",")
+                input.scheduleStart?.let { value -> it[scheduleStart] = value }
+                input.scheduleEnd?.let { value -> it[scheduleEnd] = value }
+                input.deviceId?.let { value -> it[deviceId] = value }
+                input.pistonNumber?.let { value -> it[pistonNumber] = value }
+                it[updatedAt] = now
+            }
+            if (updatedRows == 0) return@dbQuery null
+            val fetchCond = if (ownerUserId != null)
+                (VannesTable.id eq id) and (VannesTable.userId eq ownerUserId)
+            else
+                VannesTable.id eq id
+            VannesTable.select { fetchCond }.singleOrNull()?.let(::toVanne)
+        } ?: return null
+
+        // Envoyer commande MQTT si isOpen a changé et que le device est configuré
+        if (input.isOpen != null && input.isOpen != currentRow[VannesTable.isOpen]) {
+            val devId = updated.deviceId?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                ?: currentRow[VannesTable.deviceId]
+            val piston = updated.pistonNumber ?: currentRow[VannesTable.pistonNumber]
+            if (devId != null && piston != null) {
+                val action = if (input.isOpen) "activate" else "deactivate"
+                logger.info { "[MQTT] Vanne ${updated.id} → $action piston $piston on device $devId" }
+                mqttManager?.publishCommand(devId.toString(), "$action:$piston", useBinary = true)
+            }
         }
 
-        if (updatedRows == 0) return@dbQuery null
-        val fetchCond = if (ownerUserId != null)
-            (VannesTable.id eq id) and (VannesTable.userId eq ownerUserId)
-        else
-            VannesTable.id eq id
-        VannesTable.select { fetchCond }.singleOrNull()?.let(::toVanne)
+        return updated
     }
 
     suspend fun deleteVanne(id: Long, ownerUserId: Long?): Boolean = DatabaseFactory.dbQuery {
@@ -662,6 +693,8 @@ class CapteurSolService {
         scheduleStart = row[VannesTable.scheduleStart],
         updatedAt = row[VannesTable.updatedAt].toString(),
         userId = row[VannesTable.userId],
+        deviceId = row[VannesTable.deviceId]?.toString(),
+        pistonNumber = row[VannesTable.pistonNumber],
     )
 
     private fun toRapportEau(row: ResultRow): RapportEau = RapportEau(

@@ -36,7 +36,10 @@ data class UserProfileResponse(
     val typeAbo: String?,
     val dateDebAbo: String?,
     val dateExpAbo: String?,
-    val avatarUrl: String?
+    val avatarUrl: String?,
+    // Pages mobiles déverrouillées par le plan de l'utilisateur (résolu via typeAbo).
+    // "meteo" et "profil" sont toujours autorisées côté app et peuvent ne pas figurer ici.
+    val pageAccess: List<String> = emptyList()
 )
 
 @Serializable
@@ -146,15 +149,6 @@ data class AdminStatsResponse(
     val recentAuditLogs: List<AuditLog>
 )
 @Serializable
-data class SubscripNotif(
-	val id: Long,
-	val clientEmail: String,
-	val clientName: String,
-	val daysRemaining: Int,
-	val sentAt: String,
-	val createdAt: String
-)
-@Serializable
 data class RapportSol(
 	val id: Long,
 	val reportName: String,
@@ -211,15 +205,6 @@ data class RapportFile(
 	val userId: Long,
 	val fileUrl: String,
 	val uploadedAt: String
-)
-
-@Serializable
-data class TypePlante(
-	val id: Long,
-	val nomPlante: String,
-	val typePlante: String,
-	val besoinEauParPlante: Double,
-	val createdAt: String
 )
 
 @Serializable

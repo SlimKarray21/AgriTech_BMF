@@ -1,7 +1,6 @@
 package com.pistoncontrol.presentation.controller.admin
 
 import com.pistoncontrol.infrastructure.persistence.ClientSales
-import com.pistoncontrol.infrastructure.persistence.DeviceCatalog
 import com.pistoncontrol.infrastructure.persistence.DeviceSales
 import com.pistoncontrol.infrastructure.persistence.SubscriptionPayments
 import com.pistoncontrol.infrastructure.persistence.SubscriptionPlans
@@ -12,6 +11,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.*
+import org.jetbrains.exposed.exceptions.ExposedSQLException
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -29,6 +29,7 @@ fun Route.subscriptionPlansRoutes() {
                         put("price_dt",      it[SubscriptionPlans.priceDt])
                         put("duration_days", it[SubscriptionPlans.durationDays])
                         put("features",      it[SubscriptionPlans.features])
+                        put("page_access",   it[SubscriptionPlans.pageAccess])
                         put("active",        it[SubscriptionPlans.active])
                         put("created_at",    it[SubscriptionPlans.createdAt].toString())
                     }
@@ -44,6 +45,7 @@ fun Route.subscriptionPlansRoutes() {
                     it[priceDt]      = body["price_dt"]?.jsonPrimitive?.double ?: 0.0
                     it[durationDays] = body["duration_days"]?.jsonPrimitive?.int ?: 30
                     it[features]     = body["features"]?.toString() ?: "{}"
+                    it[pageAccess]   = body["page_access"]?.toString() ?: "[]"
                     it[active]       = body["active"]?.jsonPrimitive?.boolean ?: true
                     it[createdAt]    = Instant.now()
                 }[SubscriptionPlans.id]
@@ -61,6 +63,7 @@ fun Route.subscriptionPlansRoutes() {
                     body["duration_days"]?.jsonPrimitive?.intOrNull?.let { v -> it[SubscriptionPlans.durationDays] = v }
                     body["active"]?.jsonPrimitive?.booleanOrNull?.let    { v -> it[SubscriptionPlans.active]       = v }
                     body["features"]?.let                                { v -> it[SubscriptionPlans.features]     = v.toString() }
+                    body["page_access"]?.let                             { v -> it[SubscriptionPlans.pageAccess]   = v.toString() }
                 }
             }
             call.respond(HttpStatusCode.OK, mapOf("message" to "Updated"))
@@ -68,9 +71,21 @@ fun Route.subscriptionPlansRoutes() {
         delete("/{id}") {
             val id = call.parameters["id"]?.toLongOrNull()
                 ?: return@delete call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid id"))
-            val count = transaction { SubscriptionPlans.deleteWhere { SubscriptionPlans.id eq id } }
-            if (count == 0) call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
-            else call.respond(HttpStatusCode.OK, mapOf("message" to "Deleted"))
+            try {
+                val count = transaction { SubscriptionPlans.deleteWhere { SubscriptionPlans.id eq id } }
+                if (count == 0) call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
+                else call.respond(HttpStatusCode.OK, mapOf("message" to "Deleted"))
+            } catch (e: ExposedSQLException) {
+                // Le plan est référencé (paiements, réservations ou ventes) : suppression
+                // définitive impossible sans casser l'historique. On invite à le désactiver.
+                call.respond(
+                    HttpStatusCode.Conflict,
+                    ErrorResponse(
+                        "Ce plan est utilisé par des paiements, réservations ou ventes existants " +
+                            "et ne peut pas être supprimé. Désactivez-le plutôt (Modifier → décocher « Actif »)."
+                    )
+                )
+            }
         }
     }
 }
@@ -189,73 +204,6 @@ fun Route.clientSalesRoutes() {
                 }
             }
             call.respond(HttpStatusCode.OK, mapOf("message" to "Updated"))
-        }
-    }
-}
-
-fun Route.deviceCatalogRoutes() {
-    route("/device-catalog") {
-        get {
-            val rows = transaction {
-                DeviceCatalog.selectAll().map {
-                    buildJsonObject {
-                        put("id",              it[DeviceCatalog.id])
-                        put("name",            it[DeviceCatalog.name])
-                        put("device_type",     it[DeviceCatalog.deviceType])
-                        put("price_dt",        it[DeviceCatalog.priceDt])
-                        put("stock",           it[DeviceCatalog.stock])
-                        put("available",       it[DeviceCatalog.available])
-                        put("connected_state", it[DeviceCatalog.connectedState])
-                        put("info",            it[DeviceCatalog.info])
-                        put("created_at",      it[DeviceCatalog.createdAt].toString())
-                        put("updated_at",      it[DeviceCatalog.updatedAt].toString())
-                    }
-                }
-            }
-            call.respond(HttpStatusCode.OK, buildJsonArray { rows.forEach { add(it) } })
-        }
-        post {
-            val body = call.receive<JsonObject>()
-            val vInfo: String? = body["info"]?.jsonPrimitive?.contentOrNull
-            val newId = transaction {
-                DeviceCatalog.insert {
-                    it[name]           = body["name"]?.jsonPrimitive?.content ?: ""
-                    it[deviceType]     = body["device_type"]?.jsonPrimitive?.content ?: ""
-                    it[priceDt]        = body["price_dt"]?.jsonPrimitive?.double ?: 0.0
-                    it[stock]          = body["stock"]?.jsonPrimitive?.int ?: 0
-                    it[available]      = body["available"]?.jsonPrimitive?.boolean ?: true
-                    it[connectedState] = body["connected_state"]?.jsonPrimitive?.contentOrNull ?: "disconnected"
-                    it[info]           = vInfo
-                    it[createdAt]      = Instant.now()
-                    it[updatedAt]      = Instant.now()
-                }[DeviceCatalog.id]
-            }
-            call.respond(HttpStatusCode.Created, buildJsonObject { put("id", newId) })
-        }
-        patch("/{id}") {
-            val id = call.parameters["id"]?.toLongOrNull()
-                ?: return@patch call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid id"))
-            val body = call.receive<JsonObject>()
-            transaction {
-                DeviceCatalog.update({ DeviceCatalog.id eq id }) {
-                    body["name"]?.jsonPrimitive?.contentOrNull?.let            { v -> it[DeviceCatalog.name]           = v }
-                    body["device_type"]?.jsonPrimitive?.contentOrNull?.let     { v -> it[DeviceCatalog.deviceType]     = v }
-                    body["price_dt"]?.jsonPrimitive?.doubleOrNull?.let         { v -> it[DeviceCatalog.priceDt]        = v }
-                    body["stock"]?.jsonPrimitive?.intOrNull?.let               { v -> it[DeviceCatalog.stock]          = v }
-                    body["available"]?.jsonPrimitive?.booleanOrNull?.let       { v -> it[DeviceCatalog.available]      = v }
-                    body["connected_state"]?.jsonPrimitive?.contentOrNull?.let { v -> it[DeviceCatalog.connectedState] = v }
-                    body["info"]?.jsonPrimitive?.contentOrNull?.let            { v -> it[DeviceCatalog.info]           = v }
-                    it[DeviceCatalog.updatedAt] = Instant.now()
-                }
-            }
-            call.respond(HttpStatusCode.OK, mapOf("message" to "Updated"))
-        }
-        delete("/{id}") {
-            val id = call.parameters["id"]?.toLongOrNull()
-                ?: return@delete call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid id"))
-            val count = transaction { DeviceCatalog.deleteWhere { DeviceCatalog.id eq id } }
-            if (count == 0) call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
-            else call.respond(HttpStatusCode.OK, mapOf("message" to "Deleted"))
         }
     }
 }

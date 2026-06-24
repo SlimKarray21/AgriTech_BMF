@@ -26,6 +26,8 @@ data class CreateVanneRequest(
     val scheduleDays: List<String>? = null,
     val scheduleStart: String? = null,
     val scheduleEnd: String? = null,
+    val deviceId: String? = null,
+    val pistonNumber: Int? = null,
 )
 
 @Serializable
@@ -41,6 +43,8 @@ data class UpdateVanneRequest(
     val scheduleDays: List<String>? = null,
     val scheduleStart: String? = null,
     val scheduleEnd: String? = null,
+    val deviceId: String? = null,
+    val pistonNumber: Int? = null,
 )
 
 @Serializable

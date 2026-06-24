@@ -5,7 +5,6 @@ import com.pistoncontrol.infrastructure.persistence.Utilisateur
 import com.pistoncontrol.infrastructure.persistence.Devices
 import com.pistoncontrol.infrastructure.persistence.Schedules
 import com.pistoncontrol.infrastructure.persistence.Telemetry
-import com.pistoncontrol.infrastructure.persistence.Pistons
 import com.pistoncontrol.domain.model.User
 import com.pistoncontrol.domain.model.AdminStatsResponse
 import com.pistoncontrol.domain.model.TelemetryEvent
@@ -368,10 +367,9 @@ class AdminService(
             return emptyList()
         }
 
-        // Get telemetry for all user devices - join with Pistons to get piston number
+        // Get telemetry for all user devices (piston_number stocké directement)
         return dbQuery {
             Telemetry
-                .leftJoin(Pistons, { Telemetry.pistonId }, { Pistons.id })
                 .select { Telemetry.deviceId inList userDeviceIds }
                 .orderBy(Telemetry.createdAt to SortOrder.DESC)
                 .limit(limit)
@@ -379,8 +377,8 @@ class AdminService(
                     TelemetryEvent(
                         id = row[Telemetry.id],
                         deviceId = row[Telemetry.deviceId].toString(),
-                        pistonId = row[Telemetry.pistonId]?.toString(),
-                        pistonNumber = row.getOrNull(Pistons.pistonNumber),
+                        pistonId = null,
+                        pistonNumber = row[Telemetry.pistonNumber],
                         eventType = row[Telemetry.eventType],
                         payload = row[Telemetry.payload],
                         createdAt = row[Telemetry.createdAt].toString()
@@ -435,10 +433,9 @@ class AdminService(
             return emptyList()
         }
 
-        // Get telemetry with filters - always join with Pistons to get piston number
+        // Get telemetry with filters (piston_number stocké directement sur telemetry)
         return dbQuery {
             var query = Telemetry
-                .leftJoin(Pistons, { Telemetry.pistonId }, { Pistons.id })
                 .select {
                     (Telemetry.deviceId inList userDeviceIds) and
                     (Telemetry.eventType inList listOf("activated", "deactivated"))
@@ -446,7 +443,7 @@ class AdminService(
 
             // Filter by piston number
             if (pistonNumber != null) {
-                query = query.andWhere { Pistons.pistonNumber eq pistonNumber }
+                query = query.andWhere { Telemetry.pistonNumber eq pistonNumber }
             }
 
             // Filter by action type (activated/deactivated)
@@ -480,8 +477,8 @@ class AdminService(
                     TelemetryEvent(
                         id = row[Telemetry.id],
                         deviceId = row[Telemetry.deviceId].toString(),
-                        pistonId = row[Telemetry.pistonId]?.toString(),
-                        pistonNumber = row.getOrNull(Pistons.pistonNumber),
+                        pistonId = null,
+                        pistonNumber = row[Telemetry.pistonNumber],
                         eventType = row[Telemetry.eventType],
                         payload = row[Telemetry.payload],
                         createdAt = row[Telemetry.createdAt].toString()

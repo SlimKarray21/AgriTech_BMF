@@ -62,15 +62,6 @@ data class RapportFile(
 )
 
 @Serializable
-data class TypePlante(
-	val id: Long,
-	val nomPlante: String,
-	val typePlante: String,
-	val besoinEauParPlante: Double,
-	val createdAt: String
-)
-
-@Serializable
 data class Parcelle(
 	val id: Long,
 	val nomSurface: String,
@@ -131,16 +122,6 @@ data class Profile(
 )
 
 @Serializable
-data class SubscripNotif(
-	val id: Long,
-	val clientEmail: String,
-	val clientName: String,
-	val daysRemaining: Int,
-	val sentAt: String,
-	val createdAt: String
-)
-
-@Serializable
 data class Vanne(
     val id: Long,
     val createdAt: String,
@@ -155,5 +136,7 @@ data class Vanne(
     val scheduleEnd: String? = null,
     val scheduleStart: String? = null,
     val updatedAt: String,
-    val userId: Long
+    val userId: Long,
+    val deviceId: String? = null,
+    val pistonNumber: Int? = null,
 )

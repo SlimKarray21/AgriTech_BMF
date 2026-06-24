@@ -2,7 +2,7 @@ package com.pistoncontrol.application.service
 
 import com.pistoncontrol.infrastructure.persistence.DatabaseFactory.dbQuery
 import com.pistoncontrol.infrastructure.persistence.Devices
-import com.pistoncontrol.infrastructure.persistence.Pistons
+import com.pistoncontrol.infrastructure.persistence.Vannes
 import com.pistoncontrol.infrastructure.persistence.Telemetry
 import com.pistoncontrol.infrastructure.messaging.mqtt.MqttManager
 import com.pistoncontrol.presentation.controller.*
@@ -273,32 +273,21 @@ class DeviceService(private val mqttManager: MqttManager) {
     ): PistonWithIdResponse {
         return dbQuery {
             val now = Instant.now()
+            val isOpenValue = state == "active"
 
-            // Check if piston record exists
-            val existing = Pistons.select {
-                (Pistons.deviceId eq deviceId) and (Pistons.pistonNumber eq pistonNumber)
-            }.singleOrNull()
-
-            val pistonId: UUID
-
-            if (existing != null) {
-                // Update existing piston
-                pistonId = existing[Pistons.id]
-                Pistons.update({
-                    (Pistons.deviceId eq deviceId) and (Pistons.pistonNumber eq pistonNumber)
-                }) {
-                    it[Pistons.state] = state
-                    it[lastTriggered] = now
-                }
-            } else {
-                // Create new piston record
-                pistonId = Pistons.insert {
-                    it[Pistons.deviceId] = deviceId
-                    it[Pistons.pistonNumber] = pistonNumber
-                    it[Pistons.state] = state
-                    it[lastTriggered] = now
-                } get Pistons.id
+            // Mettre à jour la vanne correspondante (device + numéro de piston)
+            Vannes.update({
+                (Vannes.deviceId eq deviceId) and (Vannes.pistonNumber eq pistonNumber)
+            }) {
+                it[Vannes.isOpen] = isOpenValue
+                it[Vannes.lastAction] = if (isOpenValue) "activated" else "deactivated"
+                it[Vannes.updatedAt] = now
             }
+
+            // Id de la vanne (pour la réponse) — peut être null si aucune vanne mappée
+            val vanneId = Vannes
+                .select { (Vannes.deviceId eq deviceId) and (Vannes.pistonNumber eq pistonNumber) }
+                .firstOrNull()?.get(Vannes.id)
 
             // Record telemetry event for valve history tracking
             val jsonPayload = buildJsonObject {
@@ -308,14 +297,14 @@ class DeviceService(private val mqttManager: MqttManager) {
 
             Telemetry.insert {
                 it[Telemetry.deviceId] = deviceId
-                it[Telemetry.pistonId] = pistonId
+                it[Telemetry.pistonNumber] = pistonNumber
                 it[eventType] = if (state == "active") "activated" else "deactivated"
                 it[payload] = jsonPayload
                 it[createdAt] = now
             }
 
             PistonWithIdResponse(
-                id = pistonId.toString(),
+                id = vanneId?.toString() ?: "",
                 piston_number = pistonNumber,
                 state = state,
                 last_triggered = now.toString()
@@ -335,17 +324,18 @@ class DeviceService(private val mqttManager: MqttManager) {
      * @return List of all 8 pistons for the device (some may not exist in DB yet)
      */
     private fun getPistonsForDeviceInternal(deviceId: UUID): List<PistonResponse> {
-        // Fetch existing pistons from database
-        val existingPistons = Pistons.select { Pistons.deviceId eq deviceId }
-            .associate { it[Pistons.pistonNumber] to it }
+        // Chaque vanne de ce device représente un canal (piston) physique
+        val vannesByPiston = Vannes.select { Vannes.deviceId eq deviceId }
+            .filter { it[Vannes.pistonNumber] != null }
+            .associateBy { it[Vannes.pistonNumber]!! }
 
-        // Return all 8 pistons (1-8), using DB values for existing ones and defaults for non-existent
+        // Return all 8 pistons (1-8), using vanne values when mapped, defaults otherwise
         return (MIN_PISTON_NUMBER..MAX_PISTON_NUMBER).map { pistonNumber ->
-            val existing = existingPistons[pistonNumber]
+            val vanne = vannesByPiston[pistonNumber]
             PistonResponse(
                 piston_number = pistonNumber,
-                state = existing?.get(Pistons.state) ?: "inactive",
-                last_triggered = existing?.get(Pistons.lastTriggered)?.toString()
+                state = if (vanne?.get(Vannes.isOpen) == true) "active" else "inactive",
+                last_triggered = vanne?.get(Vannes.updatedAt)?.toString()
             )
         }
     }
@@ -368,10 +358,11 @@ class DeviceService(private val mqttManager: MqttManager) {
                 return@dbQuery DeviceResult.Failure("Device not found", 404)
             }
 
-            // Get piston statistics
-            val pistons = Pistons.select { Pistons.deviceId eq deviceId }.toList()
-            val activePistons = pistons.count { it[Pistons.state] == "active" }
-            val totalPistons = pistons.size
+            // Statistiques des canaux à partir des vannes du device
+            val vannes = Vannes.select { Vannes.deviceId eq deviceId }
+                .filter { it[Vannes.pistonNumber] != null }
+            val activePistons = vannes.count { it[Vannes.isOpen] }
+            val totalPistons = vannes.size
 
             // Get telemetry count
             val totalEvents = Telemetry.select { Telemetry.deviceId eq deviceId }.count()
@@ -476,7 +467,7 @@ class DeviceService(private val mqttManager: MqttManager) {
                     TelemetryEventResponse(
                         id = row[Telemetry.id],
                         deviceId = row[Telemetry.deviceId].toString(),
-                        pistonId = row[Telemetry.pistonId]?.toString(),
+                        pistonId = row[Telemetry.pistonNumber]?.toString(),
                         eventType = row[Telemetry.eventType],
                         payload = row[Telemetry.payload],
                         createdAt = row[Telemetry.createdAt].toString()
