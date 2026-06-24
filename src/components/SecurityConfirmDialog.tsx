@@ -5,7 +5,9 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { ShieldCheck, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { loginApi, ApiError } from "@/services/auth-api";
+
+/** Code de sécurité à composer pour valider une action sensible. */
+const SECURITY_CODE = "Karray2026";
 
 interface Props {
   open: boolean;
@@ -20,38 +22,26 @@ export default function SecurityConfirmDialog({
   onClose,
   onSuccess,
   title = "Confirmation sécurisée",
-  description = "Veuillez confirmer votre identité pour valider cette action.",
+  description = "Veuillez saisir le code de sécurité pour valider cette action.",
 }: Props) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleConfirm = async () => {
-    if (!email || !password) {
-      toast({ title: "Champs requis", description: "Email et mot de passe sont obligatoires", variant: "destructive" });
+  const handleConfirm = () => {
+    if (!code) {
+      toast({ title: "Champ requis", description: "Le code de sécurité est obligatoire", variant: "destructive" });
       return;
     }
     setLoading(true);
-    try {
-      const data = await loginApi(email, password);
-      if (data.role !== "admin") {
-        toast({ title: "Accès refusé", description: "Rôle insuffisant pour valider cette action.", variant: "destructive" });
-        return;
-      }
-      toast({ title: "Identité vérifiée ✓" });
-      setEmail("");
-      setPassword("");
-      onSuccess();
-    } catch (err: unknown) {
-      const apiErr = err as ApiError;
-      if (apiErr.status === 403 && apiErr.userId) {
-        toast({ title: "Email non vérifié", description: "Veuillez vérifier votre email avant d'effectuer cette action.", variant: "destructive" });
-      } else {
-        toast({ title: "Échec d'authentification", description: apiErr.error ?? apiErr.message ?? "Identifiants invalides.", variant: "destructive" });
-      }
-    } finally {
+    if (code !== SECURITY_CODE) {
+      toast({ title: "Code incorrect", description: "Le code de sécurité est invalide.", variant: "destructive" });
       setLoading(false);
+      return;
     }
+    toast({ title: "Code vérifié ✓" });
+    setCode("");
+    setLoading(false);
+    onSuccess();
   };
 
   return (
@@ -66,22 +56,14 @@ export default function SecurityConfirmDialog({
         </DialogHeader>
         <div className="space-y-3">
           <div>
-            <Label>Email administrateur</Label>
-            <Input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@example.com"
-              autoFocus
-            />
-          </div>
-          <div>
-            <Label>Mot de passe</Label>
+            <Label>Code de sécurité</Label>
             <Input
               type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleConfirm()}
+              placeholder="Entrez le code"
+              autoFocus
             />
           </div>
           <div className="flex justify-end gap-2 pt-2">

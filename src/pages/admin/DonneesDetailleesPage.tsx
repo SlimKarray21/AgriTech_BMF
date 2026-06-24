@@ -8,6 +8,7 @@ import {
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { SortableHead, useTableSort } from "@/components/ui/sortable-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +21,7 @@ import { toast } from "@/hooks/use-toast";
 import { Plus, Pencil, Leaf, Droplets, Trash2 } from "lucide-react";
 import { Plante, Vanne } from "@/types/models";
 
-interface VanneRow { nomVanne: string; debit: string; nbPlant: string; }
+interface VanneRow { nomVanne: string; debit: string; nbPlant: string; deviceId: string; pistonNumber: string; }
 
 const roleBadgeClass = (role?: string) => {
   const r = (role ?? "").toUpperCase();
@@ -91,7 +92,7 @@ export default function DonneesDetailleesPage() {
   const [showVanneForm, setShowVanneForm] = useState(false);
   const [selVanneUser, setSelVanneUser] = useState("");
   const [selVanneSurface, setSelVanneSurface] = useState("");
-  const [vanneRows, setVanneRows] = useState<VanneRow[]>([{ nomVanne: "", debit: "", nbPlant: "" }]);
+  const [vanneRows, setVanneRows] = useState<VanneRow[]>([{ nomVanne: "", debit: "", nbPlant: "", deviceId: "", pistonNumber: "" }]);
   const [isSavingVannes, setIsSavingVannes] = useState(false);
   const [editVanne, setEditVanne] = useState<Vanne | null>(null);
   const updateVanneMut = useMutation({ mutationFn: ({ id, data }: { id: string; data: Partial<Vanne> }) => updateVanne(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ["vannes"] }); setEditVanne(null); toast({ title: t("donnees.vanneUpdated") }); } });
@@ -102,7 +103,7 @@ export default function DonneesDetailleesPage() {
     [surfaces, selVanneUser]
   );
 
-  const addVanneRow = () => setVanneRows(r => [...r, { nomVanne: "", debit: "", nbPlant: "" }]);
+  const addVanneRow = () => setVanneRows(r => [...r, { nomVanne: "", debit: "", nbPlant: "", deviceId: "", pistonNumber: "" }]);
   const removeVanneRow = (i: number) => setVanneRows(r => r.filter((_, idx) => idx !== i));
   const updateVanneRow = (i: number, field: keyof VanneRow, val: string) =>
     setVanneRows(r => { const a = [...r]; a[i] = { ...a[i], [field]: val }; return a; });
@@ -119,6 +120,8 @@ export default function DonneesDetailleesPage() {
           debitEauParVanne: parseFloat(row.debit),
           nbPlantParVanne: parseInt(row.nbPlant) || 0,
           fkSurface: selVanneSurface,
+          deviceId: row.deviceId.trim() || undefined,
+          pistonNumber: row.pistonNumber ? parseInt(row.pistonNumber) : undefined,
         });
       }
       qc.invalidateQueries({ queryKey: ["vannes"] });
@@ -127,7 +130,7 @@ export default function DonneesDetailleesPage() {
       setShowVanneForm(false);
       setSelVanneUser("");
       setSelVanneSurface("");
-      setVanneRows([{ nomVanne: "", debit: "", nbPlant: "" }]);
+      setVanneRows([{ nomVanne: "", debit: "", nbPlant: "", deviceId: "", pistonNumber: "" }]);
     } catch (e: any) {
       toast({ title: "Erreur lors de la création", description: e?.message, variant: "destructive" });
     } finally {
@@ -180,23 +183,12 @@ export default function DonneesDetailleesPage() {
                       <Leaf className="h-4 w-4 text-emerald-600" /> {surface.nomSurface}
                       <span className="text-xs text-muted-foreground">({sPlantes.length} plante{sPlantes.length > 1 ? "s" : ""})</span>
                     </div>
-                    <Table>
-                      <TableHeader><TableRow><TableHead>Nom</TableHead><TableHead>Âge</TableHead><TableHead className="w-24 text-right">{t("common.actions")}</TableHead></TableRow></TableHeader>
-                      <TableBody>
-                        {sPlantes.map(p => (
-                          <TableRow key={p.id}>
-                            <TableCell className="font-medium">{p.nomPlante}</TableCell>
-                            <TableCell>{p.age} ans</TableCell>
-                            <TableCell>
-                              <div className="flex gap-1 justify-end">
-                                <Button variant="ghost" size="sm" onClick={() => setEditPlante(p)}><Pencil className="h-3 w-3" /></Button>
-                                <DeleteDialog onConfirm={() => deletePlanteMut.mutate(p.id)} itemName={p.nomPlante} />
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                    <PlantesTable
+                      plantes={sPlantes}
+                      actionsLabel={t("common.actions")}
+                      onEdit={setEditPlante}
+                      onDelete={(id) => deletePlanteMut.mutate(id)}
+                    />
                   </div>
                 ))}
               </CardContent>
@@ -249,22 +241,34 @@ export default function DonneesDetailleesPage() {
                   </Button>
                 </div>
                 {vanneRows.map((row, i) => (
-                  <div key={i} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end border rounded-lg p-3 bg-muted/20">
-                    <div>
-                      <Label className="text-xs">Nom</Label>
-                      <Input value={row.nomVanne} onChange={(e) => updateVanneRow(i, "nomVanne", e.target.value)} placeholder={`Vanne ${i + 1}`} className="h-8 text-sm" />
+                  <div key={i} className="border rounded-lg p-3 bg-muted/20 space-y-2">
+                    <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end">
+                      <div>
+                        <Label className="text-xs">Nom</Label>
+                        <Input value={row.nomVanne} onChange={(e) => updateVanneRow(i, "nomVanne", e.target.value)} placeholder={`Vanne ${i + 1}`} className="h-8 text-sm" />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Débit (L/h)</Label>
+                        <Input type="number" step="0.1" min="0" value={row.debit} onChange={(e) => updateVanneRow(i, "debit", e.target.value)} className="h-8 text-sm" />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Nb plantes</Label>
+                        <Input type="number" min="0" value={row.nbPlant} onChange={(e) => updateVanneRow(i, "nbPlant", e.target.value)} className="h-8 text-sm" />
+                      </div>
+                      <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0" disabled={vanneRows.length === 1} onClick={() => removeVanneRow(i)}>
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
                     </div>
-                    <div>
-                      <Label className="text-xs">Débit (L/h)</Label>
-                      <Input type="number" step="0.1" min="0" value={row.debit} onChange={(e) => updateVanneRow(i, "debit", e.target.value)} className="h-8 text-sm" />
+                    <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
+                      <div>
+                        <Label className="text-xs text-blue-600">Device UUID (ESP32)</Label>
+                        <Input value={row.deviceId} onChange={(e) => updateVanneRow(i, "deviceId", e.target.value)} placeholder="ex: 09fe96be-54a6-48c3-8342-ea55dafe5f20" className="h-8 text-xs font-mono" />
+                      </div>
+                      <div className="w-24">
+                        <Label className="text-xs text-blue-600">Piston N° (1-8)</Label>
+                        <Input type="number" min="1" max="8" value={row.pistonNumber} onChange={(e) => updateVanneRow(i, "pistonNumber", e.target.value)} placeholder="1-8" className="h-8 text-sm" />
+                      </div>
                     </div>
-                    <div>
-                      <Label className="text-xs">Nb plantes</Label>
-                      <Input type="number" min="0" value={row.nbPlant} onChange={(e) => updateVanneRow(i, "nbPlant", e.target.value)} className="h-8 text-sm" />
-                    </div>
-                    <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0" disabled={vanneRows.length === 1} onClick={() => removeVanneRow(i)}>
-                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                    </Button>
                   </div>
                 ))}
               </div>
@@ -273,7 +277,7 @@ export default function DonneesDetailleesPage() {
                 <Button onClick={handleBulkCreate} disabled={!selVanneSurface || isSavingVannes}>
                   {isSavingVannes ? "Création..." : `Créer ${vanneRows.filter(r => r.nomVanne.trim()).length || ""} vanne(s)`}
                 </Button>
-                <Button type="button" variant="outline" onClick={() => { setShowVanneForm(false); setSelVanneUser(""); setSelVanneSurface(""); setVanneRows([{ nomVanne: "", debit: "", nbPlant: "" }]); }}>{t("common.cancel")}</Button>
+                <Button type="button" variant="outline" onClick={() => { setShowVanneForm(false); setSelVanneUser(""); setSelVanneSurface(""); setVanneRows([{ nomVanne: "", debit: "", nbPlant: "", deviceId: "", pistonNumber: "" }]); }}>{t("common.cancel")}</Button>
               </div>
             </CardContent></Card>
           )}
@@ -294,24 +298,12 @@ export default function DonneesDetailleesPage() {
                       <Droplets className="h-4 w-4 text-blue-500" /> {surface.nomSurface}
                       <span className="text-xs text-muted-foreground">({sVannes.length} vanne{sVannes.length > 1 ? "s" : ""})</span>
                     </div>
-                    <Table>
-                      <TableHeader><TableRow><TableHead>Nom</TableHead><TableHead>Débit (L/h)</TableHead><TableHead>Nb plantes</TableHead><TableHead className="w-24 text-right">{t("common.actions")}</TableHead></TableRow></TableHeader>
-                      <TableBody>
-                        {sVannes.map(v => (
-                          <TableRow key={v.id}>
-                            <TableCell className="font-medium">{v.nomVanne}</TableCell>
-                            <TableCell>{v.debitEauParVanne}</TableCell>
-                            <TableCell>{v.nbPlantParVanne}</TableCell>
-                            <TableCell>
-                              <div className="flex gap-1 justify-end">
-                                <Button variant="ghost" size="sm" onClick={() => setEditVanne(v)}><Pencil className="h-3 w-3" /></Button>
-                                <DeleteDialog onConfirm={() => deleteVanneMut.mutate(v.id)} itemName={v.nomVanne} />
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                    <VannesTable
+                      vannes={sVannes}
+                      actionsLabel={t("common.actions")}
+                      onEdit={setEditVanne}
+                      onDelete={(id) => deleteVanneMut.mutate(id)}
+                    />
                   </div>
                 ))}
               </CardContent>
@@ -347,5 +339,82 @@ export default function DonneesDetailleesPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function PlantesTable({
+  plantes, actionsLabel, onEdit, onDelete,
+}: {
+  plantes: Plante[];
+  actionsLabel: string;
+  onEdit: (p: Plante) => void;
+  onDelete: (id: string) => void;
+}) {
+  const { sorted, sort } = useTableSort(plantes, {
+    nom: (p) => p.nomPlante,
+    age: (p) => p.age,
+  });
+  return (
+    <Table>
+      <TableHeader><TableRow>
+        <SortableHead field="nom" sort={sort}>Nom</SortableHead>
+        <SortableHead field="age" sort={sort}>Âge</SortableHead>
+        <TableHead className="w-24 text-right">{actionsLabel}</TableHead>
+      </TableRow></TableHeader>
+      <TableBody>
+        {sorted.map(p => (
+          <TableRow key={p.id}>
+            <TableCell className="font-medium">{p.nomPlante}</TableCell>
+            <TableCell>{p.age} ans</TableCell>
+            <TableCell>
+              <div className="flex gap-1 justify-end">
+                <Button variant="ghost" size="sm" onClick={() => onEdit(p)}><Pencil className="h-3 w-3" /></Button>
+                <DeleteDialog onConfirm={() => onDelete(p.id)} itemName={p.nomPlante} />
+              </div>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+
+function VannesTable({
+  vannes, actionsLabel, onEdit, onDelete,
+}: {
+  vannes: Vanne[];
+  actionsLabel: string;
+  onEdit: (v: Vanne) => void;
+  onDelete: (id: string) => void;
+}) {
+  const { sorted, sort } = useTableSort(vannes, {
+    nom: (v) => v.nomVanne,
+    debit: (v) => v.debitEauParVanne,
+    nbPlantes: (v) => v.nbPlantParVanne,
+  });
+  return (
+    <Table>
+      <TableHeader><TableRow>
+        <SortableHead field="nom" sort={sort}>Nom</SortableHead>
+        <SortableHead field="debit" sort={sort}>Débit (L/h)</SortableHead>
+        <SortableHead field="nbPlantes" sort={sort}>Nb plantes</SortableHead>
+        <TableHead className="w-24 text-right">{actionsLabel}</TableHead>
+      </TableRow></TableHeader>
+      <TableBody>
+        {sorted.map(v => (
+          <TableRow key={v.id}>
+            <TableCell className="font-medium">{v.nomVanne}</TableCell>
+            <TableCell>{v.debitEauParVanne}</TableCell>
+            <TableCell>{v.nbPlantParVanne}</TableCell>
+            <TableCell>
+              <div className="flex gap-1 justify-end">
+                <Button variant="ghost" size="sm" onClick={() => onEdit(v)}><Pencil className="h-3 w-3" /></Button>
+                <DeleteDialog onConfirm={() => onDelete(v.id)} itemName={v.nomVanne} />
+              </div>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }

@@ -4,6 +4,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/hooks/useAuth";
 import { getToken } from "@/lib/token";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { SortableHead, useTableSort } from "@/components/ui/sortable-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,6 +55,13 @@ export default function UsersPage() {
       .toLowerCase()
       .includes(search.toLowerCase())
   );
+
+  const { sorted, sort } = useTableSort(filtered, {
+    email: (u) => u.email,
+    firstName: (u) => u.first_name,
+    lastName: (u) => u.last_name,
+    phone: (u) => u.phone_number,
+  });
 
   const deleteMut = useMutation({
     mutationFn: async (profileId: string) => {
@@ -171,10 +179,10 @@ export default function UsersPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>{t("auth.email")}</TableHead>
-                <TableHead>{t("auth.firstName")}</TableHead>
-                <TableHead>{t("auth.lastName")}</TableHead>
-                <TableHead>{t("auth.phone")}</TableHead>
+                <SortableHead field="email" sort={sort}>{t("auth.email")}</SortableHead>
+                <SortableHead field="firstName" sort={sort}>{t("auth.firstName")}</SortableHead>
+                <SortableHead field="lastName" sort={sort}>{t("auth.lastName")}</SortableHead>
+                <SortableHead field="phone" sort={sort}>{t("auth.phone")}</SortableHead>
                 <TableHead>Rôle</TableHead>
                 <TableHead>Email vérifié</TableHead>
                 <TableHead className="w-24">{t("common.actions")}</TableHead>
@@ -186,7 +194,7 @@ export default function UsersPage() {
                   <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Chargement...</TableCell>
                 </TableRow>
               )}
-              {!isLoading && filtered.map((u) => (
+              {!isLoading && sorted.map((u) => (
                 <TableRow key={u.id}>
                   <TableCell className="font-medium">{u.email}</TableCell>
                   <TableCell>{u.first_name || "—"}</TableCell>

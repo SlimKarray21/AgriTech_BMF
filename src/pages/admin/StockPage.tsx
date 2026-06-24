@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { SortableHead, useTableSort } from "@/components/ui/sortable-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -120,6 +121,15 @@ export default function StockPage() {
     return <Badge variant="outline" className="bg-emerald-500/15 text-emerald-700 border-emerald-300">🟢 Disponible</Badge>;
   };
 
+  const { sorted, sort } = useTableSort(items, {
+    name: (i) => i.name,
+    category: (i) => CAT_LABEL[i.category] ?? i.category,
+    price: (i) => i.purchase_price_dt,
+    quantity: (i) => i.quantity,
+    value: (i) => i.quantity * i.purchase_price_dt,
+    status: (i) => (i.quantity === 0 ? 0 : i.quantity <= i.low_stock_threshold ? 1 : 2),
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -179,12 +189,12 @@ export default function StockPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Appareil</TableHead>
-                <TableHead>Catégorie</TableHead>
-                <TableHead>Prix Achat</TableHead>
-                <TableHead>Quantité</TableHead>
-                <TableHead>Valeur Stock</TableHead>
-                <TableHead>Statut</TableHead>
+                <SortableHead field="name" sort={sort}>Appareil</SortableHead>
+                <SortableHead field="category" sort={sort}>Catégorie</SortableHead>
+                <SortableHead field="price" sort={sort}>Prix Achat</SortableHead>
+                <SortableHead field="quantity" sort={sort}>Quantité</SortableHead>
+                <SortableHead field="value" sort={sort}>Valeur Stock</SortableHead>
+                <SortableHead field="status" sort={sort}>Statut</SortableHead>
                 <TableHead className="w-32">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -194,7 +204,7 @@ export default function StockPage() {
                   <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">Chargement...</TableCell>
                 </TableRow>
               )}
-              {!isLoading && items.map((i) => (
+              {!isLoading && sorted.map((i) => (
                 <TableRow key={i.id}>
                   <TableCell className="font-medium">
                     {i.name}
@@ -329,6 +339,13 @@ function HistoryDialog({ item, onClose }: { item: StockItem | null; onClose: () 
     enabled: !!item,
   });
 
+  const { sorted, sort } = useTableSort(movements, {
+    date: (m) => (m.created_at ? new Date(m.created_at) : null),
+    type: (m) => m.movement_type,
+    quantity: (m) => m.quantity,
+    reason: (m) => m.reason,
+  });
+
   if (!item) return null;
 
   const typeLabel: Record<string, { label: string; color: string }> = {
@@ -346,14 +363,14 @@ function HistoryDialog({ item, onClose }: { item: StockItem | null; onClose: () 
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Quantité</TableHead>
-                <TableHead>Raison</TableHead>
+                <SortableHead field="date" sort={sort}>Date</SortableHead>
+                <SortableHead field="type" sort={sort}>Type</SortableHead>
+                <SortableHead field="quantity" sort={sort}>Quantité</SortableHead>
+                <SortableHead field="reason" sort={sort}>Raison</SortableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {movements.map((m) => (
+              {sorted.map((m) => (
                 <TableRow key={m.id}>
                   <TableCell className="text-xs">{new Date(m.created_at).toLocaleString("fr-FR")}</TableCell>
                   <TableCell>

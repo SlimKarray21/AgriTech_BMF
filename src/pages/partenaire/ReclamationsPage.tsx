@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { SortableHead, useTableSort } from "@/components/ui/sortable-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -60,6 +61,14 @@ export default function ReclamationsPage() {
 
   const filtered = reclamations.filter(r => filterStatus === "all" || r.statut === filterStatus);
 
+  const { sorted, sort } = useTableSort(filtered, {
+    user: (r) => r.userName ?? r.userEmail,
+    sujet: (r) => r.sujet,
+    message: (r) => r.message,
+    date: (r) => (r.created_at ? new Date(r.created_at) : null),
+    statut: (r) => r.statut,
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
@@ -82,16 +91,16 @@ export default function ReclamationsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Utilisateur</TableHead>
-                <TableHead>Sujet</TableHead>
-                <TableHead>Message</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Statut</TableHead>
+                <SortableHead field="user" sort={sort}>Utilisateur</SortableHead>
+                <SortableHead field="sujet" sort={sort}>Sujet</SortableHead>
+                <SortableHead field="message" sort={sort}>Message</SortableHead>
+                <SortableHead field="date" sort={sort}>Date</SortableHead>
+                <SortableHead field="statut" sort={sort}>Statut</SortableHead>
                 <TableHead className="w-32">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((r) => (
+              {sorted.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell className="font-medium">
                     <div>{r.userName}</div>

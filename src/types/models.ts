@@ -86,8 +86,11 @@ export interface Vanne {
   nbPlantParVanne: number;
   debitEauParVanne: number;
   fkSurface: string;
-  // joined
   surfaceNom?: string;
+  deviceId?: string;
+  pistonNumber?: number;
+  isOpen?: boolean;
+  isAuto?: boolean;
 }
 
 export interface WaterReport {

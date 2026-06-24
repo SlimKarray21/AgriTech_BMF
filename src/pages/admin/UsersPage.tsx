@@ -4,6 +4,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/hooks/useAuth";
 import { getToken } from "@/lib/token";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { SortableHead, useTableSort } from "@/components/ui/sortable-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -213,6 +214,16 @@ export default function UsersPage() {
     });
   };
 
+  const { sorted, sort } = useTableSort(filtered, {
+    email: (u) => u.email,
+    firstName: (u) => u.firstName,
+    lastName: (u) => u.lastName,
+    phone: (u) => u.phoneNumber,
+    role: (u) => resolveRole(u),
+    verified: (u) => (u.emailVerified ? 1 : 0),
+    createdAt: (u) => (u.createdAt ? new Date(u.createdAt) : null),
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
@@ -239,13 +250,13 @@ export default function UsersPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>{t("auth.email")}</TableHead>
-                <TableHead>{t("auth.firstName")}</TableHead>
-                <TableHead>{t("auth.lastName")}</TableHead>
-                <TableHead>{t("auth.phone")}</TableHead>
-                <TableHead>Rôle</TableHead>
-                <TableHead>Email vérifié</TableHead>
-                <TableHead>Inscrit le</TableHead>
+                <SortableHead field="email" sort={sort}>{t("auth.email")}</SortableHead>
+                <SortableHead field="firstName" sort={sort}>{t("auth.firstName")}</SortableHead>
+                <SortableHead field="lastName" sort={sort}>{t("auth.lastName")}</SortableHead>
+                <SortableHead field="phone" sort={sort}>{t("auth.phone")}</SortableHead>
+                <SortableHead field="role" sort={sort}>Rôle</SortableHead>
+                <SortableHead field="verified" sort={sort}>Email vérifié</SortableHead>
+                <SortableHead field="createdAt" sort={sort}>Inscrit le</SortableHead>
                 <TableHead className="w-24">{t("common.actions")}</TableHead>
               </TableRow>
             </TableHeader>
@@ -257,7 +268,7 @@ export default function UsersPage() {
                   </TableCell>
                 </TableRow>
               )}
-              {!isLoading && filtered.map((u) => {
+              {!isLoading && sorted.map((u) => {
                 const isPartenaire = resolveRole(u) === "partenaire";
                 return (
                 <TableRow

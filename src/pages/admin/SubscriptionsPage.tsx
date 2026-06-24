@@ -4,6 +4,7 @@ import { getProfiles, updateProfile, getSubscriptionPlans } from "@/services/dat
 import { useFilteredProfiles } from "@/hooks/useRoleFilter";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { SortableHead, useTableSort } from "@/components/ui/sortable-table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -137,6 +138,17 @@ export default function SubscriptionsPage() {
 
   const selectedPlan = plans.find((p: any) => p.id === selectedPlanId);
 
+  const { sorted, sort } = useTableSort(profiles, {
+    user: (p) => `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || p.email,
+    abo: (p) => p.type_abo ?? null,
+    start: (p) => (p.date_deb_abo ? new Date(p.date_deb_abo) : null),
+    end: (p) => (p.date_exp_abo ? new Date(p.date_exp_abo) : null),
+    status: (p) =>
+      p.date_exp_abo
+        ? Math.ceil((new Date(p.date_exp_abo).getTime() - Date.now()) / 86400000)
+        : null,
+  });
+
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-foreground">{t("nav.subscriptions")}</h2>
@@ -154,16 +166,16 @@ export default function SubscriptionsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>{t("users.title")}</TableHead>
-                <TableHead>Abonnement actif</TableHead>
-                <TableHead>{t("sub.start")}</TableHead>
-                <TableHead>{t("sub.end")}</TableHead>
-                <TableHead>{t("common.status")}</TableHead>
+                <SortableHead field="user" sort={sort}>{t("users.title")}</SortableHead>
+                <SortableHead field="abo" sort={sort}>Abonnement actif</SortableHead>
+                <SortableHead field="start" sort={sort}>{t("sub.start")}</SortableHead>
+                <SortableHead field="end" sort={sort}>{t("sub.end")}</SortableHead>
+                <SortableHead field="status" sort={sort}>{t("common.status")}</SortableHead>
                 <TableHead className="w-24">{t("common.actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {profiles.map((p) => {
+              {sorted.map((p) => {
                 const status = getStatus(p);
                 return (
                   <TableRow key={p.id}>

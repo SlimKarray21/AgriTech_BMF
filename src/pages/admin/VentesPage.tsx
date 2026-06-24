@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getClientSales, getProfiles, getSubscriptionPlans } from "@/services/data-service";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { SortableHead, useTableSort } from "@/components/ui/sortable-table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ShoppingCart, TrendingUp, CheckCircle2, Clock, XCircle } from "lucide-react";
@@ -60,6 +61,18 @@ export default function VentesPage() {
     return <Badge variant="outline" className="bg-orange-500/15 text-orange-700 border-orange-300">En attente</Badge>;
   };
 
+  const { sorted, sort } = useTableSort(filtered, {
+    date: (s) => new Date(s.created_at),
+    buyer: (s) => {
+      const b = profById[s.profile_id];
+      return b ? `${b.first_name ?? ""} ${b.last_name ?? ""}`.trim() || b.email : null;
+    },
+    plan: (s) => planById[s.subscription_plan_id ?? ""]?.name ?? null,
+    total: (s) => s.total_dt,
+    method: (s) => METHODS[s.payment_method] ?? s.payment_method,
+    status: (s) => s.status,
+  });
+
   return (
     <div className="space-y-6">
       <div>
@@ -99,11 +112,11 @@ export default function VentesPage() {
         <CardContent className="p-0">
           <Table>
             <TableHeader><TableRow>
-              <TableHead>Date</TableHead><TableHead>Acheteur</TableHead><TableHead>Abonnement</TableHead>
-              <TableHead>Total</TableHead><TableHead>Méthode</TableHead><TableHead>Statut</TableHead>
+              <SortableHead field="date" sort={sort}>Date</SortableHead><SortableHead field="buyer" sort={sort}>Acheteur</SortableHead><SortableHead field="plan" sort={sort}>Abonnement</SortableHead>
+              <SortableHead field="total" sort={sort}>Total</SortableHead><SortableHead field="method" sort={sort}>Méthode</SortableHead><SortableHead field="status" sort={sort}>Statut</SortableHead>
             </TableRow></TableHeader>
             <TableBody>
-              {filtered.map(s => {
+              {sorted.map(s => {
                 const buyer = profById[s.profile_id];
                 const plan = planById[s.subscription_plan_id ?? ""];
                 return (

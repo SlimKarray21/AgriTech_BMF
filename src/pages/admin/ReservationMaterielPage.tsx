@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { SortableHead, useTableSort } from "@/components/ui/sortable-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -275,6 +276,26 @@ function SurfaceTable({
     return <Badge variant="outline" className="bg-emerald-500/15 text-emerald-700 border-emerald-300"><Wifi className="h-3 w-3 mr-1" />Connectée</Badge>;
   };
 
+  const aboPlanOf = (s: Surface) => {
+    const r = resBySurface.get(s.id);
+    const p = s.fkUser ? profById[s.fkUser] : null;
+    const plan = r?.subscription_plan_id ? planById[r.subscription_plan_id] : null;
+    return plan ?? (p?.type_abo ? plans.find(pl => pl.name === p.type_abo) : null);
+  };
+  const { sorted, sort } = useTableSort(surfaces, {
+    parcelle: (s) => s.nomSurface,
+    client: (s) => {
+      const p = s.fkUser ? profById[s.fkUser] : null;
+      return p ? `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || p.email : null;
+    },
+    materiel: (s) => resBySurface.get(s.id)?.total_devices_price_dt ?? 0,
+    abo: (s) => aboPlanOf(s)?.name ?? (s.fkUser ? profById[s.fkUser]?.type_abo : null) ?? null,
+    total: (s) => {
+      const r = resBySurface.get(s.id);
+      return (aboPlanOf(s)?.price_dt ?? 0) + (r?.total_devices_price_dt ?? 0);
+    },
+  });
+
   return (
     <Card>
       <CardHeader><CardTitle className="text-base">
@@ -285,13 +306,13 @@ function SurfaceTable({
       <CardContent className="p-0">
         <Table>
           <TableHeader><TableRow>
-            <TableHead>Parcelle</TableHead><TableHead>Client</TableHead>
-            <TableHead>Matériel</TableHead><TableHead>Abonnement</TableHead>
-            <TableHead>Total</TableHead><TableHead>Statut</TableHead>
+            <SortableHead field="parcelle" sort={sort}>Parcelle</SortableHead><SortableHead field="client" sort={sort}>Client</SortableHead>
+            <SortableHead field="materiel" sort={sort}>Matériel</SortableHead><SortableHead field="abo" sort={sort}>Abonnement</SortableHead>
+            <SortableHead field="total" sort={sort}>Total</SortableHead><TableHead>Statut</TableHead>
             <TableHead className="w-72">Actions</TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {surfaces.map(s => {
+            {sorted.map(s => {
               const r = resBySurface.get(s.id);
               const p = s.fkUser ? profById[s.fkUser] : null;
               const plan = r?.subscription_plan_id ? planById[r.subscription_plan_id] : null;

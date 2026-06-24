@@ -4,6 +4,7 @@ import { getSurfaces, createSurface, updateSurface, deleteSurface, getProfiles }
 import { useFilteredProfiles, useFilteredSurfaces } from "@/hooks/useRoleFilter";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { SortableHead, useTableSort } from "@/components/ui/sortable-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -56,6 +57,15 @@ export default function SurfacesPage() {
     });
   };
 
+  const { sorted, sort } = useTableSort(items, {
+    nom: (s) => s.nomSurface,
+    location: (s) => s.localisation,
+    taille: (s) => s.tailleHa ?? null,
+    vannes: (s) => s.nbVanne,
+    user: (s) => s.userEmail,
+    typeSol: (s) => s.typeSol,
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -93,17 +103,17 @@ export default function SurfacesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Nom</TableHead>
-                <TableHead>{t("surface.location")}</TableHead>
-                <TableHead>{t("parcelle.taille")}</TableHead>
-                <TableHead>Nb vannes</TableHead>
-                <TableHead>{t("wizard.user")}</TableHead>
-                <TableHead>Type sol</TableHead>
+                <SortableHead field="nom" sort={sort}>Nom</SortableHead>
+                <SortableHead field="location" sort={sort}>{t("surface.location")}</SortableHead>
+                <SortableHead field="taille" sort={sort}>{t("parcelle.taille")}</SortableHead>
+                <SortableHead field="vannes" sort={sort}>Nb vannes</SortableHead>
+                <SortableHead field="user" sort={sort}>{t("wizard.user")}</SortableHead>
+                <SortableHead field="typeSol" sort={sort}>Type sol</SortableHead>
                 <TableHead className="w-24">{t("common.actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {items.map((s) => (
+              {sorted.map((s) => (
                 <TableRow key={s.id}>
                   <TableCell>{s.nomSurface}</TableCell>
                   <TableCell>{s.localisation}</TableCell>

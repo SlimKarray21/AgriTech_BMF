@@ -6,6 +6,7 @@ import { getAdminUsersApi } from "@/services/auth-api";
 import { getProfiles } from "@/services/data-service";
 import { API_BASE_URL } from "@/services/api-config";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { SortableHead, useTableSort } from "@/components/ui/sortable-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -54,6 +55,13 @@ export default function PartenaireDetailsPage() {
   const filteredUnassigned = unassigned.filter((p) =>
     `${p.first_name} ${p.last_name} ${p.email ?? ""}`.toLowerCase().includes(search.toLowerCase())
   );
+
+  const { sorted, sort } = useTableSort(clients, {
+    email: (c) => c.email,
+    firstName: (c) => c.first_name,
+    lastName: (c) => c.last_name,
+    phone: (c) => c.phone_number,
+  });
 
   const assignMut = useMutation({
     mutationFn: async (profileIds: string[]) => {
@@ -179,10 +187,10 @@ export default function PartenaireDetailsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Prénom</TableHead>
-                  <TableHead>Nom</TableHead>
-                  <TableHead>Téléphone</TableHead>
+                  <SortableHead field="email" sort={sort}>Email</SortableHead>
+                  <SortableHead field="firstName" sort={sort}>Prénom</SortableHead>
+                  <SortableHead field="lastName" sort={sort}>Nom</SortableHead>
+                  <SortableHead field="phone" sort={sort}>Téléphone</SortableHead>
                   <TableHead>Rôle</TableHead>
                   <TableHead className="w-16"></TableHead>
                 </TableRow>
@@ -195,7 +203,7 @@ export default function PartenaireDetailsPage() {
                     </TableCell>
                   </TableRow>
                 )}
-                {clients.map((c) => (
+                {sorted.map((c) => (
                   <TableRow key={c.id}>
                     <TableCell className="font-medium">{c.email}</TableCell>
                     <TableCell>{c.first_name || "—"}</TableCell>

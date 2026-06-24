@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { SortableHead, useTableSort, type SortState } from "@/components/ui/sortable-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -66,17 +67,32 @@ export default function ReclamationsPage() {
   const userList = byStatus(reclamations.filter(r => r.userRole !== "PARTENAIRE"));
   const partenaireList = byStatus(reclamations.filter(r => r.userRole === "PARTENAIRE"));
 
-  const renderTable = (list: typeof reclamations, firstColLabel: string, emptyLabel: string) => (
+  const accessors = {
+    user: (r: (typeof reclamations)[number]) => r.userName ?? r.userEmail,
+    sujet: (r: (typeof reclamations)[number]) => r.sujet,
+    message: (r: (typeof reclamations)[number]) => r.message,
+    date: (r: (typeof reclamations)[number]) => (r.created_at ? new Date(r.created_at) : null),
+    statut: (r: (typeof reclamations)[number]) => r.statut,
+  };
+  const userSorted = useTableSort(userList, accessors);
+  const partenaireSorted = useTableSort(partenaireList, accessors);
+
+  const renderTable = (
+    list: typeof reclamations,
+    sort: SortState,
+    firstColLabel: string,
+    emptyLabel: string,
+  ) => (
     <Card>
       <CardContent className="p-0">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>{firstColLabel}</TableHead>
-              <TableHead>Sujet</TableHead>
-              <TableHead>Message</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Statut</TableHead>
+              <SortableHead field="user" sort={sort}>{firstColLabel}</SortableHead>
+              <SortableHead field="sujet" sort={sort}>Sujet</SortableHead>
+              <SortableHead field="message" sort={sort}>Message</SortableHead>
+              <SortableHead field="date" sort={sort}>Date</SortableHead>
+              <SortableHead field="statut" sort={sort}>Statut</SortableHead>
               <TableHead className="w-32">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -155,10 +171,10 @@ export default function ReclamationsPage() {
           <TabsTrigger value="partenaires"><Package className="mr-1 h-4 w-4" /> Demandes Matériel <Badge variant="secondary" className="ml-1">{partenaireList.length}</Badge></TabsTrigger>
         </TabsList>
         <TabsContent value="users" className="mt-4">
-          {renderTable(userList, "Utilisateur", "Aucune réclamation utilisateur")}
+          {renderTable(userSorted.sorted, userSorted.sort, "Utilisateur", "Aucune réclamation utilisateur")}
         </TabsContent>
         <TabsContent value="partenaires" className="mt-4">
-          {renderTable(partenaireList, "Partenaire", "Aucune demande de matériel")}
+          {renderTable(partenaireSorted.sorted, partenaireSorted.sort, "Partenaire", "Aucune demande de matériel")}
         </TabsContent>
       </Tabs>
 

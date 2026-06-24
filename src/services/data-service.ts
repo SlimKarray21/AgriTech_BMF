@@ -15,8 +15,15 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
     },
   });
   if (!res.ok) {
-    const err = await res.text();
-    throw new Error(err || `HTTP ${res.status}`);
+    const raw = await res.text();
+    let message = raw || `HTTP ${res.status}`;
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed.error === "string") message = parsed.error;
+    } catch {
+      // corps non-JSON : on garde le texte brut
+    }
+    throw new Error(message);
   }
   const text = await res.text();
   return text ? JSON.parse(text) : undefined;
@@ -195,6 +202,8 @@ export const getVannes = async (): Promise<Vanne[]> => {
     surfaceNom: surfMap.get(String(v.parcelId ?? v.parcel_id ?? v.fk_surface)) ?? "—",
     isAuto: v.isAuto ?? v.is_auto ?? false,
     isOpen: v.isOpen ?? v.is_open ?? false,
+    deviceId: v.deviceId ?? v.device_id ?? undefined,
+    pistonNumber: v.pistonNumber ?? v.piston_number ?? undefined,
   }));
 };
 
@@ -208,17 +217,22 @@ export const createVanne = async (d: Omit<Vanne, "id" | "surfaceNom">): Promise<
       nbPlants: d.nbPlantParVanne,
       isAuto: false,
       isOpen: false,
+      deviceId: d.deviceId || undefined,
+      pistonNumber: d.pistonNumber || undefined,
     }),
   });
-  return { id: String(res.id), nomVanne: d.nomVanne, nbPlantParVanne: d.nbPlantParVanne, debitEauParVanne: d.debitEauParVanne, fkSurface: d.fkSurface };
+  return { id: String(res.id), nomVanne: d.nomVanne, nbPlantParVanne: d.nbPlantParVanne, debitEauParVanne: d.debitEauParVanne, fkSurface: d.fkSurface, deviceId: d.deviceId, pistonNumber: d.pistonNumber };
 };
 
 export const updateVanne = async (id: string, d: Partial<Vanne>): Promise<Vanne | null> => {
   const body: any = {};
-  if (d.nomVanne !== undefined)        body.name      = d.nomVanne;
-  if (d.nbPlantParVanne !== undefined) body.nbPlants  = d.nbPlantParVanne;
-  if (d.debitEauParVanne !== undefined) body.debit    = d.debitEauParVanne;
-  if (d.fkSurface !== undefined)       body.parcelId  = Number(d.fkSurface);
+  if (d.nomVanne !== undefined)        body.name         = d.nomVanne;
+  if (d.nbPlantParVanne !== undefined) body.nbPlants     = d.nbPlantParVanne;
+  if (d.debitEauParVanne !== undefined) body.debit       = d.debitEauParVanne;
+  if (d.fkSurface !== undefined)       body.parcelId     = Number(d.fkSurface);
+  if (d.isOpen !== undefined)          body.isOpen       = d.isOpen;
+  if (d.deviceId !== undefined)        body.deviceId     = d.deviceId;
+  if (d.pistonNumber !== undefined)    body.pistonNumber = d.pistonNumber;
   await apiFetch(`/vannes/${id}`, { method: "PATCH", body: JSON.stringify(body) });
   return null;
 };
@@ -388,21 +402,6 @@ export const createClientSale = async (d: any): Promise<any> =>
 export const updateClientSale = async (id: string, d: any): Promise<any> =>
   apiFetch(`/api/agri/client-sales/${id}`, { method: "PATCH", body: JSON.stringify(d) });
 
-// ── DEVICE CATALOG ────────────────────────────────────────────────────────────
-
-export const getDeviceCatalog = async (): Promise<any[]> =>
-  apiFetch("/api/agri/device-catalog");
-
-export const createDeviceCatalog = async (d: any): Promise<any> =>
-  apiFetch("/api/agri/device-catalog", { method: "POST", body: JSON.stringify(d) });
-
-export const updateDeviceCatalog = async (id: string, d: any): Promise<any> =>
-  apiFetch(`/api/agri/device-catalog/${id}`, { method: "PATCH", body: JSON.stringify(d) });
-
-export const deleteDeviceCatalog = async (id: string): Promise<void> => {
-  await apiFetch(`/api/agri/device-catalog/${id}`, { method: "DELETE" });
-};
-
 // ── DEVICE SALES ──────────────────────────────────────────────────────────────
 
 export const getDeviceSales = async (): Promise<any[]> =>
@@ -466,26 +465,6 @@ export const getReservationItemsByReservation = async (reservationId: string): P
 export const deleteReservationItem = async (id: string): Promise<void> => {
   await apiFetch(`/api/agri/reservation-items/${id}`, { method: "DELETE" });
 };
-
-// ── SUPPORT NOTIFICATIONS ─────────────────────────────────────────────────────
-
-export const getSupportNotifications = async (): Promise<any[]> =>
-  apiFetch("/api/agri/support-notifications");
-
-export const createSupportNotification = async (d: any): Promise<any> =>
-  apiFetch("/api/agri/support-notifications", { method: "POST", body: JSON.stringify(d) });
-
-export const markNotificationRead = async (id: string): Promise<void> => {
-  await apiFetch(`/api/agri/support-notifications/${id}`, { method: "PATCH", body: JSON.stringify({ is_read: true }) });
-};
-
-// ── SUBSCRIP NOTIF ────────────────────────────────────────────────────────────
-
-export const getSubscripNotifs = async (): Promise<any[]> =>
-  apiFetch("/api/agri/subscrip-notif");
-
-export const createSubscripNotif = async (d: any): Promise<any> =>
-  apiFetch("/api/agri/subscrip-notif", { method: "POST", body: JSON.stringify(d) });
 
 // ── RAPPORT SOL ───────────────────────────────────────────────────────────────
 

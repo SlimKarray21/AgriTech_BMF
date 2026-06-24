@@ -4,6 +4,7 @@ import { getReclamations, createReclamation, getStockItems } from "@/services/da
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { SortableHead, useTableSort } from "@/components/ui/sortable-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -35,6 +36,13 @@ export default function DemandeMaterielPage() {
     () => reclamations.filter(r => String(r.profile_id) === String(profile?.id)),
     [reclamations, profile?.id],
   );
+
+  const { sorted, sort } = useTableSort(myDemandes, {
+    materiel: (r) => r.sujet,
+    details: (r) => r.message,
+    date: (r) => (r.created_at ? new Date(r.created_at) : null),
+    statut: (r) => r.statut,
+  });
 
   const resetForm = () => { setItems([]); setAddId(""); setAddQty(1); setNotes(""); };
 
@@ -93,14 +101,14 @@ export default function DemandeMaterielPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Matériel</TableHead>
-                <TableHead>Détails</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Statut</TableHead>
+                <SortableHead field="materiel" sort={sort}>Matériel</SortableHead>
+                <SortableHead field="details" sort={sort}>Détails</SortableHead>
+                <SortableHead field="date" sort={sort}>Date</SortableHead>
+                <SortableHead field="statut" sort={sort}>Statut</SortableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {myDemandes.map((r) => (
+              {sorted.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell className="font-medium">{r.sujet}</TableCell>
                   <TableCell className="max-w-xs truncate text-sm text-muted-foreground whitespace-pre-line">{r.message}</TableCell>
