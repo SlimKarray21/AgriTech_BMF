@@ -6,6 +6,7 @@ import 'package:uiearth_flutter/core/l10n/app_localizations.dart';
 import 'package:uiearth_flutter/core/theme/app_colors.dart';
 import 'package:uiearth_flutter/data/api/api_exception.dart';
 import 'package:uiearth_flutter/data/models/parcelle.dart';
+import 'package:uiearth_flutter/domain/providers/access_provider.dart';
 import 'package:uiearth_flutter/domain/providers/api_providers.dart';
 import 'package:uiearth_flutter/domain/providers/parcelle_provider.dart';
 import 'package:uiearth_flutter/domain/providers/valve_provider.dart';
@@ -75,6 +76,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final langState = ref.watch(languageProvider);
     final parcelles = ref.watch(parcellesProvider);
     final valveState = p.Provider.of<ValveProvider>(context);
+    final access = ref.watch(accessProvider);
     final theme = Theme.of(context);
 
     final filtered = parcelles.where((p) {
@@ -158,35 +160,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
         // Reports Icon Button
-        GestureDetector(
-          onTap: () => context.push('/rapports'),
-          child: Container(
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppColors.farmLeaf.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.farmLeaf.withValues(alpha: 0.2)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.note_add_outlined, color: AppColors.farmLeaf, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  langState.t('nav.reports'),
-                  style: const TextStyle(
-                    color: AppColors.farmLeaf,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
+        if (access.canFeature('parcelles', 'parcelles.add_rapport')) ...[
+          GestureDetector(
+            onTap: () => context.push('/rapports'),
+            child: Container(
+              height: 48,
+              decoration: BoxDecoration(
+                color: AppColors.farmLeaf.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.farmLeaf.withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.note_add_outlined, color: AppColors.farmLeaf, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    langState.t('nav.reports'),
+                    style: const TextStyle(
+                      color: AppColors.farmLeaf,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 4),
-                Icon(Icons.chevron_right, color: AppColors.farmLeaf.withValues(alpha: 0.6), size: 18),
-              ],
+                  const SizedBox(width: 4),
+                  Icon(Icons.chevron_right, color: AppColors.farmLeaf.withValues(alpha: 0.6), size: 18),
+                ],
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 12),
+          const SizedBox(height: 12),
+        ],
 
         // Search
         Container(
@@ -277,6 +281,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   void _showDetail(ParcelleData parcelle) {
     final langState = ref.read(languageProvider);
+    final access = ref.read(accessProvider);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -350,15 +355,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   '$openCount/${parcelleValves.length} ${langState.t('index.valves')} ${langState.t('index.open')}',
                   style: theme.textTheme.labelSmall,
                 ),
-                const Divider(height: 24),
-                _SectionHeader(icon: Icons.wb_sunny_outlined, color: AppColors.farmSun, title: langState.t('index.climate_data')),
-                const SizedBox(height: 8),
-                Wrap(spacing: 8, runSpacing: 8, children: [
-                  _DataChip(parcelle.climate.airTemp, langState.t('index.air_temp'), AppColors.farmSun),
-                  _DataChip(parcelle.climate.humidity, langState.t('index.humidity'), AppColors.farmWater),
-                  _DataChip(parcelle.climate.sunshine, langState.t('index.sunshine'), AppColors.farmSun),
-                  _DataChip(parcelle.climate.wind, langState.t('index.wind'), AppColors.farmWater),
-                ]),
+                if (access.canFeature('parcelles', 'parcelles.climat')) ...[
+                  const Divider(height: 24),
+                  _SectionHeader(icon: Icons.wb_sunny_outlined, color: AppColors.farmSun, title: langState.t('index.climate_data')),
+                  const SizedBox(height: 8),
+                  Wrap(spacing: 8, runSpacing: 8, children: [
+                    _DataChip(parcelle.climate.airTemp, langState.t('index.air_temp'), AppColors.farmSun),
+                    _DataChip(parcelle.climate.humidity, langState.t('index.humidity'), AppColors.farmWater),
+                    _DataChip(parcelle.climate.sunshine, langState.t('index.sunshine'), AppColors.farmSun),
+                    _DataChip(parcelle.climate.wind, langState.t('index.wind'), AppColors.farmWater),
+                  ]),
+                ],
+                if (access.canFeature('parcelles', 'parcelles.controle_vanne')) ...[
                 const Divider(height: 24),
                 _SectionHeader(icon: Icons.power_settings_new, color: AppColors.farmWater, title: langState.t('index.electrovalves')),
                 const SizedBox(height: 8),
@@ -416,19 +424,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           onChanged: (_) => _toggleValveSafe(sheetCtx, v),
                         ),
                         ]),
-                        const SizedBox(height: 8),
                         // Données du sol (capteur de la vanne)
-                        Row(children: [
-                          Expanded(child: _DataChip(parcelle.soil.temperature, langState.t('index.soil_temp'), AppColors.farmSun)),
-                          const SizedBox(width: 8),
-                          Expanded(child: _DataChip(parcelle.soil.humidity, langState.t('index.soil_humidity'), AppColors.farmWater)),
-                          const SizedBox(width: 8),
-                          Expanded(child: _DataChip(parcelle.soil.ph, langState.t('index.soil_ph'), AppColors.farmEarth)),
-                        ]),
+                        if (access.canFeature('parcelles', 'parcelles.sol')) ...[
+                          const SizedBox(height: 8),
+                          Row(children: [
+                            Expanded(child: _DataChip(parcelle.soil.temperature, langState.t('index.soil_temp'), AppColors.farmSun)),
+                            const SizedBox(width: 8),
+                            Expanded(child: _DataChip(parcelle.soil.humidity, langState.t('index.soil_humidity'), AppColors.farmWater)),
+                            const SizedBox(width: 8),
+                            Expanded(child: _DataChip(parcelle.soil.ph, langState.t('index.soil_ph'), AppColors.farmEarth)),
+                          ]),
+                        ],
                       ],
                     ),
                   );
                 }),
+                ],
                 const Divider(height: 24),
                 _SectionHeader(icon: Icons.calendar_today, color: AppColors.farmSun, title: langState.t('index.next_ops')),
                 const SizedBox(height: 8),

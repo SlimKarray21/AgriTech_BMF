@@ -1,28 +1,36 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uiearth_flutter/core/l10n/app_localizations.dart';
 import 'package:uiearth_flutter/core/theme/app_colors.dart';
 
-class BottomNavBar extends ConsumerWidget {
+/// Description d'un onglet de la barre de navigation.
+class NavTab {
+  final String path;
+  final IconData activeIcon;
+  final IconData icon;
+  final String label;
+  const NavTab({
+    required this.path,
+    required this.activeIcon,
+    required this.icon,
+    required this.label,
+  });
+}
+
+class BottomNavBar extends StatelessWidget {
+  final List<NavTab> tabs;
   final int currentIndex;
   final ValueChanged<int> onTap;
 
-  const BottomNavBar({super.key, required this.currentIndex, required this.onTap});
+  const BottomNavBar({
+    super.key,
+    required this.tabs,
+    required this.currentIndex,
+    required this.onTap,
+  });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final langState = ref.watch(languageProvider);
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-
-    final tabs = [
-      _Tab(Icons.home_rounded,              Icons.home_outlined,             langState.t('nav.accueil')),
-      _Tab(Icons.terrain_rounded,           Icons.terrain_outlined,          langState.t('nav.home')),
-      _Tab(Icons.monitor_heart_rounded,     Icons.monitor_heart_outlined,    langState.t('nav.health')),
-      _Tab(Icons.water_drop_rounded,        Icons.water_drop_outlined,       langState.t('nav.valves')),
-      _Tab(Icons.cloud_rounded,             Icons.cloud_outlined,            langState.t('nav.weather')),
-      _Tab(Icons.person_rounded,            Icons.person_outline_rounded,    langState.t('nav.profile')),
-    ];
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
@@ -104,11 +112,4 @@ class BottomNavBar extends ConsumerWidget {
       ),
     );
   }
-}
-
-class _Tab {
-  final IconData activeIcon;
-  final IconData icon;
-  final String label;
-  const _Tab(this.activeIcon, this.icon, this.label);
 }

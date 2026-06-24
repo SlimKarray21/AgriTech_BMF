@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart' as p;
 import 'package:uiearth_flutter/core/theme/app_colors.dart';
 import 'package:uiearth_flutter/data/models/parcelle.dart';
+import 'package:uiearth_flutter/domain/providers/access_provider.dart';
 import 'package:uiearth_flutter/domain/providers/api_providers.dart';
 import 'package:uiearth_flutter/domain/providers/parcelle_provider.dart';
 import 'package:uiearth_flutter/domain/providers/valve_provider.dart';
@@ -89,6 +90,7 @@ class _AccueilScreenState extends ConsumerState<AccueilScreen> {
   Widget build(BuildContext context) {
     final parcelles = ref.watch(parcellesProvider);
     final valveState = p.Provider.of<ValveProvider>(context);
+    final access = ref.watch(accessProvider);
     final theme = Theme.of(context);
     final allVannes = valveState.valves;
 
@@ -115,6 +117,8 @@ class _AccueilScreenState extends ConsumerState<AccueilScreen> {
               totalPlants: totalPlants,
               totalVannes: allVannes.length,
               loading: _loading,
+              showAddParcelle: access.canFeature('accueil', 'accueil.add_parcelle'),
+              showReports: access.canFeature('accueil', 'accueil.add_rapport'),
               onAddParcelle: () => context.push('/formulaire'),
               onReports: () => context.push('/rapports'),
             ),
@@ -153,11 +157,12 @@ class _AccueilScreenState extends ConsumerState<AccueilScreen> {
                     const SizedBox(height: 12),
                     Text('Aucune parcelle', style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.outline)),
                     const SizedBox(height: 8),
-                    ElevatedButton.icon(
-                      onPressed: () => context.push('/formulaire'),
-                      icon: const Icon(Icons.add),
-                      label: const Text('Ajouter une parcelle'),
-                    ),
+                    if (access.canFeature('accueil', 'accueil.add_parcelle'))
+                      ElevatedButton.icon(
+                        onPressed: () => context.push('/formulaire'),
+                        icon: const Icon(Icons.add),
+                        label: const Text('Ajouter une parcelle'),
+                      ),
                   ],
                 ),
               ),
@@ -183,10 +188,11 @@ class _AccueilScreenState extends ConsumerState<AccueilScreen> {
             ),
 
           // ── Chatbot section ──────────────────────────────────────────────
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-            sliver: SliverToBoxAdapter(child: _ChatbotWidget()),
-          ),
+          if (access.canFeature('accueil', 'accueil.ia'))
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+              sliver: SliverToBoxAdapter(child: _ChatbotWidget()),
+            ),
         ],
       ),
     );
@@ -200,6 +206,7 @@ class _HeroHeader extends StatelessWidget {
   final double totalHa;
   final int openCount, connectedCount, totalPlants, totalVannes;
   final bool loading;
+  final bool showAddParcelle, showReports;
   final VoidCallback onAddParcelle, onReports;
 
   const _HeroHeader({
@@ -210,6 +217,8 @@ class _HeroHeader extends StatelessWidget {
     required this.totalPlants,
     required this.totalVannes,
     required this.loading,
+    required this.showAddParcelle,
+    required this.showReports,
     required this.onAddParcelle,
     required this.onReports,
   });
@@ -263,12 +272,16 @@ class _HeroHeader extends StatelessWidget {
                 const SizedBox(width: 10),
                 _KpiCard(value: '$totalVannes', label: 'Total vannes', icon: Icons.settings_input_component_rounded, color: const Color(0xFFfed7aa)),
               ]),
-              const SizedBox(height: 20),
-              Row(children: [
-                Expanded(child: _ActionBtn(label: '+ Parcelle', icon: Icons.add_circle_outline, onTap: onAddParcelle, filled: true)),
-                const SizedBox(width: 10),
-                Expanded(child: _ActionBtn(label: 'Rapports', icon: Icons.note_add_outlined, onTap: onReports, filled: false)),
-              ]),
+              if (showAddParcelle || showReports) ...[
+                const SizedBox(height: 20),
+                Row(children: [
+                  if (showAddParcelle)
+                    Expanded(child: _ActionBtn(label: '+ Parcelle', icon: Icons.add_circle_outline, onTap: onAddParcelle, filled: true)),
+                  if (showAddParcelle && showReports) const SizedBox(width: 10),
+                  if (showReports)
+                    Expanded(child: _ActionBtn(label: 'Rapports', icon: Icons.note_add_outlined, onTap: onReports, filled: false)),
+                ]),
+              ],
             ],
           ),
         ),
