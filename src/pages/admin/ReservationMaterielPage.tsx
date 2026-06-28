@@ -16,7 +16,7 @@ import { ClipboardList, Plus, Trash2, MapPin, User as UserIcon, Search, CheckCir
 import { toast } from "@/hooks/use-toast";
 import {
   getSurfaces, updateSurface,
-  getProfiles, updateProfile,
+  getProfiles,
   getSubscriptionPlans,
   getStockItems, updateStockItem, createStockMovement,
   getMaterialReservations, createMaterialReservation, updateMaterialReservation,
@@ -169,15 +169,12 @@ function SurfaceTable({
   const confirmRes = useMutation({
     mutationFn: async (s: Surface) => {
       const r = resBySurface.get(s.id);
-      const p = s.fkUser ? profById[s.fkUser] : null;
       const hasMat = !!r && (r.total_devices_price_dt ?? 0) > 0;
-      const hasAbo = !!r?.subscription_plan_id || !!p?.type_abo;
       if (!hasMat)
         throw new Error("Ajoutez au moins un matériel à cette parcelle avant de confirmer.");
-      if (!hasAbo)
-        throw new Error("Ajoutez un abonnement à cette parcelle avant de confirmer.");
 
-      // Le backend décrémente le stock et enregistre les mouvements lors du passage à "reserve"
+      // Réservation = appareillage uniquement. L'abonnement est un flux séparé
+      // (Finance → paiement d'abonnement). Le backend décrémente le stock au passage à "reserve".
       await updateMaterialReservation(r!.id, { status: "reserve" });
     },
     onSuccess: () => {
@@ -192,34 +189,32 @@ function SurfaceTable({
     mutationFn: async (s: Surface) => {
       const r = resBySurface.get(s.id);
       if (!r) throw new Error("Aucune réservation");
-      const plan = r.subscription_plan_id ? planById[r.subscription_plan_id] : null;
-      const subPrice = plan?.price_dt ?? 0;
-      const total = subPrice + (r.total_devices_price_dt ?? 0);
+      const p = s.fkUser ? profById[s.fkUser] : null;
+      // Activation du service conditionnée à un abonnement client ACTIF (payé).
+      const subActive = !!p?.date_exp_abo && new Date(p.date_exp_abo).getTime() > Date.now();
+      if (!subActive)
+        throw new Error("Abonnement inactif : le client doit régler son abonnement (Finance) avant l'activation du service.");
+
+      // Vente = appareillage uniquement. L'abonnement n'est JAMAIS facturé ici
+      // ni octroyé d'office : il passe exclusivement par subscription_payments.
       await createClientSale({
         profile_id: r.profile_id ? Number(r.profile_id) : null,
         reservation_id: Number(r.id),
-        subscription_plan_id: r.subscription_plan_id ? Number(r.subscription_plan_id) : null,
-        subscription_price_dt: subPrice,
+        subscription_plan_id: null,
+        subscription_price_dt: 0,
         equipment_price_dt: r.total_devices_price_dt,
-        total_dt: total,
+        total_dt: r.total_devices_price_dt,
         payment_method: "carte",
         status: "confirme",
         confirmed_at: new Date().toISOString(),
       });
-      if (plan && r.profile_id) {
-        const start = new Date(); const exp = new Date(); exp.setDate(exp.getDate() + (plan.duration_days || 30));
-        await updateProfile(r.profile_id, {
-          date_deb_abo: start.toISOString().slice(0, 10),
-          date_exp_abo: exp.toISOString().slice(0, 10),
-        });
-      }
       await updateMaterialReservation(r.id, { status: "installe" });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["reservations-all"] });
       qc.invalidateQueries({ queryKey: ["surfaces-all"] });
-      qc.invalidateQueries({ queryKey: ["profiles-all"] });
-      toast({ title: "Parcelle connectée ✓", description: "Vente créée dans le module Ventes." });
+      qc.invalidateQueries({ queryKey: ["client-sales"] });
+      toast({ title: "Parcelle connectée ✓", description: "Vente d'appareillage enregistrée dans les Recettes." });
     },
     onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
@@ -323,7 +318,13 @@ function SurfaceTable({
                         </Button>
                       )}
                       {mode === "att" && (
-                        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => markConnected.mutate(s)} disabled={markConnected.isPending || !r?.subscription_plan_id}>
+                        <Button
+                          size="sm"
+                          className="bg-emerald-600 hover:bg-emerald-700"
+                          onClick={() => markConnected.mutate(s)}
+                          disabled={markConnected.isPending || !(p?.date_exp_abo && new Date(p.date_exp_abo).getTime() > Date.now())}
+                          title={p?.date_exp_abo && new Date(p.date_exp_abo).getTime() > Date.now() ? undefined : "Abonnement client inactif"}
+                        >
                           <Wifi className="h-3 w-3 mr-1" />Connecter
                         </Button>
                       )}

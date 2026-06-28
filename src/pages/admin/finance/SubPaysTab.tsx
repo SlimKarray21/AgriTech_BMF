@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createSubscriptionPayment, updateSubscriptionPayment, updateProfile } from "@/services/data-service";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
-import { Plus, CheckCircle2, XCircle } from "lucide-react";
+import { Plus, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { Plan, SubPay } from "./types";
 import { DT, METHOD_LABEL } from "./utils";
 
@@ -27,6 +27,51 @@ export default function SubPaysTab({
   const [creating, setCreating] = useState(false);
   const profiles = Object.values(profById);
   const plans = Object.values(planById);
+
+  const emptyForm = { profileId: "", planId: "", amount: "", method: "especes", dateStart: "", dateExp: "" };
+  const [form, setForm] = useState(emptyForm);
+
+  const autoDates = (days: number) => {
+    const start = new Date();
+    const exp = new Date();
+    exp.setDate(exp.getDate() + (days || 30));
+    return { dateStart: start.toISOString().slice(0, 10), dateExp: exp.toISOString().slice(0, 10) };
+  };
+
+  // Sélection d'un client → pré-remplit le plan déjà choisi dans Abonnements
+  // (profile.type_abo == nom du plan), ainsi que le montant et la période.
+  const pickClient = (profileId: string) => {
+    const client = profById[profileId];
+    const matched = client?.type_abo ? (plans as Plan[]).find((p) => p.name === client.type_abo) : null;
+    setForm((f) => matched
+      ? { ...f, profileId, planId: String(matched.id), amount: String(matched.price_dt), ...autoDates(matched.duration_days) }
+      : { ...f, profileId });
+  };
+
+  const pickPlan = (planId: string) => {
+    const plan = (plans as Plan[]).find((p) => String(p.id) === planId);
+    setForm((f) => plan
+      ? { ...f, planId, amount: String(plan.price_dt), ...autoDates(plan.duration_days) }
+      : { ...f, planId });
+  };
+
+  const openCreate = () => { setForm(emptyForm); setCreating(true); };
+  const openCreateFor = (profileId: string) => { setForm(emptyForm); setCreating(true); pickClient(profileId); };
+
+  // Clients ayant choisi un abonnement (type_abo) mais dont le service n'est pas
+  // actif et sans paiement déjà en attente → "à encaisser" (action requise).
+  const enAttenteByProfile = useMemo(
+    () => new Set(subpays.filter((s) => s.status === "en_attente").map((s) => String(s.profile_id))),
+    [subpays],
+  );
+  const aEncaisser = useMemo(
+    () => (profiles as any[]).filter((p) => {
+      if (!p.type_abo) return false;
+      const active = !!p.date_exp_abo && new Date(p.date_exp_abo).getTime() > Date.now();
+      return !active && !enAttenteByProfile.has(String(p.id));
+    }),
+    [profiles, enAttenteByProfile],
+  );
 
   const validate = useMutation({
     mutationFn: async ({ s, status }: { s: SubPay; status: string }) => {
@@ -84,11 +129,55 @@ export default function SubPaysTab({
   });
 
   return (
+    <div className="space-y-6">
+      {isAdmin && aEncaisser.length > 0 && (
+        <Card className="border-orange-300 bg-orange-500/5">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Clock className="h-4 w-4 text-orange-500" /> Clients à encaisser ({aEncaisser.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Client</TableHead>
+                  <TableHead>Abonnement choisi</TableHead>
+                  <TableHead>État</TableHead>
+                  <TableHead className="w-36">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {aEncaisser.map((p: any) => {
+                  const expired = !!p.date_exp_abo && new Date(p.date_exp_abo).getTime() <= Date.now();
+                  return (
+                    <TableRow key={p.id}>
+                      <TableCell className="font-medium">{`${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || p.email}</TableCell>
+                      <TableCell>{p.type_abo}</TableCell>
+                      <TableCell>
+                        {expired
+                          ? <Badge variant="outline" className="bg-red-500/15 text-red-700 border-red-300">Expiré</Badge>
+                          : <Badge variant="outline" className="bg-orange-500/15 text-orange-700 border-orange-300">Jamais payé</Badge>}
+                      </TableCell>
+                      <TableCell>
+                        <Button size="sm" onClick={() => openCreateFor(String(p.id))}>
+                          <Plus className="h-3 w-3 mr-1" />Encaisser
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-base">Paiements d'abonnement</CardTitle>
         {isAdmin && (
-          <Button size="sm" onClick={() => setCreating(true)}>
+          <Button size="sm" onClick={openCreate}>
             <Plus className="h-4 w-4 mr-1" />Nouveau paiement
           </Button>
         )}
@@ -168,21 +257,20 @@ export default function SubPaysTab({
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              const fd = new FormData(e.currentTarget);
               createMut.mutate({
-                profile_id: fd.get("profile_id"),
-                plan_id: fd.get("plan_id"),
-                amount_dt: fd.get("amount_dt"),
-                payment_method: fd.get("payment_method"),
-                date_start: fd.get("date_start"),
-                date_exp: fd.get("date_exp"),
+                profile_id: form.profileId,
+                plan_id: form.planId,
+                amount_dt: form.amount,
+                payment_method: form.method,
+                date_start: form.dateStart,
+                date_exp: form.dateExp,
               });
             }}
             className="space-y-3"
           >
             <div>
               <Label>Client *</Label>
-              <select name="profile_id" required className="w-full border rounded-md px-3 py-2 text-sm bg-background">
+              <select required value={form.profileId} onChange={(e) => pickClient(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm bg-background">
                 <option value="">Sélectionner...</option>
                 {profiles.map((p: any) => (
                   <option key={p.id} value={p.id}>
@@ -193,21 +281,26 @@ export default function SubPaysTab({
             </div>
             <div>
               <Label>Plan *</Label>
-              <select name="plan_id" required className="w-full border rounded-md px-3 py-2 text-sm bg-background">
+              <select required value={form.planId} onChange={(e) => pickPlan(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm bg-background">
                 <option value="">Sélectionner...</option>
                 {plans.map((p: any) => (
-                  <option key={p.id} value={p.id}>{p.name} — {DT(p.price_dt)}</option>
+                  <option key={p.id} value={String(p.id)}>{p.name} — {DT(p.price_dt)}</option>
                 ))}
               </select>
+              {form.profileId && profById[form.profileId]?.type_abo && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Abonnement choisi dans Abonnements : <span className="font-medium text-foreground">{profById[form.profileId].type_abo}</span>
+                </p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Montant (DT) *</Label>
-                <Input name="amount_dt" type="number" step="0.01" min="0" required />
+                <Input type="number" step="0.01" min="0" required value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
               </div>
               <div>
                 <Label>Méthode *</Label>
-                <select name="payment_method" required className="w-full border rounded-md px-3 py-2 text-sm bg-background">
+                <select required value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value })} className="w-full border rounded-md px-3 py-2 text-sm bg-background">
                   <option value="especes">Espèces</option>
                   <option value="carte">Carte</option>
                   <option value="virement">Virement</option>
@@ -216,8 +309,8 @@ export default function SubPaysTab({
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div><Label>Date début</Label><Input name="date_start" type="date" /></div>
-              <div><Label>Date expiration</Label><Input name="date_exp" type="date" /></div>
+              <div><Label>Date début</Label><Input type="date" value={form.dateStart} onChange={(e) => setForm({ ...form, dateStart: e.target.value })} /></div>
+              <div><Label>Date expiration</Label><Input type="date" value={form.dateExp} onChange={(e) => setForm({ ...form, dateExp: e.target.value })} /></div>
             </div>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setCreating(false)}>Annuler</Button>
@@ -229,5 +322,6 @@ export default function SubPaysTab({
         </DialogContent>
       </Dialog>
     </Card>
+    </div>
   );
 }

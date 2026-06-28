@@ -60,7 +60,7 @@ export default function FinancePage() {
         </TabsList>
 
         <TabsContent value="clients" className="mt-4">
-          <ClientsTab profById={profById} planById={planById} plans={plans} isAdmin={isAdmin} />
+          <ClientsTab profById={profById} isAdmin={isAdmin} />
         </TabsContent>
         <TabsContent value="plans" className="mt-4">
           <PlansTab plans={plans} isAdmin={isAdmin} />

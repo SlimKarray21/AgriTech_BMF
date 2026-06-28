@@ -23,8 +23,9 @@ import BaseDonneesPage from "@/pages/admin/BaseDonneesPage";
 import ReclamationsPage from "@/pages/admin/ReclamationsPage";
 import FinancePage from "@/pages/admin/FinancePage";
 import StockPage from "@/pages/admin/StockPage";
+import FicheClientPage from "@/pages/admin/FicheClientPage";
 import ReservationMaterielPage from "@/pages/admin/ReservationMaterielPage";
-import VentesPage from "@/pages/admin/VentesPage";
+import RecettesPage from "@/pages/admin/RecettesPage";
 import PartenaireDetailsPage from "@/pages/admin/PartenaireDetailsPage";
 import LoginPage from "@/pages/auth/LoginPage";
 import ForgotPasswordPage from "@/pages/auth/ForgotPasswordPage";
@@ -90,7 +91,9 @@ const App = () => (
                 <Route path="finance" element={<FinancePage />} />
                 <Route path="stock" element={<StockPage />} />
                 <Route path="reservation-materiel" element={<ReservationMaterielPage />} />
-                <Route path="ventes" element={<VentesPage />} />
+                <Route path="recettes" element={<RecettesPage />} />
+                <Route path="fiche-client" element={<FicheClientPage />} />
+                <Route path="fiche-client/:clientId" element={<FicheClientPage />} />
                 <Route path="partenaire/:partenaireId" element={<PartenaireDetailsPage />} />
               </Route>
               <Route

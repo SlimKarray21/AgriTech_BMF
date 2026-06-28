@@ -1,5 +1,5 @@
 import { Outlet, Navigate, useLocation, useNavigate } from "react-router-dom";
-import { Grid3X3, Users, LogOut, CreditCard, LayoutDashboard, Cpu, Database, FileBarChart, HardDrive, MessageSquare, Wallet, Package, ClipboardList, ShoppingCart } from "lucide-react";
+import { Grid3X3, Users, LogOut, CreditCard, LayoutDashboard, Cpu, Database, FileBarChart, HardDrive, MessageSquare, Wallet, Package, ClipboardList, Receipt, UserRound } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -32,7 +32,8 @@ const navStock: NavItem[] = [
 // Sous-partie "Comptabilité" (sous Stock) : finance + ventes.
 const navComptabilite: NavItem[] = [
   { titleKey: "nav.finance", url: "/admin/finance", icon: Wallet, roles: ["ADMIN"] },
-  { titleKey: "nav.ventes", url: "/admin/ventes", icon: ShoppingCart, roles: ["ADMIN"] },
+  { titleKey: "nav.recettes", url: "/admin/recettes", icon: Receipt, roles: ["ADMIN"] },
+  { titleKey: "nav.ficheClient", url: "/admin/fiche-client", icon: UserRound, roles: ["ADMIN"] },
 ];
 
 const navTravail: NavItem[] = [
@@ -57,7 +58,8 @@ const pageTitleKeys: Record<string, string> = {
   "/admin/finance": "nav.finance",
   "/admin/stock": "nav.stock",
   "/admin/reservation-materiel": "nav.reservationMateriel",
-  "/admin/ventes": "nav.ventes",
+  "/admin/recettes": "nav.recettes",
+  "/admin/fiche-client": "nav.ficheClient",
   "/admin/profile": "nav.profile",
 };
 

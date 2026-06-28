@@ -10,15 +10,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "@/hooks/use-toast";
 import { Trash2, CheckCircle2 } from "lucide-react";
 import SecurityConfirmDialog from "@/components/SecurityConfirmDialog";
-import { Plan, Reservation } from "./types";
+import { Reservation } from "./types";
 import { DT } from "./utils";
 
+// Onglet "Clients prêts à la confirmation" = vente/installation de l'APPAREILLAGE
+// uniquement. L'abonnement est un flux séparé (onglet Paiements abos). Le service
+// ne peut être activé que si l'abonnement du client est actif (payé).
 export default function ClientsTab({
-  profById, planById, plans, isAdmin,
+  profById, isAdmin,
 }: {
   profById: Record<string, any>;
-  planById: Record<string, Plan>;
-  plans: Plan[];
   isAdmin: boolean;
 }) {
   const qc = useQueryClient();
@@ -52,12 +53,11 @@ export default function ClientsTab({
     [rawSales]
   );
 
-  const updatePlanMut = useMutation({
-    mutationFn: ({ id, planId }: { id: string; planId: string }) =>
-      updateMaterialReservation(id, { subscription_plan_id: Number(planId) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["finance-reservations"] }),
-    onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
-  });
+  // Abonnement client actif (payé et non expiré) → condition d'activation du service.
+  const isSubActive = (profileId: string | null) => {
+    const c = profById[profileId ?? ""];
+    return !!c?.date_exp_abo && new Date(c.date_exp_abo).getTime() > Date.now();
+  };
 
   const deleteResMut = useMutation({
     mutationFn: async (id: string) => {
@@ -77,56 +77,48 @@ export default function ClientsTab({
   const confirmSale = async () => {
     if (!pendingSale) return;
     const { res, method } = pendingSale;
-    const plan = res.subscription_plan_id ? planById[res.subscription_plan_id] : null;
-    const subPrice = plan?.price_dt ?? 0;
-    const total = subPrice + (res.total_devices_price_dt ?? 0);
 
     try {
+      // Vente = appareillage uniquement. L'abonnement n'est jamais facturé ici.
       await createClientSale({
         profile_id: Number(res.profile_id),
         reservation_id: Number(res.id),
-        subscription_plan_id: res.subscription_plan_id ? Number(res.subscription_plan_id) : null,
-        subscription_price_dt: subPrice,
+        subscription_plan_id: null,
+        subscription_price_dt: 0,
         equipment_price_dt: res.total_devices_price_dt,
-        total_dt: total,
+        total_dt: res.total_devices_price_dt,
         payment_method: method,
         status: "confirme",
       });
       await updateMaterialReservation(res.id, { status: "installe" });
       qc.invalidateQueries({ queryKey: ["finance-reservations"] });
       qc.invalidateQueries({ queryKey: ["client-sales"] });
-      toast({ title: "Vente confirmée ✓", description: "Transférée vers la section Ventes" });
+      toast({ title: "Vente confirmée ✓", description: "Encaissement appareillage visible dans le Journal des Recettes" });
       setPendingSale(null);
     } catch (e: any) {
       toast({ title: "Erreur", description: e.message, variant: "destructive" });
     }
   };
 
-  const subPriceOf = (r: Reservation) =>
-    (r.subscription_plan_id ? planById[r.subscription_plan_id]?.price_dt ?? 0 : 0);
   const { sorted, sort } = useTableSort(reservations, {
     client: (r) => {
       const c = profById[r.profile_id ?? ""];
       return c ? `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim() || c.email : null;
     },
-    plan: (r) => (r.subscription_plan_id ? planById[r.subscription_plan_id]?.name ?? null : null),
-    subPrice: (r) => subPriceOf(r),
+    abo: (r) => (isSubActive(r.profile_id) ? 1 : 0),
     material: (r) => r.total_devices_price_dt ?? 0,
-    total: (r) => subPriceOf(r) + (r.total_devices_price_dt ?? 0),
   });
 
   return (
     <Card>
-      <CardHeader><CardTitle className="text-base">Clients prêts à la confirmation</CardTitle></CardHeader>
+      <CardHeader><CardTitle className="text-base">Clients prêts à la confirmation (appareillage)</CardTitle></CardHeader>
       <CardContent className="p-0">
         <Table>
           <TableHeader>
             <TableRow>
               <SortableHead field="client" sort={sort}>Client</SortableHead>
-              <SortableHead field="plan" sort={sort}>Abonnement</SortableHead>
-              <SortableHead field="subPrice" sort={sort}>Prix Abo</SortableHead>
+              <SortableHead field="abo" sort={sort}>Abonnement</SortableHead>
               <SortableHead field="material" sort={sort}>Prix Matériel</SortableHead>
-              <SortableHead field="total" sort={sort}>Total</SortableHead>
               <TableHead>Méthode</TableHead>
               <TableHead className="w-44">Actions</TableHead>
             </TableRow>
@@ -134,10 +126,8 @@ export default function ClientsTab({
           <TableBody>
             {sorted.map((r) => {
               const client = profById[r.profile_id ?? ""];
-              const plan = r.subscription_plan_id ? planById[r.subscription_plan_id] : null;
-              const subPrice = plan?.price_dt ?? 0;
-              const total = subPrice + (r.total_devices_price_dt ?? 0);
               const sold = salesByRes.has(r.id);
+              const subActive = isSubActive(r.profile_id);
               const method = methodChoice[r.id] ?? "especes";
               return (
                 <TableRow key={r.id}>
@@ -145,20 +135,11 @@ export default function ClientsTab({
                     {client ? `${client.first_name ?? ""} ${client.last_name ?? ""}`.trim() || client.email : "—"}
                   </TableCell>
                   <TableCell>
-                    <Select
-                      value={r.subscription_plan_id ?? ""}
-                      onValueChange={(v) => updatePlanMut.mutate({ id: r.id, planId: v })}
-                      disabled={sold}
-                    >
-                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Choisir..." /></SelectTrigger>
-                      <SelectContent>
-                        {plans.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    {subActive
+                      ? <Badge variant="outline" className="bg-emerald-500/15 text-emerald-700 border-emerald-300">Actif</Badge>
+                      : <Badge variant="outline" className="bg-red-500/15 text-red-700 border-red-300">Inactif</Badge>}
                   </TableCell>
-                  <TableCell>{DT(subPrice)}</TableCell>
-                  <TableCell>{DT(r.total_devices_price_dt)}</TableCell>
-                  <TableCell className="font-bold text-primary">{DT(total)}</TableCell>
+                  <TableCell className="font-bold text-primary">{DT(r.total_devices_price_dt)}</TableCell>
                   <TableCell>
                     <Select
                       value={method}
@@ -181,7 +162,8 @@ export default function ClientsTab({
                       ) : (
                         <Button
                           size="sm"
-                          disabled={!r.subscription_plan_id}
+                          disabled={!subActive}
+                          title={subActive ? undefined : "Abonnement client inactif — à régler dans Paiements abos"}
                           onClick={() => { setPendingSale({ res: r, method }); setSecurityOpen(true); }}
                         >
                           <CheckCircle2 className="h-3 w-3 mr-1" />Confirmer
@@ -202,7 +184,7 @@ export default function ClientsTab({
             })}
             {reservations.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
                   Aucun client en attente. Réservez du matériel dans "Réservation Matériel".
                 </TableCell>
               </TableRow>
@@ -215,7 +197,7 @@ export default function ClientsTab({
         open={securityOpen}
         onClose={() => { setSecurityOpen(false); setPendingSale(null); }}
         onSuccess={() => { setSecurityOpen(false); confirmSale(); }}
-        title="Confirmer la vente"
+        title="Confirmer la vente d'appareillage"
         description="Authentifiez-vous pour valider cette vente."
       />
     </Card>
