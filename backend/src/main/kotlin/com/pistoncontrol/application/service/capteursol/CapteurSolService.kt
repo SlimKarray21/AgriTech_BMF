@@ -662,6 +662,35 @@ class CapteurSolService(private val mqttManager: MqttManager? = null) {
             }
     }
 
+    // Crée une plante et la rattache à la parcelle (table de liaison parcelle_plantes).
+    // Utilisé par POST /parcelles/{id}/plants (ajout d'une plante depuis l'admin).
+    suspend fun addPlantToParcelle(parcelleId: Long, input: WizardPlantInput): ParcellePlantSummary =
+        DatabaseFactory.dbQuery {
+            val now = Instant.now()
+            val planteId = PlantesTable.insert {
+                it[name] = input.name
+                it[type] = input.type
+                it[age] = input.age
+                it[count] = input.count
+                it[waterNeedPerPlant] = input.waterNeedPerPlant
+                it[createdAt] = now
+            } get PlantesTable.id
+
+            ParcellePlantesTable.insert {
+                it[ParcellePlantesTable.parcelleId] = parcelleId
+                it[ParcellePlantesTable.planteId] = planteId
+            }
+
+            ParcellePlantSummary(
+                id = planteId,
+                name = input.name,
+                type = input.type,
+                age = input.age,
+                count = input.count,
+                waterNeedPerPlant = input.waterNeedPerPlant,
+            )
+        }
+
     private fun toParcelle(row: ResultRow): Parcelle = Parcelle(
         id = row[ParcelleTable.id],
         nomSurface = row[ParcelleTable.nomSurface],

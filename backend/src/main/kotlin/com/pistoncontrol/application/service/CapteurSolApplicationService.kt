@@ -56,6 +56,12 @@ class CapteurSolApplicationService(mqttManager: MqttManager? = null) {
     suspend fun listPlantsByParcelleId(parcelleId: Long): List<com.pistoncontrol.application.service.capteursol.ParcellePlantSummary> =
         delegate.listPlantsByParcelleId(parcelleId)
 
+    suspend fun addPlantToParcelle(
+        parcelleId: Long,
+        input: com.pistoncontrol.application.service.capteursol.WizardPlantInput,
+    ): com.pistoncontrol.application.service.capteursol.ParcellePlantSummary =
+        delegate.addPlantToParcelle(parcelleId, input)
+
     suspend fun createParcelleWizard(input: CreateParcelleWizardInput): WizardCreateResult =
         delegate.createParcelleWizard(input)
 

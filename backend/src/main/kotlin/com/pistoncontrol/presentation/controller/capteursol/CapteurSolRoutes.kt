@@ -31,6 +31,7 @@ import com.pistoncontrol.common.utils.jwtUserIdClaim
 import com.pistoncontrol.common.utils.stringValue
 import com.pistoncontrol.presentation.dto.capteursol.CreateParcelleRequest
 import com.pistoncontrol.presentation.dto.capteursol.CreateParcelleWizardRequest
+import com.pistoncontrol.presentation.dto.capteursol.WizardPlantRequest
 import com.pistoncontrol.presentation.dto.capteursol.CreateVanneRequest
 import com.pistoncontrol.presentation.dto.capteursol.UpdateParcelleRequest
 import com.pistoncontrol.presentation.dto.capteursol.UpdateVanneRequest
@@ -319,6 +320,36 @@ fun Route.capteurSolRoutes(mqttManager: MqttManager? = null, service: CapteurSol
                     val data = service.listPlantsByParcelleId(parcelId)
                     call.respond(HttpStatusCode.OK, data)
                 }
+            }
+
+            post("/{id}/plants") {
+                val parcelId = call.parameters["id"]?.toLongOrNull()
+                    ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid parcelle id"))
+                val capteurUserId = authenticatedCapteurUserId(call, service) ?: return@post
+                val isAdmin = call.isAdminJwt()
+                val role = call.jwtPrincipal()?.payload?.getClaim("role")?.asString()?.uppercase()
+                val ownerFilter = when {
+                    isAdmin -> null
+                    role == "PARTENAIRE" && service.isParcelleInPartenaireScope(parcelId, capteurUserId) -> null
+                    else -> capteurUserId
+                }
+                // Vérifie que la parcelle existe et appartient bien à l'appelant.
+                val ownedParcelle = service.getParcelleDetails(parcelId, ownerFilter)
+                if (ownedParcelle == null) {
+                    return@post call.respond(HttpStatusCode.NotFound, ErrorResponse("Parcelle not found"))
+                }
+                val body = call.receive<WizardPlantRequest>()
+                val created = service.addPlantToParcelle(
+                    parcelId,
+                    WizardPlantInput(
+                        name = body.name,
+                        type = body.type,
+                        age = body.age,
+                        count = body.count,
+                        waterNeedPerPlant = body.waterNeedPerPlant,
+                    ),
+                )
+                call.respond(HttpStatusCode.Created, created)
             }
         }
 

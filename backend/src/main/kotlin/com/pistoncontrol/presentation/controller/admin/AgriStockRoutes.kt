@@ -174,37 +174,73 @@ fun Route.materialReservationsRoutes() {
             val body = call.receive<JsonObject>()
             val newStatus = body["status"]?.jsonPrimitive?.contentOrNull
             transaction {
+                val oldStatus = MaterialReservations
+                    .select { MaterialReservations.id eq id }
+                    .singleOrNull()?.get(MaterialReservations.status)
+
+                // États où le matériel est physiquement sorti du stock mais encore
+                // restituable (pas encore installé chez le client).
+                val reservedStates = setOf("reserve", "confirme")
+                // États d'abandon : on rend le matériel au stock.
+                val returnStates = setOf("annule", "nouvelle_demande")
+
                 // Confirmation d'une réservation (-> "reserve") : décrémenter le stock
                 // et enregistrer un mouvement, une seule fois (garde anti double décrément).
-                if (newStatus == "reserve") {
-                    val oldStatus = MaterialReservations
-                        .select { MaterialReservations.id eq id }
-                        .singleOrNull()?.get(MaterialReservations.status)
-                    if (oldStatus != "reserve" && oldStatus != "installe") {
-                        val items = ReservationItems
-                            .select { ReservationItems.reservationId eq id }
-                            .toList()
-                        for (item in items) {
-                            val sid = item[ReservationItems.stockItemId]
-                            val qty = item[ReservationItems.quantity]
-                            val curQty = StockItems
-                                .select { StockItems.id eq sid }
-                                .singleOrNull()?.get(StockItems.quantity) ?: 0
-                            StockItems.update({ StockItems.id eq sid }) {
-                                it[StockItems.quantity]  = maxOf(0, curQty - qty)
-                                it[StockItems.updatedAt] = Instant.now()
-                            }
-                            StockMovements.insert {
-                                it[StockMovements.stockItemId]   = sid
-                                it[StockMovements.movementType]  = "reservation"
-                                it[StockMovements.quantity]      = -qty
-                                it[StockMovements.reason]        = "Matériel réservé"
-                                it[StockMovements.reservationId] = id
-                                it[StockMovements.createdAt]     = Instant.now()
-                            }
+                if (newStatus == "reserve" && oldStatus != "reserve" && oldStatus != "installe") {
+                    val items = ReservationItems
+                        .select { ReservationItems.reservationId eq id }
+                        .toList()
+                    for (item in items) {
+                        val sid = item[ReservationItems.stockItemId]
+                        val qty = item[ReservationItems.quantity]
+                        val curQty = StockItems
+                            .select { StockItems.id eq sid }
+                            .singleOrNull()?.get(StockItems.quantity) ?: 0
+                        StockItems.update({ StockItems.id eq sid }) {
+                            it[StockItems.quantity]  = maxOf(0, curQty - qty)
+                            it[StockItems.updatedAt] = Instant.now()
+                        }
+                        StockMovements.insert {
+                            it[StockMovements.stockItemId]   = sid
+                            it[StockMovements.movementType]  = "reservation"
+                            it[StockMovements.quantity]      = -qty
+                            it[StockMovements.reason]        = "Matériel réservé"
+                            it[StockMovements.reservationId] = id
+                            it[StockMovements.createdAt]     = Instant.now()
                         }
                     }
                 }
+
+                // Annulation / remise en brouillon depuis un état réservé : restituer
+                // le stock décrémenté + mouvement d'entrée, une seule fois (garde anti
+                // double ré-incrément — symétrique du décrément ci-dessus).
+                if (newStatus != null && oldStatus != null && newStatus in returnStates && oldStatus in reservedStates) {
+                    val items = ReservationItems
+                        .select { ReservationItems.reservationId eq id }
+                        .toList()
+                    for (item in items) {
+                        val sid = item[ReservationItems.stockItemId]
+                        val qty = item[ReservationItems.quantity]
+                        val curQty = StockItems
+                            .select { StockItems.id eq sid }
+                            .singleOrNull()?.get(StockItems.quantity) ?: 0
+                        StockItems.update({ StockItems.id eq sid }) {
+                            it[StockItems.quantity]  = curQty + qty
+                            it[StockItems.updatedAt] = Instant.now()
+                        }
+                        StockMovements.insert {
+                            it[StockMovements.stockItemId]   = sid
+                            it[StockMovements.movementType]  = "in"
+                            it[StockMovements.quantity]      = qty
+                            it[StockMovements.reason]        =
+                                if (newStatus == "annule") "Réservation annulée — retour stock"
+                                else "Réservation remise en brouillon — retour stock"
+                            it[StockMovements.reservationId] = id
+                            it[StockMovements.createdAt]     = Instant.now()
+                        }
+                    }
+                }
+
                 MaterialReservations.update({ MaterialReservations.id eq id }) {
                     body["status"]?.jsonPrimitive?.contentOrNull?.let { v -> it[MaterialReservations.status] = v }
                     body["notes"]?.jsonPrimitive?.contentOrNull?.let  { v -> it[MaterialReservations.notes]  = v }
