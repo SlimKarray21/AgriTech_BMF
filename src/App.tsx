@@ -13,12 +13,12 @@ import DonneesDetailleesPage from "@/pages/admin/DonneesDetailleesPage";
 import CapteurPage from "@/pages/admin/CapteurPage";
 import UsersPage from "@/pages/admin/UsersPage";
 import SubscriptionsPage from "@/pages/admin/SubscriptionsPage";
-import ProfilePage from "@/pages/admin/ProfilePage";
-import ClientDetailPage from "@/pages/admin/ClientDetailPage";
-import RapportSolPage from "@/pages/admin/RapportSolPage";
-import RapportEauPage from "@/pages/admin/RapportEauPage";
-import RapportsPage from "@/pages/admin/RapportsPage";
-import SurfaceDetailPage from "@/pages/admin/SurfaceDetailPage";
+import ProfilePage from "@/pages/shared/ProfilePage";
+import ClientDetailPage from "@/pages/shared/ClientDetailPage";
+import RapportSolPage from "@/pages/shared/RapportSolPage";
+import RapportEauPage from "@/pages/shared/RapportEauPage";
+import RapportsPage from "@/pages/shared/RapportsPage";
+import SurfaceDetailPage from "@/pages/shared/SurfaceDetailPage";
 import BaseDonneesPage from "@/pages/admin/BaseDonneesPage";
 import ReclamationsPage from "@/pages/admin/ReclamationsPage";
 import FinancePage from "@/pages/admin/FinancePage";
@@ -33,18 +33,23 @@ import NotFound from "./pages/NotFound";
 import PartenaireLayout from "@/components/PartenaireLayout";
 import PartenaireUsersPage from "@/pages/partenaire/UsersPage";
 import PartenaireSubscriptionsPage from "@/pages/partenaire/SubscriptionsPage";
-import PartenaireProfilePage from "@/pages/partenaire/ProfilePage";
-import PartenaireClientDetailPage from "@/pages/partenaire/ClientDetailPage";
-import PartenaireSurfaceDetailPage from "@/pages/partenaire/SurfaceDetailPage";
-import PartenaireRapportsPage from "@/pages/partenaire/RapportsPage";
-import PartenaireRapportSolPage from "@/pages/partenaire/RapportSolPage";
-import PartenaireRapportEauPage from "@/pages/partenaire/RapportEauPage";
 import PartenaireBaseDonneesPage from "@/pages/partenaire/BaseDonneesPage";
 import PartenaireReclamationsPage from "@/pages/partenaire/ReclamationsPage";
 import PartenaireDemandeMaterielPage from "@/pages/partenaire/DemandeMaterielPage";
 import PartenaireVerifyEmailPage from "@/pages/partenaire/VerifyEmailPage";
 
-const queryClient = new QueryClient();
+// Cache partagé entre navigations : évite que les données repartent en
+// `undefined`/null à chaque changement de page (flash de valeurs vides).
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60_000,          // données considérées fraîches 1 min
+      gcTime: 5 * 60_000,         // gardées en cache 5 min
+      retry: 1,
+      refetchOnWindowFocus: false, // pas de refetch (et de flicker) au focus
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -75,7 +80,7 @@ const App = () => (
                 <Route path="users" element={<UsersPage />} />
                 <Route path="subscriptions" element={<SubscriptionsPage />} />
                 <Route path="profile" element={<ProfilePage />} />
-                <Route path="travail/client/:clientId" element={<ClientDetailPage />} />
+                <Route path="travail/client/:clientId" element={<ClientDetailPage backTo="/admin/travail" />} />
                 <Route path="travail/surface/:surfaceId" element={<SurfaceDetailPage />} />
                 <Route path="rapports" element={<RapportsPage />} />
                 <Route path="rapport-sol" element={<RapportSolPage />} />
@@ -98,12 +103,12 @@ const App = () => (
               >
                 <Route path="users" element={<PartenaireUsersPage />} />
                 <Route path="subscriptions" element={<PartenaireSubscriptionsPage />} />
-                <Route path="profile" element={<PartenaireProfilePage />} />
-                <Route path="travail/client/:clientId" element={<PartenaireClientDetailPage />} />
-                <Route path="travail/surface/:surfaceId" element={<PartenaireSurfaceDetailPage />} />
-                <Route path="rapports" element={<PartenaireRapportsPage />} />
-                <Route path="rapport-sol" element={<PartenaireRapportSolPage />} />
-                <Route path="rapport-eau" element={<PartenaireRapportEauPage />} />
+                <Route path="profile" element={<ProfilePage />} />
+                <Route path="travail/client/:clientId" element={<ClientDetailPage />} />
+                <Route path="travail/surface/:surfaceId" element={<SurfaceDetailPage />} />
+                <Route path="rapports" element={<RapportsPage />} />
+                <Route path="rapport-sol" element={<RapportSolPage />} />
+                <Route path="rapport-eau" element={<RapportEauPage />} />
                 <Route path="base-donnees" element={<PartenaireBaseDonneesPage />} />
                 <Route path="reclamations" element={<PartenaireReclamationsPage />} />
                 <Route path="demande-materiel" element={<PartenaireDemandeMaterielPage />} />

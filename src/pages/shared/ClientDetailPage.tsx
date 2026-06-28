@@ -2,14 +2,25 @@ import { useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getProfiles, getSurfaces, getVannes } from "@/services/data-service";
+import { useRoleBasePath } from "@/hooks/useRoleBasePath";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, MapPin, Droplets, Leaf, Wifi, WifiOff } from "lucide-react";
 
-export default function ClientDetailPage() {
+interface ClientDetailPageProps {
+  /**
+   * Destination du bouton "retour". Si non fourni, on revient à la page
+   * précédente (navigate(-1)) — utilisé par l'espace Partenaire qui n'a
+   * pas d'index "travail".
+   */
+  backTo?: string;
+}
+
+export default function ClientDetailPage({ backTo }: ClientDetailPageProps) {
   const { clientId } = useParams();
   const navigate = useNavigate();
+  const basePath = useRoleBasePath();
 
   const { data: profiles = [] } = useQuery({ queryKey: ["profiles"], queryFn: getProfiles });
   const { data: surfaces = [] } = useQuery({ queryKey: ["surfaces"], queryFn: getSurfaces });
@@ -18,11 +29,13 @@ export default function ClientDetailPage() {
   const profile = useMemo(() => profiles.find((p) => p.id === clientId), [profiles, clientId]);
   const profileSurfaces = useMemo(() => surfaces.filter((s) => s.fkUser === clientId), [surfaces, clientId]);
 
+  const goBack = () => (backTo ? navigate(backTo) : navigate(-1));
+
   if (!profile) {
     return (
       <div className="text-center py-12">
         <p className="text-muted-foreground">Utilisateur introuvable</p>
-        <Button variant="outline" className="mt-4" onClick={() => navigate(-1)}>
+        <Button variant="outline" className="mt-4" onClick={goBack}>
           <ArrowLeft className="mr-2 h-4 w-4" /> Retour
         </Button>
       </div>
@@ -32,7 +45,7 @@ export default function ClientDetailPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+        <Button variant="ghost" size="icon" onClick={goBack}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
@@ -61,7 +74,7 @@ export default function ClientDetailPage() {
           {profileSurfaces.map((surface) => {
             const surfaceVannes = vannes.filter((v) => v.fkSurface === surface.id);
             return (
-              <Card key={surface.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/admin/travail/surface/${surface.id}`)}>
+              <Card key={surface.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`${basePath}/travail/surface/${surface.id}`)}>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base">{surface.nomSurface}</CardTitle>
                 </CardHeader>

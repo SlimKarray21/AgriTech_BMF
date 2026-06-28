@@ -7,6 +7,7 @@ import { SortableHead, useTableSort } from "@/components/ui/sortable-table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ShoppingCart, TrendingUp, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { DT } from "@/lib/format";
 
 type Sale = {
   id: string;
@@ -21,7 +22,6 @@ type Sale = {
   confirmed_at: string | null;
 };
 
-const DT = (n: number) => `${Number(n ?? 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} DT`;
 const METHODS: Record<string, string> = { especes: "Espèces", carte: "Carte", virement: "Virement", mobile: "Paiement mobile" };
 
 export default function VentesPage() {

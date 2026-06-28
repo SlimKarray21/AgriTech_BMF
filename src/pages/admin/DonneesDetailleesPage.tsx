@@ -82,9 +82,10 @@ export default function DonneesDetailleesPage() {
 
   // Plantes CRUD
   const [showPlanteForm, setShowPlanteForm] = useState(false);
+  const [selPlanteUser, setSelPlanteUser] = useState("");
   const [selSurface, setSelSurface] = useState("");
   const [editPlante, setEditPlante] = useState<Plante | null>(null);
-  const createPlanteMut = useMutation({ mutationFn: createPlante, onSuccess: () => { qc.invalidateQueries({ queryKey: ["plantes"] }); setShowPlanteForm(false); toast({ title: t("donnees.planteCreated") }); } });
+  const createPlanteMut = useMutation({ mutationFn: createPlante, onSuccess: () => { qc.invalidateQueries({ queryKey: ["plantes"] }); setShowPlanteForm(false); setSelPlanteUser(""); setSelSurface(""); toast({ title: t("donnees.planteCreated") }); } });
   const updatePlanteMut = useMutation({ mutationFn: ({ id, data }: { id: string; data: Partial<Plante> }) => updatePlante(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ["plantes"] }); setEditPlante(null); toast({ title: t("donnees.planteUpdated") }); } });
   const deletePlanteMut = useMutation({ mutationFn: deletePlante, onSuccess: () => { qc.invalidateQueries({ queryKey: ["plantes"] }); toast({ title: t("donnees.planteDeleted") }); } });
 
@@ -101,6 +102,12 @@ export default function DonneesDetailleesPage() {
   const userFilteredSurfaces = useMemo(
     () => selVanneUser ? surfaces.filter(s => s.fkUser === selVanneUser) : surfaces,
     [surfaces, selVanneUser]
+  );
+
+  // Surfaces filtrées par l'utilisateur choisi dans le formulaire Plante.
+  const planteFilteredSurfaces = useMemo(
+    () => selPlanteUser ? surfaces.filter(s => s.fkUser === selPlanteUser) : surfaces,
+    [surfaces, selPlanteUser]
   );
 
   const addVanneRow = () => setVanneRows(r => [...r, { nomVanne: "", debit: "", nbPlant: "", deviceId: "", pistonNumber: "" }]);
@@ -153,16 +160,32 @@ export default function DonneesDetailleesPage() {
           {showPlanteForm && (
             <Card><CardContent className="pt-4">
               <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget); createPlanteMut.mutate({ nomPlante: fd.get("nomPlante") as string, age: parseInt(fd.get("age") as string), fkSurface: selSurface }); }} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <Label>Utilisateur</Label>
+                  <Select value={selPlanteUser} onValueChange={(v) => { setSelPlanteUser(v); setSelSurface(""); }}>
+                    <SelectTrigger><SelectValue placeholder="Filtrer par utilisateur..." /></SelectTrigger>
+                    <SelectContent>
+                      {profiles.map(p => (
+                        <SelectItem key={p.id} value={p.id}>
+                          <span className="flex items-center gap-2">
+                            <span>{p.first_name} {p.last_name}</span>
+                            <Badge variant="outline" className={`text-[10px] ${roleBadgeClass(p.user_role)}`}>{p.user_role}</Badge>
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div><Label>Nom</Label><Input name="nomPlante" required /></div>
                 <div><Label>Âge (ans)</Label><Input name="age" type="number" min="0" required /></div>
                 <div className="md:col-span-2">
-                  <Label>Surface</Label>
-                  <Select value={selSurface} onValueChange={setSelSurface}>
-                    <SelectTrigger><SelectValue placeholder="Surface" /></SelectTrigger>
-                    <SelectContent>{surfaces.map(s => <SelectItem key={s.id} value={s.id}>{s.nomSurface}</SelectItem>)}</SelectContent>
+                  <Label>Surface *</Label>
+                  <Select value={selSurface} onValueChange={setSelSurface} disabled={!selPlanteUser}>
+                    <SelectTrigger><SelectValue placeholder={selPlanteUser ? "Choisir une surface..." : "Sélectionnez d'abord un utilisateur"} /></SelectTrigger>
+                    <SelectContent>{planteFilteredSurfaces.map(s => <SelectItem key={s.id} value={s.id}>{s.nomSurface}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
-                <div className="md:col-span-2 flex gap-2"><Button type="submit" disabled={!selSurface}>{t("common.create")}</Button><Button type="button" variant="outline" onClick={() => setShowPlanteForm(false)}>{t("common.cancel")}</Button></div>
+                <div className="md:col-span-2 flex gap-2"><Button type="submit" disabled={!selSurface}>{t("common.create")}</Button><Button type="button" variant="outline" onClick={() => { setShowPlanteForm(false); setSelPlanteUser(""); setSelSurface(""); }}>{t("common.cancel")}</Button></div>
               </form>
             </CardContent></Card>
           )}

@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import logoTesla from "@/assets/logo-tesla-energie.png";
 import {
   SidebarProvider, Sidebar, SidebarContent, SidebarGroup, SidebarGroupLabel,
@@ -18,7 +19,6 @@ const navGlobal: NavItem[] = [
   { titleKey: "nav.dashboard", url: "/admin/dashboard", icon: LayoutDashboard, roles: ["ADMIN"] },
   { titleKey: "nav.users", url: "/admin/users", icon: Users, roles: ["ADMIN"] },
   { titleKey: "nav.subscriptions", url: "/admin/subscriptions", icon: CreditCard, roles: ["ADMIN"] },
-  { titleKey: "nav.finance", url: "/admin/finance", icon: Wallet, roles: ["ADMIN"] },
   { titleKey: "nav.rapports", url: "/admin/rapports", icon: FileBarChart, roles: ["ADMIN"] },
   { titleKey: "nav.reclamations", url: "/admin/reclamations", icon: MessageSquare, roles: ["ADMIN"] },
   { titleKey: "nav.baseDonnees", url: "/admin/base-donnees", icon: HardDrive, roles: ["ADMIN"] },
@@ -27,6 +27,11 @@ const navGlobal: NavItem[] = [
 const navStock: NavItem[] = [
   { titleKey: "nav.stock", url: "/admin/stock", icon: Package, roles: ["ADMIN"] },
   { titleKey: "nav.reservationMateriel", url: "/admin/reservation-materiel", icon: ClipboardList, roles: ["ADMIN"] },
+];
+
+// Sous-partie "Comptabilité" (sous Stock) : finance + ventes.
+const navComptabilite: NavItem[] = [
+  { titleKey: "nav.finance", url: "/admin/finance", icon: Wallet, roles: ["ADMIN"] },
   { titleKey: "nav.ventes", url: "/admin/ventes", icon: ShoppingCart, roles: ["ADMIN"] },
 ];
 
@@ -145,6 +150,24 @@ export default function AdminLayout() {
             </SidebarGroup>
 
             <SidebarGroup>
+              <SidebarGroupLabel>Comptabilité</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {navComptabilite.filter(item => item.roles.includes(userRole)).map((item) => (
+                    <SidebarMenuItem key={item.titleKey}>
+                      <SidebarMenuButton asChild>
+                        <NavLink to={item.url} end className="hover:bg-sidebar-accent/50" activeClassName="bg-primary/10 text-primary font-medium">
+                          <item.icon className="mr-2 h-4 w-4" />
+                          <span className="flex-1">{t(item.titleKey)}</span>
+                        </NavLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarGroup>
               <SidebarGroupLabel>{t("nav.travail")}</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
@@ -177,7 +200,11 @@ export default function AdminLayout() {
             <h1 className="text-lg font-semibold text-foreground flex-1">{title}</h1>
           </header>
           <div className="p-6">
-            <Outlet />
+            {/* key={pathname} : le boundary se remonte à chaque navigation,
+                donc une erreur sur une page ne bloque pas les suivantes. */}
+            <ErrorBoundary key={location.pathname}>
+              <Outlet />
+            </ErrorBoundary>
           </div>
         </SidebarInset>
       </div>

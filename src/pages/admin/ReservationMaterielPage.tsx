@@ -22,9 +22,9 @@ import {
   getMaterialReservations, createMaterialReservation, updateMaterialReservation,
   getReservationItemsByReservation, createReservationItem, deleteReservationItem,
   getClientSales, createClientSale,
-  createSubscriptionPayment,
 } from "@/services/data-service";
 import type { Surface } from "@/types/models";
+import { DT } from "@/lib/format";
 
 type Reservation = {
   id: string; profile_id: string | null; surface_id: string | null;
@@ -34,8 +34,6 @@ type Reservation = {
 type StockItem = { id: string; name: string; quantity: number; purchase_price_dt: number; category: string };
 type ResItem = { id: string; reservation_id: string; stock_item_id: string; quantity: number; unit_price_dt: number };
 type Plan = { id: string; name: string; price_dt: number; duration_days: number };
-
-const DT = (n: number) => `${Number(n ?? 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} DT`;
 
 export default function ReservationMaterielPage() {
   const qc = useQueryClient();
@@ -276,12 +274,6 @@ function SurfaceTable({
     return <Badge variant="outline" className="bg-emerald-500/15 text-emerald-700 border-emerald-300"><Wifi className="h-3 w-3 mr-1" />Connectée</Badge>;
   };
 
-  const aboPlanOf = (s: Surface) => {
-    const r = resBySurface.get(s.id);
-    const p = s.fkUser ? profById[s.fkUser] : null;
-    const plan = r?.subscription_plan_id ? planById[r.subscription_plan_id] : null;
-    return plan ?? (p?.type_abo ? plans.find(pl => pl.name === p.type_abo) : null);
-  };
   const { sorted, sort } = useTableSort(surfaces, {
     parcelle: (s) => s.nomSurface,
     client: (s) => {
@@ -289,11 +281,6 @@ function SurfaceTable({
       return p ? `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || p.email : null;
     },
     materiel: (s) => resBySurface.get(s.id)?.total_devices_price_dt ?? 0,
-    abo: (s) => aboPlanOf(s)?.name ?? (s.fkUser ? profById[s.fkUser]?.type_abo : null) ?? null,
-    total: (s) => {
-      const r = resBySurface.get(s.id);
-      return (aboPlanOf(s)?.price_dt ?? 0) + (r?.total_devices_price_dt ?? 0);
-    },
   });
 
   return (
@@ -307,19 +294,14 @@ function SurfaceTable({
         <Table>
           <TableHeader><TableRow>
             <SortableHead field="parcelle" sort={sort}>Parcelle</SortableHead><SortableHead field="client" sort={sort}>Client</SortableHead>
-            <SortableHead field="materiel" sort={sort}>Matériel</SortableHead><SortableHead field="abo" sort={sort}>Abonnement</SortableHead>
-            <SortableHead field="total" sort={sort}>Total</SortableHead><TableHead>Statut</TableHead>
+            <SortableHead field="materiel" sort={sort}>Matériel</SortableHead><TableHead>Statut</TableHead>
             <TableHead className="w-72">Actions</TableHead>
           </TableRow></TableHeader>
           <TableBody>
             {sorted.map(s => {
               const r = resBySurface.get(s.id);
               const p = s.fkUser ? profById[s.fkUser] : null;
-              const plan = r?.subscription_plan_id ? planById[r.subscription_plan_id] : null;
-              const aboPlan = plan ?? (p?.type_abo ? plans.find(pl => pl.name === p.type_abo) : null);
-              const subPrice = aboPlan?.price_dt ?? 0;
               const matPrice = r?.total_devices_price_dt ?? 0;
-              const total = subPrice + matPrice;
               return (
                 <TableRow key={s.id}>
                   <TableCell>
@@ -331,14 +313,6 @@ function SurfaceTable({
                     <div className="text-xs text-muted-foreground">{p?.email}</div>
                   </TableCell>
                   <TableCell className="text-sm font-medium">{DT(matPrice)}</TableCell>
-                  <TableCell className="text-sm">
-                    {aboPlan?.name
-                      ? <div><span className="font-medium">{aboPlan.name}</span><div className="text-xs text-muted-foreground">{DT(subPrice)}</div></div>
-                      : p?.type_abo
-                        ? <div><span className="font-medium">{p.type_abo}</span>{p.date_exp_abo && <div className="text-xs text-muted-foreground">exp. {p.date_exp_abo}</div>}</div>
-                        : <span className="text-muted-foreground">—</span>}
-                  </TableCell>
-                  <TableCell className="font-semibold text-primary">{total > 0 ? DT(total) : "—"}</TableCell>
                   <TableCell>{statusBadge(mode)}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
@@ -367,7 +341,7 @@ function SurfaceTable({
               );
             })}
             {surfaces.length === 0 && (
-              <TableRow><TableCell colSpan={7} className="text-center py-12 text-muted-foreground">Aucune parcelle dans cette catégorie</TableCell></TableRow>
+              <TableRow><TableCell colSpan={5} className="text-center py-12 text-muted-foreground">Aucune parcelle dans cette catégorie</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
@@ -392,12 +366,6 @@ function ParcelleEditDialog({
   const currentResId = internalResId ?? (reservation?.id != null ? String(reservation.id) : null);
 
   const stockById = useMemo(() => Object.fromEntries(stockItems.map(s => [String(s.id), s])), [stockItems]);
-
-  const hasActiveSub = !!profile?.date_exp_abo;
-  const selectedPlan = plans.find((p: any) => p.id === planId);
-  const baseAbo = selectedPlan?.price_dt ?? 0;
-  const discount = hasActiveSub ? baseAbo * 0.1 : 0;
-  const finalAbo = baseAbo - discount;
 
   const { data: items = [], refetch: refetchItems } = useQuery<ResItem[]>({
     queryKey: ["reservation-items", currentResId],
@@ -485,24 +453,6 @@ function ParcelleEditDialog({
     onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
 
-  const reabonner = useMutation({
-    mutationFn: async () => {
-      if (!profile?.id || !selectedPlan) throw new Error("Sélectionnez un abonnement et un client");
-      const start = new Date(); const exp = new Date(); exp.setDate(exp.getDate() + (selectedPlan.duration_days || 30));
-      await createSubscriptionPayment({
-        profile_id: Number(profile.id),
-        plan_id: Number(selectedPlan.id),
-        amount_dt: finalAbo,
-        payment_method: "carte",
-        status: "en_attente",
-        date_start: start.toISOString().slice(0, 10),
-        date_exp: exp.toISOString().slice(0, 10),
-      });
-    },
-    onSuccess: () => toast({ title: "Réabonnement créé", description: `Montant: ${DT(finalAbo)}${hasActiveSub ? " (remise 10% appliquée)" : ""}. À valider dans Finance.` }),
-    onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
-  });
-
   if (!surface) return null;
 
   return (
@@ -513,26 +463,6 @@ function ParcelleEditDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          {selectedPlan ? (
-            <div className="p-3 rounded-lg border bg-gradient-to-br from-primary/5 to-transparent">
-              <div className="text-sm font-medium text-primary mb-2">Abonnement</div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">{selectedPlan.name}</span>
-                <span className="font-semibold">{DT(selectedPlan.price_dt)}</span>
-              </div>
-            </div>
-          ) : profile?.type_abo ? (
-            <div className="p-3 rounded-lg border bg-gradient-to-br from-primary/5 to-transparent">
-              <div className="text-sm font-medium text-primary mb-2">Abonnement</div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-medium">{profile.type_abo}</span>
-                {profile.date_exp_abo && <span className="text-xs text-muted-foreground">exp. {profile.date_exp_abo}</span>}
-              </div>
-            </div>
-          ) : (
-            <div className="p-3 rounded-lg border bg-muted/30 text-sm text-muted-foreground">Aucun abonnement</div>
-          )}
-
           <div className="grid grid-cols-2 gap-3 text-sm p-3 bg-muted/40 rounded-lg">
             <div><UserIcon className="h-3 w-3 inline mr-1 text-muted-foreground" />{profile ? `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() || profile.email : "—"}</div>
             <div><MapPin className="h-3 w-3 inline mr-1 text-muted-foreground" />{surface.localisation || "—"}</div>

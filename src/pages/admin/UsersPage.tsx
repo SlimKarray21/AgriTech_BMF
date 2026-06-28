@@ -24,7 +24,7 @@ import {
   registerUserApi,
   verifyEmailApi,
 } from "@/services/auth-api";
-import { getProfiles } from "@/services/data-service";
+import { getProfiles, assignClientToPartner } from "@/services/data-service";
 
 export default function UsersPage() {
   const { t } = useLanguage();
@@ -74,6 +74,18 @@ export default function UsersPage() {
     },
     onError: (e: any) =>
       toast({ title: "Erreur", description: e.error ?? e.message, variant: "destructive" }),
+  });
+
+  // Affectation client → partenaire (created_by sur le profil du client).
+  const assignMut = useMutation({
+    mutationFn: ({ clientProfileId, partnerId }: { clientProfileId: number; partnerId: number | null }) =>
+      assignClientToPartner(clientProfileId, partnerId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["profiles"] });
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+    },
+    onError: (e: any) =>
+      toast({ title: "Erreur d'affectation", description: e.error ?? e.message, variant: "destructive" }),
   });
 
   const deleteMut = useMutation({
@@ -188,12 +200,35 @@ export default function UsersPage() {
     );
   };
 
+  // Profil (BIGINT id + created_by) du user en cours d'édition, et liste des partenaires.
+  const editingProfile = editing
+    ? profilesData.find((p) => p.user_id === editing.id)
+    : null;
+  const partners = profilesData.filter(
+    (p) => (p.user_role ?? "").toUpperCase() === "PARTENAIRE"
+  );
+
   const handleEditSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editing) return;
     const fd = new FormData(e.currentTarget);
     const frontendRole = fd.get("role") as string;
     const backendRole = frontendRole === "admin" ? "admin" : frontendRole === "partenaire" ? "partenaire" : "user";
+
+    // Affectation à un partenaire (clients uniquement). "none" = rattaché à l'admin.
+    if (frontendRole === "user" && editingProfile) {
+      const partnerVal = fd.get("partner") as string | null;
+      const newCreatedBy = partnerVal && partnerVal !== "none" ? Number(partnerVal) : null;
+      const currentCreatedBy = editingProfile.created_by ?? null;
+      if (newCreatedBy !== currentCreatedBy) {
+        try {
+          await assignMut.mutateAsync({ clientProfileId: Number(editingProfile.id), partnerId: newCreatedBy });
+        } catch {
+          return; // l'erreur est déjà affichée par onError
+        }
+      }
+    }
+
     updateRoleMut.mutate({ userId: editing.id, role: backendRole });
   };
 
@@ -343,9 +378,9 @@ export default function UsersPage() {
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Modifier le rôle</DialogTitle>
+            <DialogTitle>Modifier l'utilisateur</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleEditSubmit} className="space-y-4">
+          <form key={editing?.id} onSubmit={handleEditSubmit} className="space-y-4">
             <div>
               <Label>Email</Label>
               <p className="text-sm text-muted-foreground mt-1">{editing?.email}</p>
@@ -363,11 +398,32 @@ export default function UsersPage() {
                 </SelectContent>
               </Select>
             </div>
+            {editing && resolveRole(editing) === "user" && (
+              <div>
+                <Label>Partenaire</Label>
+                <Select name="partner" defaultValue={editingProfile?.created_by ? String(editingProfile.created_by) : "none"}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Aucun (rattaché à l'admin)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Aucun (rattaché à l'admin)</SelectItem>
+                    {partners.map((p) => (
+                      <SelectItem key={p.id} value={String(p.id)}>
+                        {p.first_name} {p.last_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Affecte ce client à un partenaire : il apparaîtra alors sous ce partenaire.
+                </p>
+              </div>
+            )}
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setEditing(null)}>
                 {t("common.cancel")}
               </Button>
-              <Button type="submit" disabled={updateRoleMut.isPending}>
+              <Button type="submit" disabled={updateRoleMut.isPending || assignMut.isPending}>
                 {t("common.save")}
               </Button>
             </div>

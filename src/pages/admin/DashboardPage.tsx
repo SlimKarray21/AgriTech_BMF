@@ -7,9 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Users, Wallet, Package, ShoppingBag, Clock, CheckCircle2, ShieldCheck, ShieldOff, TrendingUp, CalendarDays } from "lucide-react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, AreaChart, Area, LineChart, Line } from "recharts";
+import { DT as formatDT } from "@/lib/format";
 
 type Range = "day" | "week" | "month" | "year" | "all";
-const DT = (n: number) => `${Number(n ?? 0).toLocaleString("fr-FR", { maximumFractionDigits: 0 })} DT`;
+// Dashboard : montants arrondis (0 décimale) pour les KPI.
+const DT = (n: number) => formatDT(n, 0);
 
 export default function DashboardPage() {
   const { t } = useLanguage();

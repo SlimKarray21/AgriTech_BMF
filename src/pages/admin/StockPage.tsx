@@ -19,6 +19,7 @@ import {
   deleteStockItem,
   getStockMovements,
 } from "@/services/data-service";
+import { DT } from "@/lib/format";
 
 type StockItem = {
   id: string;
@@ -49,7 +50,6 @@ const CAT_LABEL: Record<string, string> = {
   gateway: "Gateway/ESP32",
   autre: "Autre",
 };
-const DT = (n: number) => `${Number(n ?? 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} DT`;
 
 export default function StockPage() {
   const qc = useQueryClient();
