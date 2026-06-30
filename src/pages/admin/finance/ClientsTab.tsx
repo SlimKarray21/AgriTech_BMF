@@ -151,6 +151,8 @@ export default function ClientsTab({
                         <SelectItem value="especes">Espèces</SelectItem>
                         <SelectItem value="carte">Carte</SelectItem>
                         <SelectItem value="virement">Virement</SelectItem>
+                        <SelectItem value="cheque">Chèque</SelectItem>
+                        <SelectItem value="cimbielle">Cimbielle</SelectItem>
                         <SelectItem value="mobile">Mobile</SelectItem>
                       </SelectContent>
                     </Select>

@@ -670,6 +670,8 @@ function SurfaceTable({
                   <SelectItem value="especes">Espèces</SelectItem>
                   <SelectItem value="carte">Carte bancaire</SelectItem>
                   <SelectItem value="virement">Virement</SelectItem>
+                  <SelectItem value="cheque">Chèque</SelectItem>
+                  <SelectItem value="cimbielle">Cimbielle</SelectItem>
                   <SelectItem value="mobile">Paiement mobile</SelectItem>
                 </SelectContent>
               </Select>
@@ -767,6 +769,8 @@ function SurfaceTable({
                   <SelectItem value="especes">Espèces</SelectItem>
                   <SelectItem value="carte">Carte bancaire</SelectItem>
                   <SelectItem value="virement">Virement</SelectItem>
+                  <SelectItem value="cheque">Chèque</SelectItem>
+                  <SelectItem value="cimbielle">Cimbielle</SelectItem>
                   <SelectItem value="mobile">Paiement mobile</SelectItem>
                 </SelectContent>
               </Select>

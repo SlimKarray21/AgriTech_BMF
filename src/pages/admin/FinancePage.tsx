@@ -5,10 +5,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { getProfiles, getSubscriptionPlans, getSubscriptionPayments, getClientSales } from "@/services/data-service";
 import { useFilteredProfiles } from "@/hooks/useRoleFilter";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { CreditCard, ShieldCheck, Users, Package } from "lucide-react";
+import { CreditCard, ShieldCheck, Package } from "lucide-react";
 import { Plan, SubPay, MatPay } from "./finance/types";
 import { normalizePlan } from "./finance/utils";
-import ClientsTab from "./finance/ClientsTab";
 import SubPaysTab from "./finance/SubPaysTab";
 import MatPaysTab from "./finance/MatPaysTab";
 
@@ -70,16 +69,12 @@ export default function FinancePage() {
         <p className="text-sm text-muted-foreground">Abonnements, paiements et clients</p>
       </div>
 
-      <Tabs defaultValue={initialTab === "plans" ? "clients" : initialTab}>
-        <TabsList className="grid grid-cols-3 w-full max-w-xl">
-          <TabsTrigger value="clients"><Users className="h-4 w-4 mr-1.5" />Clients</TabsTrigger>
+      <Tabs defaultValue={initialTab === "subpays" || initialTab === "matpays" ? initialTab : "subpays"}>
+        <TabsList className="grid grid-cols-2 w-full max-w-md">
           <TabsTrigger value="subpays"><ShieldCheck className="h-4 w-4 mr-1.5" />Paiements abos</TabsTrigger>
           <TabsTrigger value="matpays"><Package className="h-4 w-4 mr-1.5" />Paiements matériels</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="clients" className="mt-4">
-          <ClientsTab profById={profById} isAdmin={isAdmin} />
-        </TabsContent>
         <TabsContent value="subpays" className="mt-4">
           <SubPaysTab subpays={subpays} planById={planById} profById={profById} isAdmin={isAdmin} userId={profile?.id} />
         </TabsContent>

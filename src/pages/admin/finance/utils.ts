@@ -6,6 +6,8 @@ export { DT } from "@/lib/format";
 export const METHOD_LABEL: Record<string, string> = {
   carte: "Carte bancaire",
   virement: "Virement",
+  cheque: "Chèque",
+  cimbielle: "Cimbielle",
   electronique: "Paiement électronique",
   main_a_main: "Main à main",
   especes: "Espèces",
