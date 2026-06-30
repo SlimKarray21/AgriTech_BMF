@@ -22,6 +22,17 @@ export type SubPay = {
   created_at: string;
 };
 
+// Paiement d'appareillage (vente client) — traçabilité côté Finance.
+export type MatPay = {
+  id: string;
+  profile_id: string;
+  reservation_id: string | null;
+  amount_dt: number;
+  payment_method: string;
+  status: string;
+  created_at: string;
+};
+
 export type Reservation = {
   id: string;
   profile_id: string | null;

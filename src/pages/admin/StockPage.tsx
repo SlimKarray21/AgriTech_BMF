@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Package, Plus, Pencil, Trash2, History, AlertTriangle, Boxes, DollarSign } from "lucide-react";
+import { Package, Plus, Pencil, Trash2, History, AlertTriangle, Boxes, DollarSign, PackagePlus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import {
   getStockItems,
@@ -18,6 +18,7 @@ import {
   updateStockItem,
   deleteStockItem,
   getStockMovements,
+  createStockMovement,
 } from "@/services/data-service";
 import { DT } from "@/lib/format";
 
@@ -55,6 +56,8 @@ export default function StockPage() {
   const qc = useQueryClient();
   const [edit, setEdit] = useState<Partial<StockItem> | null>(null);
   const [historyOf, setHistoryOf] = useState<StockItem | null>(null);
+  // Recharge d'un appareil déjà existant : { itemId, qty } | null
+  const [recharge, setRecharge] = useState<{ itemId: string; qty: number } | null>(null);
 
   const { data: items = [], isLoading } = useQuery<StockItem[]>({
     queryKey: ["stock-items"],
@@ -93,6 +96,28 @@ export default function StockPage() {
       qc.invalidateQueries({ queryKey: ["stock-items"] });
       setEdit(null);
       toast({ title: "Appareil enregistré" });
+    },
+    onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+  });
+
+  const rechargeMut = useMutation({
+    mutationFn: async ({ itemId, qty }: { itemId: string; qty: number }) => {
+      const item = items.find((i) => i.id === itemId);
+      if (!item) throw new Error("Appareil introuvable.");
+      if (!qty || qty <= 0) throw new Error("Quantité invalide.");
+      await updateStockItem(itemId, { quantity: item.quantity + qty });
+      await createStockMovement({
+        stock_item_id: Number(itemId),
+        movement_type: "in",
+        quantity: qty,
+        reason: "Recharge stock",
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["stock-items"] });
+      qc.invalidateQueries({ queryKey: ["stock-movements"] });
+      setRecharge(null);
+      toast({ title: "Stock rechargé" });
     },
     onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
@@ -184,7 +209,17 @@ export default function StockPage() {
       </div>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Inventaire</CardTitle></CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-base">Inventaire</CardTitle>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={items.length === 0}
+            onClick={() => setRecharge({ itemId: "", qty: 1 })}
+          >
+            <PackagePlus className="h-4 w-4 mr-1" /> Recharger
+          </Button>
+        </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -313,6 +348,61 @@ export default function StockPage() {
               </div>
             </form>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Recharge d'un appareil existant */}
+      <Dialog open={!!recharge} onOpenChange={(o) => !o && setRecharge(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <PackagePlus className="h-5 w-5 text-primary" /> Recharger le stock
+            </DialogTitle>
+          </DialogHeader>
+          {recharge && (() => {
+            const selected = items.find((i) => i.id === recharge.itemId);
+            return (
+              <form
+                onSubmit={(e) => { e.preventDefault(); rechargeMut.mutate(recharge); }}
+                className="space-y-3"
+              >
+                <div>
+                  <Label>Appareil existant *</Label>
+                  <Select value={recharge.itemId} onValueChange={(v) => setRecharge({ ...recharge, itemId: v })}>
+                    <SelectTrigger><SelectValue placeholder="Sélectionner un appareil..." /></SelectTrigger>
+                    <SelectContent>
+                      {items.map((i) => (
+                        <SelectItem key={i.id} value={i.id}>
+                          {i.name} ({CAT_LABEL[i.category] ?? i.category}) — stock : {i.quantity}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Quantité à ajouter *</Label>
+                  <Input
+                    type="number" min="1"
+                    value={recharge.qty}
+                    onChange={(e) => setRecharge({ ...recharge, qty: +e.target.value })}
+                    required
+                  />
+                </div>
+                {selected && (
+                  <p className="text-xs text-muted-foreground">
+                    Stock actuel : <span className="font-medium text-foreground">{selected.quantity}</span> →
+                    nouveau stock : <span className="font-medium text-foreground">{selected.quantity + (recharge.qty || 0)}</span>
+                  </p>
+                )}
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button type="button" variant="outline" onClick={() => setRecharge(null)}>Annuler</Button>
+                  <Button type="submit" disabled={rechargeMut.isPending || !recharge.itemId || recharge.qty <= 0}>
+                    {rechargeMut.isPending ? "Recharge..." : "Recharger"}
+                  </Button>
+                </div>
+              </form>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 

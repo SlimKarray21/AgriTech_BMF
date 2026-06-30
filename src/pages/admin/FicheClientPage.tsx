@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Search, ArrowLeft, CreditCard, Package, Grid3X3, CheckCircle2, XCircle,
   Wallet, ShoppingCart, UserRound,
@@ -67,6 +68,7 @@ function ClientPicker({ profiles, onPick }: { profiles: Profile[]; onPick: (id: 
 export default function FicheClientPage() {
   const { clientId } = useParams();
   const navigate = useNavigate();
+  const [openHistory, setOpenHistory] = useState<"abo" | "appareillage" | null>(null);
 
   const { data: allProfiles = [] } = useQuery({ queryKey: ["profiles"], queryFn: getProfiles });
   const profiles = useFilteredProfiles(allProfiles);
@@ -204,63 +206,97 @@ export default function FicheClientPage() {
         <CardContent><SubscriptionStatus profile={profile} /></CardContent>
       </Card>
 
-      {/* Historique paiements abonnement */}
-      <Card>
-        <CardHeader><CardTitle className="text-base flex items-center gap-2"><Wallet className="h-4 w-4 text-primary" /> Historique — Paiements abonnement ({subPays.length})</CardTitle></CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead><TableHead>Plan</TableHead><TableHead>Montant</TableHead>
-                <TableHead>Méthode</TableHead><TableHead>Période</TableHead><TableHead>Statut</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {subPays.map((s) => (
-                <TableRow key={s.id}>
-                  <TableCell className="text-xs">{s.created_at ? new Date(s.created_at).toLocaleDateString("fr-FR") : "—"}</TableCell>
-                  <TableCell>{planName[String(s.plan_id)] ?? "—"}</TableCell>
-                  <TableCell className="font-semibold">{DT(Number(s.amount_dt ?? 0))}</TableCell>
-                  <TableCell className="text-xs">{METHOD_LABEL[s.payment_method] ?? s.payment_method}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{s.date_start ?? "—"} → {s.date_exp ?? "—"}</TableCell>
-                  <TableCell>{subStatusBadge(s.status)}</TableCell>
-                </TableRow>
-              ))}
-              {subPays.length === 0 && (
-                <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Aucun paiement d'abonnement</TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {/* Deux historiques séparés, accessibles via deux boutons */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Button variant="outline" className="h-auto py-4 justify-start gap-3" onClick={() => setOpenHistory("abo")}>
+          <div className="h-9 w-9 rounded-full bg-blue-500/15 flex items-center justify-center shrink-0">
+            <Wallet className="h-5 w-5 text-blue-600" />
+          </div>
+          <div className="text-left">
+            <p className="font-semibold">Paiement Abonnement</p>
+            <p className="text-xs text-muted-foreground">{subPays.length} mouvement(s) · {DT(totals.abo)} encaissé</p>
+          </div>
+        </Button>
+        <Button variant="outline" className="h-auto py-4 justify-start gap-3" onClick={() => setOpenHistory("appareillage")}>
+          <div className="h-9 w-9 rounded-full bg-violet-500/15 flex items-center justify-center shrink-0">
+            <Package className="h-5 w-5 text-violet-600" />
+          </div>
+          <div className="text-left">
+            <p className="font-semibold">Paiement Appareillage</p>
+            <p className="text-xs text-muted-foreground">{sales.length} mouvement(s) · {DT(totals.appareillage)} encaissé</p>
+          </div>
+        </Button>
+      </div>
 
-      {/* Historique paiements appareillage */}
-      <Card>
-        <CardHeader><CardTitle className="text-base flex items-center gap-2"><Package className="h-4 w-4 text-primary" /> Historique — Paiements appareillage ({sales.length})</CardTitle></CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead><TableHead>Montant matériel</TableHead>
-                <TableHead>Méthode</TableHead><TableHead>Statut</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sales.map((s) => (
-                <TableRow key={s.id}>
-                  <TableCell className="text-xs">{s.created_at ? new Date(s.created_at).toLocaleDateString("fr-FR") : "—"}</TableCell>
-                  <TableCell className="font-semibold">{DT(Number(s.equipment_price_dt ?? 0))}</TableCell>
-                  <TableCell className="text-xs">{METHOD_LABEL[s.payment_method] ?? s.payment_method}</TableCell>
-                  <TableCell>{saleStatusBadge(s.status)}</TableCell>
+      {/* Dialog — Historique paiements abonnement */}
+      <Dialog open={openHistory === "abo"} onOpenChange={(o) => !o && setOpenHistory(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wallet className="h-4 w-4 text-blue-600" /> Paiements abonnement — {profile.first_name} {profile.last_name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[70vh] overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead><TableHead>Plan</TableHead><TableHead>Montant</TableHead>
+                  <TableHead>Méthode</TableHead><TableHead>Période</TableHead><TableHead>Statut</TableHead>
                 </TableRow>
-              ))}
-              {sales.length === 0 && (
-                <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Aucun paiement d'appareillage</TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              </TableHeader>
+              <TableBody>
+                {subPays.map((s) => (
+                  <TableRow key={s.id}>
+                    <TableCell className="text-xs">{s.created_at ? new Date(s.created_at).toLocaleDateString("fr-FR") : "—"}</TableCell>
+                    <TableCell>{planName[String(s.plan_id)] ?? "—"}</TableCell>
+                    <TableCell className="font-semibold">{DT(Number(s.amount_dt ?? 0))}</TableCell>
+                    <TableCell className="text-xs">{METHOD_LABEL[s.payment_method] ?? s.payment_method}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{s.date_start ?? "—"} → {s.date_exp ?? "—"}</TableCell>
+                    <TableCell>{subStatusBadge(s.status)}</TableCell>
+                  </TableRow>
+                ))}
+                {subPays.length === 0 && (
+                  <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Aucun paiement d'abonnement</TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog — Historique paiements appareillage */}
+      <Dialog open={openHistory === "appareillage"} onOpenChange={(o) => !o && setOpenHistory(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-4 w-4 text-violet-600" /> Paiements appareillage — {profile.first_name} {profile.last_name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[70vh] overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead><TableHead>Montant matériel</TableHead>
+                  <TableHead>Méthode</TableHead><TableHead>Statut</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sales.map((s) => (
+                  <TableRow key={s.id}>
+                    <TableCell className="text-xs">{s.created_at ? new Date(s.created_at).toLocaleDateString("fr-FR") : "—"}</TableCell>
+                    <TableCell className="font-semibold">{DT(Number(s.equipment_price_dt ?? 0))}</TableCell>
+                    <TableCell className="text-xs">{METHOD_LABEL[s.payment_method] ?? s.payment_method}</TableCell>
+                    <TableCell>{saleStatusBadge(s.status)}</TableCell>
+                  </TableRow>
+                ))}
+                {sales.length === 0 && (
+                  <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Aucun paiement d'appareillage</TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

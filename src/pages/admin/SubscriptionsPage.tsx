@@ -1,8 +1,12 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getProfiles, updateProfile, getSubscriptionPlans } from "@/services/data-service";
 import { useFilteredProfiles } from "@/hooks/useRoleFilter";
+import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { Plan as FinancePlan } from "./finance/types";
+import { normalizePlan } from "./finance/utils";
+import PlansTab from "./finance/PlansTab";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SortableHead, useTableSort } from "@/components/ui/sortable-table";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,6 +25,8 @@ import { Profile } from "@/types/models";
 export default function SubscriptionsPage() {
   const { t } = useLanguage();
   const qc = useQueryClient();
+  const { profile } = useAuth();
+  const isAdmin = profile?.user_role === "ADMIN";
 
   const { data: allProfiles = [] } = useQuery({ queryKey: ["profiles"], queryFn: getProfiles });
   const profiles = useFilteredProfiles(allProfiles);
@@ -36,6 +42,10 @@ export default function SubscriptionsPage() {
     duration_days: Number(p.duration_days ?? 30),
     active: Boolean(p.active ?? true),
   })).filter((p: any) => p.active);
+
+  // Catalogue complet (avec fonctionnalités & accès) pour la fenêtre « Plans disponibles ».
+  const catalogPlans: FinancePlan[] = useMemo(() => rawPlans.map(normalizePlan), [rawPlans]);
+  const [showPlans, setShowPlans] = useState(false);
 
   const [editing, setEditing] = useState<Profile | null>(null);
   const [selectedPlanId, setSelectedPlanId] = useState<string>("");
@@ -151,15 +161,32 @@ export default function SubscriptionsPage() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-foreground">{t("nav.subscriptions")}</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-foreground">{t("nav.subscriptions")}</h2>
+        <Button variant="outline" onClick={() => setShowPlans(true)}>
+          <Package className="h-4 w-4 mr-1.5" />Plans disponibles
+        </Button>
+      </div>
 
       {plans.length === 0 && (
         <div className="rounded-lg border border-orange-200 bg-orange-50 dark:bg-orange-950/20 p-4 text-sm text-orange-700 flex items-center gap-2">
           <Package className="h-4 w-4 shrink-0" />
-          Aucun plan d'abonnement actif. Créez-en un dans{" "}
-          <strong>Finance → Abonnements</strong> pour pouvoir les assigner ici.
+          Aucun plan d'abonnement actif. Créez-en un via{" "}
+          <strong>Plans disponibles</strong> pour pouvoir les assigner ici.
         </div>
       )}
+
+      {/* Catalogue des plans (déplacé depuis Finance → Abonnements) */}
+      <Dialog open={showPlans} onOpenChange={setShowPlans}>
+        <DialogContent className="max-w-5xl max-h-[85vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5 text-primary" />Plans disponibles
+            </DialogTitle>
+          </DialogHeader>
+          <PlansTab plans={catalogPlans} isAdmin={isAdmin} />
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardContent className="p-0">
@@ -246,7 +273,7 @@ export default function SubscriptionsPage() {
               <Label className="text-sm font-medium">Plan d'abonnement</Label>
               {plans.length === 0 ? (
                 <p className="text-sm text-muted-foreground italic">
-                  Aucun plan disponible. Créez-en un dans Finance → Abonnements.
+                  Aucun plan disponible. Créez-en un via le bouton « Plans disponibles ».
                 </p>
               ) : (
                 <Select value={selectedPlanId} onValueChange={handlePlanChange}>
