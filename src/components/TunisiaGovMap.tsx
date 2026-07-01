@@ -55,6 +55,9 @@ function greenScale(t: number): string {
   return `hsl(150, 55%, ${light}%)`;
 }
 
+const HOVER_FILL = "#2fbf82";     // survol : vert plus vif
+const SELECTED_FILL = "#008a5c";  // sélection : vert de référence (comme l'image)
+
 export default function TunisiaGovMap({
   counts, selected, onSelect, height = 340,
 }: {
@@ -81,15 +84,15 @@ export default function TunisiaGovMap({
           const c = counts[p.name] ?? 0;
           const isSel = selected === p.name;
           const isHover = hover === p.name;
+          const fill = isSel ? SELECTED_FILL : isHover ? HOVER_FILL : greenScale(c / max);
           return (
             <path
               key={p.name}
               d={p.d}
-              fill={greenScale(c / max)}
+              fill={fill}
               stroke={isSel ? "#0f5132" : "#ffffff"}
-              strokeWidth={isSel ? 3 : 1}
-              opacity={isHover ? 0.85 : 1}
-              style={{ cursor: "pointer", transition: "opacity .12s" }}
+              strokeWidth={isSel ? 2.5 : 1}
+              style={{ cursor: "pointer", transition: "fill .12s ease" }}
               onClick={() => onSelect(isSel ? null : p.name)}
               onMouseEnter={() => setHover(p.name)}
               onMouseLeave={() => setHover((h) => (h === p.name ? null : h))}
