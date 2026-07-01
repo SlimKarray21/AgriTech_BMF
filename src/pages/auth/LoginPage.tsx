@@ -84,15 +84,22 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
+    <div className="relative min-h-screen flex items-center justify-center overflow-hidden p-4 bg-gradient-to-br from-emerald-50 via-background to-teal-50/50 dark:from-emerald-950/40 dark:via-background dark:to-background">
+      {/* Halos décoratifs branchés (non interactifs) */}
+      <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-emerald-400/20 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-32 -right-24 h-80 w-80 rounded-full bg-teal-400/20 blur-3xl" />
+
+      <Card className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border-border/60 shadow-xl shadow-emerald-900/5">
+        <div className="h-1.5 w-full bg-gradient-to-r from-emerald-500 via-emerald-400 to-teal-400" />
         <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <img
-              src={teslaLogo}
-              alt="Tesla Energie"
-              className="h-20 w-auto object-contain"
-            />
+          <div className="flex justify-center mb-3">
+            <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/15">
+              <img
+                src={teslaLogo}
+                alt="Tesla Energie"
+                className="h-14 w-auto object-contain"
+              />
+            </div>
           </div>
           <CardTitle className="text-2xl">
             {otpStep ? "Vérification de l'email" : t("auth.loginTitle")}
