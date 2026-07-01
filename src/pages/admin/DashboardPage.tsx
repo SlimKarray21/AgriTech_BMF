@@ -22,27 +22,41 @@ type View = "overview" | "payments" | "subs" | "sales" | "clients";
 const DT = (n: number) => formatDT(n, 0);
 const H = 170; // hauteur compacte des charts pour tenir sans scroll
 
-// KPI compact (bandeau).
+// Palette « agri / Power BI » : verts + teal, warning ambre, négatif rouge.
+const C = {
+  green: "hsl(152,58%,39%)",
+  greenDark: "hsl(152,60%,27%)",
+  teal: "hsl(182,52%,40%)",
+  lime: "hsl(96,48%,46%)",
+  blueGreen: "hsl(196,55%,44%)",
+  amber: "hsl(38,92%,52%)",
+  red: "hsl(0,72%,55%)",
+};
+
+// Carte KPI façon Power BI : encadrée, barre d'accent verte, grande valeur.
 function Stat({ icon: Icon, label, value, color }: { icon: any; label: string; value: any; color: string }) {
   return (
-    <Card>
-      <CardContent className="p-2.5 flex items-center gap-2 min-w-0">
-        <div className={`p-2 rounded-lg shrink-0 ${color}`}><Icon className="h-4 w-4" /></div>
-        <div className="min-w-0">
-          <p className="text-xl font-bold leading-none truncate" title={String(value)}>{value}</p>
-          <p className="text-[11px] text-muted-foreground leading-tight truncate mt-0.5" title={label}>{label}</p>
+    <Card className="relative overflow-hidden">
+      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-600 to-teal-400" />
+      <CardContent className="p-3 pt-3.5">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-2xl font-extrabold tracking-tight text-foreground truncate" title={String(value)}>{value}</p>
+          <div className={`p-1.5 rounded-md shrink-0 ${color}`}><Icon className="h-4 w-4" /></div>
         </div>
+        <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-primary truncate" title={label}>{label}</p>
       </CardContent>
     </Card>
   );
 }
 
-// Carte graphique dense (petit titre, peu de padding).
+// Carte graphique façon panneau Power BI (en-tête léger encadré).
 function ChartCard({ title, children }: { title: string; children: any }) {
   return (
     <Card className="overflow-hidden">
-      <CardHeader className="py-2 px-3"><CardTitle className="text-xs font-semibold">{title}</CardTitle></CardHeader>
-      <CardContent className="p-1.5 pt-0">{children}</CardContent>
+      <CardHeader className="py-2 px-3 border-b bg-muted/30">
+        <CardTitle className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="p-1.5 pt-2">{children}</CardContent>
     </Card>
   );
 }
@@ -129,27 +143,27 @@ export default function DashboardPage() {
   }, [sales, subpays]);
 
   const caSplit = [
-    { name: "Abonnements", value: Math.round(revenusAbos), fill: "hsl(145,63%,40%)" },
-    { name: "Appareils", value: Math.round(revenusAppareils), fill: "hsl(30,90%,55%)" },
+    { name: "Abonnements", value: Math.round(revenusAbos), fill: C.green },
+    { name: "Appareils", value: Math.round(revenusAppareils), fill: C.teal },
   ].filter((d) => d.value > 0);
   const abosStatusData = [
-    { name: "Actifs", value: abosActifs, fill: "hsl(145,63%,40%)" },
-    { name: "Expirés", value: abosExpires, fill: "hsl(0,75%,55%)" },
+    { name: "Actifs", value: abosActifs, fill: C.green },
+    { name: "Expirés", value: abosExpires, fill: C.red },
   ].filter((d) => d.value > 0);
   const payStatusData = [
-    { name: "Validés", value: paiementsValides, fill: "hsl(145,63%,40%)" },
-    { name: "En attente", value: paiementsEnAttente, fill: "hsl(30,90%,55%)" },
-    { name: "Refusés", value: paiementsRefuses, fill: "hsl(0,75%,55%)" },
+    { name: "Validés", value: paiementsValides, fill: C.green },
+    { name: "En attente", value: paiementsEnAttente, fill: C.amber },
+    { name: "Refusés", value: paiementsRefuses, fill: C.red },
   ].filter((d) => d.value > 0);
   const parcellesData = [
-    { name: "Connectées", value: parcellesConn, fill: "hsl(145,63%,40%)" },
-    { name: "En attente", value: parcellesAtt, fill: "hsl(30,90%,55%)" },
+    { name: "Connectées", value: parcellesConn, fill: C.green },
+    { name: "En attente", value: parcellesAtt, fill: C.amber },
   ].filter((d) => d.value > 0);
   const countsData = [
-    { name: "Clients", value: clients, fill: "hsl(210,80%,55%)" },
-    { name: "Parcelles", value: parcelles, fill: "hsl(265,70%,60%)" },
-    { name: "Connectées", value: parcellesConn, fill: "hsl(145,63%,40%)" },
-    { name: "Attente", value: parcellesAtt, fill: "hsl(30,90%,55%)" },
+    { name: "Clients", value: clients, fill: C.green },
+    { name: "Parcelles", value: parcelles, fill: C.teal },
+    { name: "Connectées", value: parcellesConn, fill: C.lime },
+    { name: "Attente", value: parcellesAtt, fill: C.amber },
   ];
 
   const ranges: { v: Range; label: string }[] = [
@@ -201,13 +215,13 @@ export default function DashboardPage() {
     <ResponsiveContainer width="100%" height={H}>
       <AreaChart data={timeSeries}>
         <defs>
-          <linearGradient id="gA" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="hsl(145,63%,40%)" stopOpacity={0.6} /><stop offset="100%" stopColor="hsl(145,63%,40%)" stopOpacity={0} /></linearGradient>
-          <linearGradient id="gB" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="hsl(30,90%,55%)" stopOpacity={0.6} /><stop offset="100%" stopColor="hsl(30,90%,55%)" stopOpacity={0} /></linearGradient>
+          <linearGradient id="gA" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={C.green} stopOpacity={0.55} /><stop offset="100%" stopColor={C.green} stopOpacity={0} /></linearGradient>
+          <linearGradient id="gB" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={C.teal} stopOpacity={0.55} /><stop offset="100%" stopColor={C.teal} stopOpacity={0} /></linearGradient>
         </defs>
         {grid()}<XAxis dataKey="name" fontSize={10} interval="preserveStartEnd" /><YAxis fontSize={10} width={36} />
         <Tooltip formatter={(v: any) => `${v} DT`} /><Legend wrapperStyle={{ fontSize: 10 }} />
-        <Area type="monotone" dataKey="Abonnements" stroke="hsl(145,63%,40%)" fill="url(#gA)" strokeWidth={2} />
-        <Area type="monotone" dataKey="Appareils" stroke="hsl(30,90%,55%)" fill="url(#gB)" strokeWidth={2} />
+        <Area type="monotone" dataKey="Abonnements" stroke={C.green} fill="url(#gA)" strokeWidth={2} />
+        <Area type="monotone" dataKey="Appareils" stroke={C.teal} fill="url(#gB)" strokeWidth={2} />
       </AreaChart>
     </ResponsiveContainer>
   );
@@ -216,25 +230,40 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* Bandeau titre façon Power BI */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-gradient-to-r from-emerald-700 via-emerald-600 to-teal-600 px-4 py-3 text-white shadow-sm">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">{t("dashboard.title")}</h2>
-          <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+          <h2 className="text-xl font-bold flex items-center gap-2"><LayoutDashboard className="h-5 w-5" /> {t("dashboard.title")}</h2>
+          <p className="text-xs text-emerald-50/80 flex items-center gap-1.5 mt-0.5">
             <CalendarDays className="h-3.5 w-3.5" />
             {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
           </p>
         </div>
-        <div className="flex gap-1 p-1 rounded-lg bg-muted">
+        <div className="flex gap-0.5 rounded-lg bg-white/15 p-0.5">
           {ranges.map((r) => (
-            <Button key={r.v} size="sm" variant={range === r.v ? "default" : "ghost"} onClick={() => setRange(r.v)} className="h-7 text-xs">{r.label}</Button>
+            <Button
+              key={r.v}
+              size="sm"
+              variant="ghost"
+              onClick={() => setRange(r.v)}
+              className={`h-7 text-xs border-0 hover:text-white ${range === r.v ? "bg-white text-emerald-700 hover:bg-white hover:text-emerald-700" : "bg-transparent text-white hover:bg-white/20"}`}
+            >
+              {r.label}
+            </Button>
           ))}
         </div>
       </div>
 
-      {/* Navigation entre les 5 vues */}
-      <div className="flex flex-wrap gap-2">
+      {/* Barre d'onglets (pages) façon Power BI */}
+      <div className="flex flex-wrap gap-1 rounded-lg border bg-card p-1 shadow-sm">
         {views.map((vw) => (
-          <Button key={vw.v} variant={view === vw.v ? "default" : "outline"} size="sm" onClick={() => setView(vw.v)} className="gap-1.5">
+          <Button
+            key={vw.v}
+            size="sm"
+            variant="ghost"
+            onClick={() => setView(vw.v)}
+            className={`h-8 gap-1.5 ${view === vw.v ? "bg-primary/10 text-primary font-semibold hover:bg-primary/10" : "text-muted-foreground hover:bg-muted"}`}
+          >
             <vw.icon className="h-4 w-4" />{vw.label}
           </Button>
         ))}
@@ -251,15 +280,15 @@ export default function DashboardPage() {
           </div>
           <div className={chartsGrid}>
             <ChartCard title="Évolution des revenus (DT)">{revenueArea}</ChartCard>
-            <ChartCard title="CA cumulé (DT)">{lineChart("Total", "hsl(145,63%,32%)")}</ChartCard>
+            <ChartCard title="CA cumulé (DT)">{lineChart("Total", C.greenDark)}</ChartCard>
             <ChartCard title="Répartition du CA">{pie(caSplit, "Aucune recette")}</ChartCard>
-            <ChartCard title="Paiements par période">{barChart("Paiements", "hsl(280,60%,55%)")}</ChartCard>
+            <ChartCard title="Paiements par période">{barChart("Paiements", C.blueGreen)}</ChartCard>
             <ChartCard title="État des parcelles">{pie(parcellesData, "Aucune parcelle")}</ChartCard>
             <ChartCard title="Recettes par méthode (DT)">
               <ResponsiveContainer width="100%" height={H}>
                 <BarChart data={methodAgg} layout="vertical">
                   {grid()}<XAxis type="number" fontSize={10} /><YAxis type="category" dataKey="name" fontSize={10} width={70} />
-                  <Tooltip formatter={(v: any) => `${v} DT`} /><Bar dataKey="value" fill="hsl(190,70%,45%)" radius={[0, 5, 5, 0]} />
+                  <Tooltip formatter={(v: any) => `${v} DT`} /><Bar dataKey="value" fill={C.teal} radius={[0, 5, 5, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </ChartCard>
@@ -277,18 +306,18 @@ export default function DashboardPage() {
             <Stat icon={XCircle} label="Refusés" value={paiementsRefuses} color="bg-red-500/10 text-red-600" />
           </div>
           <div className={chartsGrid}>
-            <ChartCard title="Paiements par période">{barChart("Paiements", "hsl(280,60%,55%)")}</ChartCard>
+            <ChartCard title="Paiements par période">{barChart("Paiements", C.blueGreen)}</ChartCard>
             <ChartCard title="Répartition des statuts">{pie(payStatusData, "Aucun paiement")}</ChartCard>
             <ChartCard title="Recettes par méthode (DT)">
               <ResponsiveContainer width="100%" height={H}>
                 <BarChart data={methodAgg} layout="vertical">
                   {grid()}<XAxis type="number" fontSize={10} /><YAxis type="category" dataKey="name" fontSize={10} width={70} />
-                  <Tooltip formatter={(v: any) => `${v} DT`} /><Bar dataKey="value" fill="hsl(190,70%,45%)" radius={[0, 5, 5, 0]} />
+                  <Tooltip formatter={(v: any) => `${v} DT`} /><Bar dataKey="value" fill={C.teal} radius={[0, 5, 5, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </ChartCard>
             <ChartCard title="Évolution des revenus (DT)">{revenueArea}</ChartCard>
-            <ChartCard title="CA cumulé (DT)">{lineChart("Total", "hsl(145,63%,32%)")}</ChartCard>
+            <ChartCard title="CA cumulé (DT)">{lineChart("Total", C.greenDark)}</ChartCard>
             <ChartCard title="Répartition du CA">{pie(caSplit, "Aucune recette")}</ChartCard>
           </div>
         </>
@@ -305,14 +334,14 @@ export default function DashboardPage() {
           </div>
           <div className={chartsGrid}>
             <ChartCard title="Actifs vs expirés">{pie(abosStatusData, "Aucun abonnement")}</ChartCard>
-            <ChartCard title="Revenus abonnements (DT)">{barChart("Abonnements", "hsl(160,63%,42%)", true)}</ChartCard>
-            <ChartCard title="Paiements par période">{barChart("Paiements", "hsl(280,60%,55%)")}</ChartCard>
-            <ChartCard title="CA cumulé (DT)">{lineChart("Total", "hsl(145,63%,32%)")}</ChartCard>
+            <ChartCard title="Revenus abonnements (DT)">{barChart("Abonnements", C.green, true)}</ChartCard>
+            <ChartCard title="Paiements par période">{barChart("Paiements", C.blueGreen)}</ChartCard>
+            <ChartCard title="CA cumulé (DT)">{lineChart("Total", C.greenDark)}</ChartCard>
             <ChartCard title="Recettes par méthode (DT)">
               <ResponsiveContainer width="100%" height={H}>
                 <BarChart data={methodAgg} layout="vertical">
                   {grid()}<XAxis type="number" fontSize={10} /><YAxis type="category" dataKey="name" fontSize={10} width={70} />
-                  <Tooltip formatter={(v: any) => `${v} DT`} /><Bar dataKey="value" fill="hsl(190,70%,45%)" radius={[0, 5, 5, 0]} />
+                  <Tooltip formatter={(v: any) => `${v} DT`} /><Bar dataKey="value" fill={C.teal} radius={[0, 5, 5, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </ChartCard>
@@ -331,16 +360,16 @@ export default function DashboardPage() {
             <Stat icon={TrendingUp} label="Panier moyen" value={DT(panierMoyen)} color="bg-fuchsia-500/10 text-fuchsia-600" />
           </div>
           <div className={chartsGrid}>
-            <ChartCard title="Ventes d'appareils (qté)">{barChart("Ventes", "hsl(210,80%,55%)")}</ChartCard>
-            <ChartCard title="Revenus appareils (DT)">{barChart("Appareils", "hsl(30,90%,55%)", true)}</ChartCard>
-            <ChartCard title="Tendance revenus (DT)">{lineChart("Appareils", "hsl(30,90%,50%)")}</ChartCard>
-            <ChartCard title="CA cumulé (DT)">{lineChart("Total", "hsl(145,63%,32%)")}</ChartCard>
+            <ChartCard title="Ventes d'appareils (qté)">{barChart("Ventes", C.teal)}</ChartCard>
+            <ChartCard title="Revenus appareils (DT)">{barChart("Appareils", C.teal, true)}</ChartCard>
+            <ChartCard title="Tendance revenus (DT)">{lineChart("Appareils", C.teal)}</ChartCard>
+            <ChartCard title="CA cumulé (DT)">{lineChart("Total", C.greenDark)}</ChartCard>
             <ChartCard title="Évolution des revenus (DT)">{revenueArea}</ChartCard>
             <ChartCard title="Recettes par méthode (DT)">
               <ResponsiveContainer width="100%" height={H}>
                 <BarChart data={methodAgg} layout="vertical">
                   {grid()}<XAxis type="number" fontSize={10} /><YAxis type="category" dataKey="name" fontSize={10} width={70} />
-                  <Tooltip formatter={(v: any) => `${v} DT`} /><Bar dataKey="value" fill="hsl(190,70%,45%)" radius={[0, 5, 5, 0]} />
+                  <Tooltip formatter={(v: any) => `${v} DT`} /><Bar dataKey="value" fill={C.teal} radius={[0, 5, 5, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </ChartCard>
@@ -374,11 +403,11 @@ export default function DashboardPage() {
               <ResponsiveContainer width="100%" height={H}>
                 <BarChart data={methodAgg} layout="vertical">
                   {grid()}<XAxis type="number" fontSize={10} /><YAxis type="category" dataKey="name" fontSize={10} width={70} />
-                  <Tooltip formatter={(v: any) => `${v} DT`} /><Bar dataKey="value" fill="hsl(190,70%,45%)" radius={[0, 5, 5, 0]} />
+                  <Tooltip formatter={(v: any) => `${v} DT`} /><Bar dataKey="value" fill={C.teal} radius={[0, 5, 5, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </ChartCard>
-            <ChartCard title="Paiements par période">{barChart("Paiements", "hsl(280,60%,55%)")}</ChartCard>
+            <ChartCard title="Paiements par période">{barChart("Paiements", C.blueGreen)}</ChartCard>
             <ChartCard title="Abonnements actifs vs expirés">{pie(abosStatusData, "Aucun abonnement")}</ChartCard>
           </div>
         </>
