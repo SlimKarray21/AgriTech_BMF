@@ -1,4 +1,5 @@
-import { MapContainer, TileLayer, CircleMarker, Tooltip } from "react-leaflet";
+import { useEffect, useRef } from "react";
+import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 // Les 24 gouvernorats de Tunisie + centroïdes approximatifs (lat, lng).
@@ -31,7 +32,7 @@ export const TN_GOVERNORATES: { name: string; lat: number; lng: number }[] = [
 
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
-/** Déduit le gouvernorat à partir d'une chaîne de localisation libre (ex. "El Amra,Sfax,Tunisie"). */
+/** Déduit le gouvernorat à partir d'une localisation libre (ex. "El Amra,Sfax,Tunisie"). */
 export function governorateFromLocalisation(loc?: string | null): string | null {
   if (!loc) return null;
   const l = norm(loc);
@@ -39,6 +40,8 @@ export function governorateFromLocalisation(loc?: string | null): string | null 
   return found?.name ?? null;
 }
 
+// Implémentation en Leaflet natif (impératif) — compatible React 18/19,
+// contrairement à react-leaflet v5 qui exige React 19.
 export default function TunisiaGovMap({
   counts, selected, onSelect, height = 340,
 }: {
@@ -47,43 +50,55 @@ export default function TunisiaGovMap({
   onSelect: (gov: string | null) => void;
   height?: number;
 }) {
-  const max = Math.max(1, ...Object.values(counts));
-  return (
-    <div style={{ height }} className="overflow-hidden rounded-lg border">
-      <MapContainer
-        center={[34.6, 9.6]}
-        zoom={6}
-        minZoom={5}
-        style={{ height: "100%", width: "100%" }}
-        scrollWheelZoom={false}
-        attributionControl={false}
-      >
-        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-        {TN_GOVERNORATES.map((g) => {
-          const c = counts[g.name] ?? 0;
-          const isSel = selected === g.name;
-          const radius = c > 0 ? 6 + (c / max) * 16 : 4;
-          return (
-            <CircleMarker
-              key={g.name}
-              center={[g.lat, g.lng]}
-              radius={radius}
-              pathOptions={{
-                color: isSel ? "#0f5132" : "#1f7a42",
-                weight: isSel ? 3 : 1,
-                fillColor: "#2ea15f",
-                fillOpacity: selected && !isSel ? 0.2 : 0.65,
-              }}
-              eventHandlers={{ click: () => onSelect(isSel ? null : g.name) }}
-            >
-              <Tooltip direction="top" offset={[0, -4]}>
-                <span className="text-xs font-medium">{g.name}</span>
-                <span className="text-xs text-muted-foreground"> — {c}</span>
-              </Tooltip>
-            </CircleMarker>
-          );
-        })}
-      </MapContainer>
-    </div>
-  );
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const layerRef = useRef<L.LayerGroup | null>(null);
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
+
+  // Initialisation unique de la carte.
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current) return;
+    const map = L.map(containerRef.current, {
+      scrollWheelZoom: false,
+      attributionControl: false,
+      minZoom: 5,
+    }).setView([34.6, 9.6], 6);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+    layerRef.current = L.layerGroup().addTo(map);
+    mapRef.current = map;
+    // Corrige le rendu des tuiles quand le conteneur vient d'obtenir sa taille.
+    setTimeout(() => map.invalidateSize(), 0);
+    return () => {
+      map.remove();
+      mapRef.current = null;
+      layerRef.current = null;
+    };
+  }, []);
+
+  // (Re)dessine les bulles à chaque changement de données / sélection.
+  useEffect(() => {
+    const layer = layerRef.current;
+    if (!layer) return;
+    layer.clearLayers();
+    const values = Object.values(counts);
+    const max = Math.max(1, ...(values.length ? values : [1]));
+    TN_GOVERNORATES.forEach((g) => {
+      const c = counts[g.name] ?? 0;
+      const isSel = selected === g.name;
+      const radius = c > 0 ? 6 + (c / max) * 16 : 4;
+      const marker = L.circleMarker([g.lat, g.lng], {
+        radius,
+        color: isSel ? "#0f5132" : "#1f7a42",
+        weight: isSel ? 3 : 1,
+        fillColor: "#2ea15f",
+        fillOpacity: selected && !isSel ? 0.2 : 0.65,
+      });
+      marker.bindTooltip(`${g.name} — ${c}`, { direction: "top", offset: [0, -4] });
+      marker.on("click", () => onSelectRef.current(isSel ? null : g.name));
+      marker.addTo(layer);
+    });
+  }, [counts, selected]);
+
+  return <div ref={containerRef} style={{ height }} className="overflow-hidden rounded-lg border" />;
 }
