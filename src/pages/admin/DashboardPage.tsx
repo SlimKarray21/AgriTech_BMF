@@ -325,31 +325,38 @@ export default function DashboardPage() {
             <Stat icon={ShieldCheck} label="Abonnements actifs" value={abosActifs} color="bg-teal-500/10 text-teal-600" />
           </div>
 
-          {/* Carte Tunisie — filtre par gouvernorat (24) */}
-          <Card className="overflow-hidden">
-            <CardHeader className="py-2 px-3 border-b bg-muted/30 flex flex-row items-center justify-between space-y-0">
-              <CardTitle className="text-xs font-bold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-                <MapPin className="h-3.5 w-3.5" /> Parcelles par gouvernorat
-              </CardTitle>
-              {selectedGov ? (
-                <button type="button" onClick={() => setSelectedGov(null)} className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/15">
-                  {selectedGov} <XCircle className="h-3.5 w-3.5" />
-                </button>
-              ) : (
-                <span className="text-[11px] text-muted-foreground">Cliquez un gouvernorat pour filtrer</span>
-              )}
-            </CardHeader>
-            <CardContent className="p-0">
-              <TunisiaGovMap counts={govCounts} selected={selectedGov} onSelect={setSelectedGov} height={320} />
-            </CardContent>
-          </Card>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            {/* Carte Tunisie (silhouette verte, 24 gouvernorats) — à gauche */}
+            <Card className="overflow-hidden">
+              <CardHeader className="py-2 px-3 border-b bg-muted/30 flex flex-row items-center justify-between space-y-0">
+                <CardTitle className="text-xs font-bold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5" /> Parcelles par gouvernorat
+                </CardTitle>
+                {selectedGov ? (
+                  <button type="button" onClick={() => setSelectedGov(null)} className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/15">
+                    {selectedGov} <XCircle className="h-3.5 w-3.5" />
+                  </button>
+                ) : (
+                  <span className="text-[11px] text-muted-foreground">Cliquez un gouvernorat</span>
+                )}
+              </CardHeader>
+              <CardContent className="p-2">
+                <TunisiaGovMap counts={govCounts} selected={selectedGov} onSelect={setSelectedGov} height={360} />
+              </CardContent>
+            </Card>
+
+            {/* Graphiques — à droite */}
+            <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3 auto-rows-min">
+              <ChartCard title="Évolution des revenus (DT)">{revenueArea}</ChartCard>
+              <ChartCard title="CA cumulé (DT)">{lineChart("Total", C.greenDark)}</ChartCard>
+              <ChartCard title="Répartition du CA">{pie(caSplit, "Aucune recette")}</ChartCard>
+              <ChartCard title="État des parcelles">{pie(parcellesData, "Aucune parcelle")}</ChartCard>
+            </div>
+          </div>
 
           <div className={chartsGrid}>
-            <ChartCard title="Évolution des revenus (DT)">{revenueArea}</ChartCard>
-            <ChartCard title="CA cumulé (DT)">{lineChart("Total", C.greenDark)}</ChartCard>
-            <ChartCard title="Répartition du CA">{pie(caSplit, "Aucune recette")}</ChartCard>
             <ChartCard title="Paiements par période">{barChart("Paiements", C.blueGreen)}</ChartCard>
-            <ChartCard title="État des parcelles">{pie(parcellesData, "Aucune parcelle")}</ChartCard>
+            <ChartCard title="Ventes d'appareils (qté)">{barChart("Ventes", C.teal)}</ChartCard>
             <ChartCard title="Recettes par méthode (DT)">
               <ResponsiveContainer width="100%" height={H}>
                 <BarChart data={methodAgg} layout="vertical">
