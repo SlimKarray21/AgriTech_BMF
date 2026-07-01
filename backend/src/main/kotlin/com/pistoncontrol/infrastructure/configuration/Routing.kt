@@ -4,9 +4,11 @@ import com.pistoncontrol.presentation.controller.capteursol.capteurSolRoutes
 import com.pistoncontrol.infrastructure.messaging.mqtt.MqttManager
 import com.pistoncontrol.application.service.DeviceMessageHandler
 import com.pistoncontrol.application.service.EmailService
+import com.pistoncontrol.application.service.EmailCampaignService
 import com.pistoncontrol.application.service.UserService
 import com.pistoncontrol.presentation.controller.*
 import com.pistoncontrol.presentation.controller.admin.agriAdminRoutes
+import com.pistoncontrol.presentation.controller.admin.emailCampaignRoutes
 import com.pistoncontrol.infrastructure.messaging.websocket.WebSocketManager
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -15,8 +17,15 @@ import io.ktor.server.auth.jwt.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
+import mu.KotlinLogging
 import java.util.UUID
+
+private val routingLogger = KotlinLogging.logger {}
 
 @Serializable
 data class HealthResponse(
@@ -24,6 +33,7 @@ data class HealthResponse(
     val timestamp: Long
 )
 
+@OptIn(DelicateCoroutinesApi::class)
 fun Application.configureRouting(
     mqttManager: MqttManager,
     messageHandler: DeviceMessageHandler,
@@ -47,6 +57,24 @@ fun Application.configureRouting(
     wsManager.startMqttForwarding()
 
     val userService = UserService()
+
+    // ── Campagnes « Mail automatique » : service + planificateur (tous les N jours) ──
+    val emailCampaignService = EmailCampaignService(emailService)
+    try {
+        emailCampaignService.ensureSchema()
+    } catch (e: Exception) {
+        routingLogger.error(e) { "❌ Failed to ensure email_campaign schema" }
+    }
+    GlobalScope.launch {
+        while (true) {
+            try {
+                emailCampaignService.runDue()
+            } catch (e: Exception) {
+                routingLogger.error(e) { "❌ Email campaign scheduler tick failed" }
+            }
+            delay(60 * 60 * 1000L) // vérifie toutes les heures
+        }
+    }
 
     routing {
                 get("/swagger") {
@@ -119,6 +147,13 @@ fun Application.configureRouting(
         avatarRoutes(baseUrl)  // Avatar upload and serving routes
         capteurSolRoutes(mqttManager) // Parcelles/Vannes domain used by UIEarth screens
         agriAdminRoutes()  // Full admin CRUD — all piston_control tables for Admin panel
+
+        // Campagnes « Mail automatique » (admin)
+        authenticate("auth-jwt") {
+            route("/api/agri") {
+                emailCampaignRoutes(emailCampaignService)
+            }
+        }
 
         authenticate("auth-jwt") {
             get("/devices/{id}/stats") {

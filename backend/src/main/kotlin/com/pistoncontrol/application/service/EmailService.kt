@@ -100,4 +100,18 @@ class EmailService(
         Transport.send(message)
         logger.info { "Verification email sent to $toEmail" }
     }
+
+    /**
+     * Envoi générique d'un email HTML (utilisé par les campagnes « Mail automatique »).
+     */
+    fun sendHtml(toEmail: String, subjectLine: String, htmlBody: String) {
+        val message = MimeMessage(session).apply {
+            setFrom(InternetAddress(fromAddress, "AgriTech"))
+            setRecipient(Message.RecipientType.TO, InternetAddress(toEmail))
+            subject = subjectLine
+            setContent(htmlBody, "text/html; charset=UTF-8")
+        }
+        Transport.send(message)
+        logger.info { "Campaign email sent to $toEmail" }
+    }
 }
