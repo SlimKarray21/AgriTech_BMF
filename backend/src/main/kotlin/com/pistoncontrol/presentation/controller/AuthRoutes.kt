@@ -10,6 +10,7 @@ import io.ktor.server.routing.*
 
 fun Route.authRoutes(jwtSecret: String, jwtIssuer: String, jwtAudience: String, emailService: EmailService) {
     val authService = AuthService(jwtSecret, jwtIssuer, jwtAudience, emailService)
+    runCatching { authService.ensureResetSchema() } // crée la table des codes si absente
 
     route("/auth") {
         // Navigateur = GET : sans ceci, Chrome affiche « HTTP 405 ». L’authentification se fait en POST + JSON.
@@ -164,6 +165,58 @@ fun Route.authRoutes(jwtSecret: String, jwtIssuer: String, jwtAudience: String, 
                 }
             } catch (e: Exception) {
                 call.respond(HttpStatusCode.InternalServerError, ErrorResponse("Reset failed: ${e.message}"))
+            }
+        }
+
+        // ── Flux OTP « mot de passe oublié » ──
+        // Étape 1 : demander un code (envoyé par email)
+        post("/forgot-password") {
+            try {
+                val request = call.receive<ForgotPasswordRequest>()
+                when (val result = authService.requestPasswordReset(request.email)) {
+                    is AuthService.AuthResult.VerificationRequired ->
+                        call.respond(HttpStatusCode.OK, RegisterResponse(userId = "", message = result.message, otpLength = result.otpLength, expiresInMinutes = result.expiresInMinutes))
+                    is AuthService.AuthResult.Failure ->
+                        call.respond(HttpStatusCode.fromValue(result.statusCode), ErrorResponse(result.error))
+                    is AuthService.AuthResult.Success ->
+                        call.respond(HttpStatusCode.OK, mapOf("message" to "OK"))
+                }
+            } catch (e: Exception) {
+                call.respond(HttpStatusCode.InternalServerError, ErrorResponse("Forgot-password failed: ${e.message}"))
+            }
+        }
+
+        // Étape 2 (optionnelle) : vérifier le code
+        post("/verify-reset-code") {
+            try {
+                val request = call.receive<VerifyResetCodeRequest>()
+                when (val result = authService.verifyResetCode(request.email, request.code)) {
+                    is AuthService.AuthResult.VerificationRequired ->
+                        call.respond(HttpStatusCode.OK, mapOf("message" to result.message))
+                    is AuthService.AuthResult.Failure ->
+                        call.respond(HttpStatusCode.fromValue(result.statusCode), ErrorResponse(result.error))
+                    is AuthService.AuthResult.Success ->
+                        call.respond(HttpStatusCode.OK, mapOf("message" to "OK"))
+                }
+            } catch (e: Exception) {
+                call.respond(HttpStatusCode.InternalServerError, ErrorResponse("Verify-reset-code failed: ${e.message}"))
+            }
+        }
+
+        // Étape 3 : confirmer (email + code + nouveau mot de passe)
+        post("/reset-password-confirm") {
+            try {
+                val request = call.receive<ResetPasswordConfirmRequest>()
+                when (val result = authService.confirmPasswordReset(request.email, request.code, request.newPassword)) {
+                    is AuthService.AuthResult.VerificationRequired ->
+                        call.respond(HttpStatusCode.OK, mapOf("message" to result.message))
+                    is AuthService.AuthResult.Failure ->
+                        call.respond(HttpStatusCode.fromValue(result.statusCode), ErrorResponse(result.error))
+                    is AuthService.AuthResult.Success ->
+                        call.respond(HttpStatusCode.OK, mapOf("message" to "Mot de passe réinitialisé avec succès."))
+                }
+            } catch (e: Exception) {
+                call.respond(HttpStatusCode.InternalServerError, ErrorResponse("Reset-confirm failed: ${e.message}"))
             }
         }
 

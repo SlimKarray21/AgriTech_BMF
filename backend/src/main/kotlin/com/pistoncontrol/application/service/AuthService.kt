@@ -3,9 +3,12 @@ package com.pistoncontrol.application.service
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.pistoncontrol.infrastructure.persistence.DatabaseFactory.dbQuery
+import com.pistoncontrol.infrastructure.persistence.PasswordResetCode
 import com.pistoncontrol.infrastructure.persistence.Utilisateur
 import mu.KotlinLogging
 import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.transactions.transaction
 import org.mindrot.jbcrypt.BCrypt
 import java.security.MessageDigest
 import java.time.Instant
@@ -159,6 +162,75 @@ class AuthService(
             otpLength = 0,
             expiresInMinutes = 0,
         )
+    }
+
+    // ── Réinitialisation par OTP email (email → code → nouveau mot de passe) ──
+
+    /** Crée la table des codes si absente (base déjà initialisée). */
+    fun ensureResetSchema() {
+        transaction { SchemaUtils.createMissingTablesAndColumns(PasswordResetCode) }
+    }
+
+    /** Étape 1 : génère un code, l'enregistre et l'envoie par email (réponse générique). */
+    suspend fun requestPasswordReset(email: String): AuthResult {
+        if (!isValidEmail(email)) return AuthResult.Failure("Invalid email format", statusCode = 400)
+        val exists = dbQuery { Utilisateur.select { Utilisateur.email eq email }.any() }
+        if (exists) {
+            val code = (100000..999999).random().toString()
+            val expires = Instant.now().plusSeconds(otpExpiryMinutes * 60)
+            val firstName = dbQuery {
+                PasswordResetCode.deleteWhere { PasswordResetCode.email eq email }
+                PasswordResetCode.insert {
+                    it[PasswordResetCode.email] = email
+                    it[PasswordResetCode.code] = code
+                    it[expiresAt] = expires
+                    it[createdAt] = Instant.now()
+                }
+                Utilisateur.select { Utilisateur.email eq email }.firstOrNull()?.get(Utilisateur.firstName)
+            }
+            try {
+                emailService.sendPasswordResetCode(email, code, firstName, otpExpiryMinutes)
+            } catch (e: Exception) {
+                logger.error(e) { "Failed to send password reset code to $email" }
+            }
+        }
+        return AuthResult.VerificationRequired(
+            userId = "",
+            message = "Si un compte existe, un code de vérification a été envoyé par email.",
+            otpLength = otpLength,
+            expiresInMinutes = otpExpiryMinutes,
+        )
+    }
+
+    private suspend fun isResetCodeValid(email: String, code: String): Boolean = dbQuery {
+        val row = PasswordResetCode.select {
+            (PasswordResetCode.email eq email) and (PasswordResetCode.code eq code.trim())
+        }.firstOrNull()
+        row != null && row[PasswordResetCode.expiresAt].isAfter(Instant.now())
+    }
+
+    /** Étape 2 (optionnelle) : valide le code sans le consommer. */
+    suspend fun verifyResetCode(email: String, code: String): AuthResult {
+        return if (isResetCodeValid(email, code))
+            AuthResult.VerificationRequired("", "Code valide.", otpLength, otpExpiryMinutes)
+        else AuthResult.Failure("Code invalide ou expiré.", statusCode = 400)
+    }
+
+    /** Étape 3 : vérifie le code + change le mot de passe, puis consomme le code. */
+    suspend fun confirmPasswordReset(email: String, code: String, newPassword: String): AuthResult {
+        val passwordError = validatePassword(newPassword)
+        if (passwordError != null) return AuthResult.Failure(passwordError, statusCode = 400)
+        if (!isResetCodeValid(email, code)) return AuthResult.Failure("Code invalide ou expiré.", statusCode = 400)
+        val hashed = hashPassword(newPassword)
+        val updated = dbQuery {
+            Utilisateur.update({ Utilisateur.email eq email }) {
+                it[passwordHash] = hashed
+                it[updatedAt] = Instant.now()
+            }
+        }
+        if (updated == 0) return AuthResult.Failure("Aucun compte associé à cet email.", statusCode = 404)
+        dbQuery { PasswordResetCode.deleteWhere { PasswordResetCode.email eq email } }
+        return AuthResult.VerificationRequired("", "Mot de passe réinitialisé avec succès.", 0, 0)
     }
 
     // OTP désactivé (table email_verification_codes supprimée).

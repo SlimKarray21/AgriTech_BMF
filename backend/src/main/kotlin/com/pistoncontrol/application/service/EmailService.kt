@@ -101,6 +101,41 @@ class EmailService(
         logger.info { "Verification email sent to $toEmail" }
     }
 
+    /** Email contenant un code OTP de réinitialisation de mot de passe. */
+    fun sendPasswordResetCode(toEmail: String, code: String, firstName: String?, expiresInMinutes: Long) {
+        val name = firstName ?: "there"
+        val html = """
+            <!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+            <body style="margin:0;padding:0;background:#f3f7f4;font-family:Arial,sans-serif;color:#1f2937;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="padding:24px 12px;"><tr><td align="center">
+                <table width="100%" cellpadding="0" cellspacing="0" style="max-width:620px;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
+                  <tr><td style="background:linear-gradient(135deg,#1f7a42,#2ea15f);padding:22px;text-align:center;color:#fff;">
+                    <div style="font-size:22px;font-weight:700;">AgriTech</div>
+                    <div style="font-size:13px;opacity:.9;margin-top:6px;">Réinitialisation du mot de passe</div>
+                  </td></tr>
+                  <tr><td style="padding:24px;">
+                    <p style="margin:0 0 12px 0;font-size:15px;">Bonjour $name,</p>
+                    <p style="margin:0 0 18px 0;font-size:15px;line-height:1.5;">Voici votre code pour réinitialiser votre mot de passe&nbsp;:</p>
+                    <div style="background:#f0f9f2;border:1px dashed #2ea15f;border-radius:12px;padding:18px;text-align:center;">
+                      <span style="font-size:34px;font-weight:700;letter-spacing:10px;color:#1f7a42;">$code</span>
+                    </div>
+                    <p style="margin:18px 0 0 0;font-size:14px;line-height:1.5;">Ce code expire dans <strong>$expiresInMinutes minutes</strong>. Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.</p>
+                  </td></tr>
+                  <tr><td style="padding:16px 24px;background:#f9fafb;border-top:1px solid #e5e7eb;color:#6b7280;font-size:12px;text-align:center;">AgriTech — email automatique</td></tr>
+                </table>
+              </td></tr></table>
+            </body></html>
+        """.trimIndent()
+        val message = MimeMessage(session).apply {
+            setFrom(InternetAddress(fromAddress, "AgriTech"))
+            setRecipient(Message.RecipientType.TO, InternetAddress(toEmail))
+            subject = "Code de réinitialisation AgriTech: $code"
+            setContent(html, "text/html; charset=UTF-8")
+        }
+        Transport.send(message)
+        logger.info { "Password reset email sent to $toEmail" }
+    }
+
     /**
      * Envoi générique d'un email HTML (utilisé par les campagnes « Mail automatique »).
      */

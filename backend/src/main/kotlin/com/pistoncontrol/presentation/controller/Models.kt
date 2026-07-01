@@ -40,6 +40,16 @@ data class ErrorResponse(
 @Serializable
 data class ResetPasswordRequest(val email: String, val newPassword: String)
 
+// Flux OTP « mot de passe oublié » : email → code → nouveau mot de passe.
+@Serializable
+data class ForgotPasswordRequest(val email: String)
+
+@Serializable
+data class VerifyResetCodeRequest(val email: String, val code: String)
+
+@Serializable
+data class ResetPasswordConfirmRequest(val email: String, val code: String, val newPassword: String)
+
 @Serializable
 data class VerifyEmailRequest(val userId: String, val code: String)
 
