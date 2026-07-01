@@ -6,7 +6,8 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import TunisiaGovMap, { governorateFromLocalisation } from "@/components/TunisiaGovMap";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import TunisiaGovMap, { governorateFromLocalisation, TN_GOVERNORATES } from "@/components/TunisiaGovMap";
 import {
   Users, Wallet, Package, ShoppingBag, Clock, CheckCircle2, ShieldCheck, ShieldOff,
   TrendingUp, CalendarDays, LayoutDashboard, MapPin, Wifi, XCircle, CreditCard,
@@ -72,6 +73,7 @@ export default function DashboardPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [selectedGov, setSelectedGov] = useState<string | null>(null);
+  const [method, setMethod] = useState("all");
 
   const { data: allProfiles = [] } = useQuery({ queryKey: ["profiles"], queryFn: getProfiles });
   const allFiltered = useFilteredProfiles(allProfiles);
@@ -83,14 +85,13 @@ export default function DashboardPage() {
   const dateActive = from !== "" && to !== "";
   const winStart = dateActive ? new Date(from).getTime() : -Infinity;
   const winEnd = dateActive ? new Date(to).getTime() + 86400000 : Infinity;
-  const sales = useMemo(
-    () => dateActive ? rawSales.filter((x) => { const tm = new Date(x.created_at).getTime(); return tm >= winStart && tm <= winEnd; }) : rawSales,
-    [rawSales, dateActive, winStart, winEnd],
-  );
-  const subpays = useMemo(
-    () => dateActive ? rawSubpays.filter((x) => { const tm = new Date(x.created_at).getTime(); return tm >= winStart && tm <= winEnd; }) : rawSubpays,
-    [rawSubpays, dateActive, winStart, winEnd],
-  );
+  const keep = (x: any) => {
+    if (dateActive) { const tm = new Date(x.created_at).getTime(); if (tm < winStart || tm > winEnd) return false; }
+    if (method !== "all" && (x.payment_method || "") !== method) return false;
+    return true;
+  };
+  const sales = useMemo(() => rawSales.filter(keep), [rawSales, dateActive, winStart, winEnd, method]);
+  const subpays = useMemo(() => rawSubpays.filter(keep), [rawSubpays, dateActive, winStart, winEnd, method]);
 
   // ── Filtre gouvernorat (carte Tunisie) : nombre de parcelles par gouvernorat + filtrage des parcelles ──
   const govCounts = useMemo(() => {
@@ -298,6 +299,42 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Ligne de filtres (Power BI) */}
+      <div className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-2 shadow-sm">
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Gouvernorat</label>
+          <Select value={selectedGov ?? "all"} onValueChange={(v) => setSelectedGov(v === "all" ? null : v)}>
+            <SelectTrigger className="h-8 w-44 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous</SelectItem>
+              {[...TN_GOVERNORATES].sort().map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Méthode de paiement</label>
+          <Select value={method} onValueChange={setMethod}>
+            <SelectTrigger className="h-8 w-44 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Toutes</SelectItem>
+              {["especes", "carte", "virement", "cheque", "cimbielle", "mobile"].map((m) => (
+                <SelectItem key={m} value={m}>{METHOD_LABEL[m] ?? m}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {(selectedGov || method !== "all" || dateActive) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 gap-1 text-muted-foreground hover:text-destructive"
+            onClick={() => { setSelectedGov(null); setMethod("all"); setFrom(""); setTo(""); setRange("month"); }}
+          >
+            <XCircle className="h-3.5 w-3.5" />Réinitialiser
+          </Button>
+        )}
       </div>
 
       {/* Barre d'onglets (pages) façon Power BI */}
