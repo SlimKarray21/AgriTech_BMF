@@ -20,7 +20,6 @@ const navGlobal: NavItem[] = [
   { titleKey: "nav.subscriptions", url: "/partenaire/subscriptions", icon: CreditCard, roles: ["PARTENAIRE"] },
   { titleKey: "nav.rapports", url: "/partenaire/rapports", icon: FileBarChart, roles: ["PARTENAIRE"] },
   { titleKey: "nav.reclamations", url: "/partenaire/reclamations", icon: MessageSquare, roles: ["PARTENAIRE"] },
-  { titleKey: "nav.demandeMateriel", url: "/partenaire/demande-materiel", icon: Package, roles: ["PARTENAIRE"] },
   { titleKey: "nav.baseDonnees", url: "/partenaire/base-donnees", icon: HardDrive, roles: ["PARTENAIRE"] },
 ];
 
@@ -36,7 +35,6 @@ const pageTitleKeys: Record<string, string> = {
   "/partenaire/rapport-eau": "rapports.waterReport",
   "/partenaire/base-donnees": "nav.baseDonnees",
   "/partenaire/reclamations": "nav.reclamations",
-  "/partenaire/demande-materiel": "nav.demandeMateriel",
   "/partenaire/finance": "nav.finance",
   "/partenaire/stock": "nav.stock",
   "/partenaire/reservation-materiel": "nav.reservationMateriel",

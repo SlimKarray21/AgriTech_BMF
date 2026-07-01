@@ -13,9 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DeleteDialog } from "@/components/DeleteDialog";
-import { CheckCircle2, Clock, Plus, MessageSquare, RotateCcw, Users, Package } from "lucide-react";
+import { CheckCircle2, Clock, Plus, MessageSquare, RotateCcw } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 export default function ReclamationsPage() {
@@ -65,7 +64,6 @@ export default function ReclamationsPage() {
     list.filter(r => filterStatus === "all" || r.statut === filterStatus);
 
   const userList = byStatus(reclamations.filter(r => r.userRole !== "PARTENAIRE"));
-  const partenaireList = byStatus(reclamations.filter(r => r.userRole === "PARTENAIRE"));
 
   const accessors = {
     user: (r: (typeof reclamations)[number]) => r.userName ?? r.userEmail,
@@ -75,7 +73,6 @@ export default function ReclamationsPage() {
     statut: (r: (typeof reclamations)[number]) => r.statut,
   };
   const userSorted = useTableSort(userList, accessors);
-  const partenaireSorted = useTableSort(partenaireList, accessors);
 
   const renderTable = (
     list: typeof reclamations,
@@ -165,18 +162,7 @@ export default function ReclamationsPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="users">
-        <TabsList>
-          <TabsTrigger value="users"><Users className="mr-1 h-4 w-4" /> Utilisateurs <Badge variant="secondary" className="ml-1">{userList.length}</Badge></TabsTrigger>
-          <TabsTrigger value="partenaires"><Package className="mr-1 h-4 w-4" /> Demandes Matériel <Badge variant="secondary" className="ml-1">{partenaireList.length}</Badge></TabsTrigger>
-        </TabsList>
-        <TabsContent value="users" className="mt-4">
-          {renderTable(userSorted.sorted, userSorted.sort, "Utilisateur", "Aucune réclamation utilisateur")}
-        </TabsContent>
-        <TabsContent value="partenaires" className="mt-4">
-          {renderTable(partenaireSorted.sorted, partenaireSorted.sort, "Partenaire", "Aucune demande de matériel")}
-        </TabsContent>
-      </Tabs>
+      {renderTable(userSorted.sorted, userSorted.sort, "Utilisateur", "Aucune réclamation")}
 
       <Dialog open={creating} onOpenChange={setCreating}>
         <DialogContent>

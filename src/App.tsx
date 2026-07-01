@@ -21,6 +21,7 @@ import RapportsPage from "@/pages/shared/RapportsPage";
 import SurfaceDetailPage from "@/pages/shared/SurfaceDetailPage";
 import BaseDonneesPage from "@/pages/admin/BaseDonneesPage";
 import ReclamationsPage from "@/pages/admin/ReclamationsPage";
+import MailAutomatiquePage from "@/pages/admin/MailAutomatiquePage";
 import FinancePage from "@/pages/admin/FinancePage";
 import StockPage from "@/pages/admin/StockPage";
 import FicheClientPage from "@/pages/admin/FicheClientPage";
@@ -36,7 +37,6 @@ import PartenaireUsersPage from "@/pages/partenaire/UsersPage";
 import PartenaireSubscriptionsPage from "@/pages/partenaire/SubscriptionsPage";
 import PartenaireBaseDonneesPage from "@/pages/partenaire/BaseDonneesPage";
 import PartenaireReclamationsPage from "@/pages/partenaire/ReclamationsPage";
-import PartenaireDemandeMaterielPage from "@/pages/partenaire/DemandeMaterielPage";
 import PartenaireVerifyEmailPage from "@/pages/partenaire/VerifyEmailPage";
 
 // Cache partagé entre navigations : évite que les données repartent en
@@ -88,6 +88,7 @@ const App = () => (
                 <Route path="rapport-eau" element={<RapportEauPage />} />
                 <Route path="base-donnees" element={<BaseDonneesPage />} />
                 <Route path="reclamations" element={<ReclamationsPage />} />
+                <Route path="mail-automatique" element={<MailAutomatiquePage />} />
                 <Route path="finance" element={<FinancePage />} />
                 <Route path="stock" element={<StockPage />} />
                 <Route path="reservation-materiel" element={<ReservationMaterielPage />} />
@@ -114,7 +115,6 @@ const App = () => (
                 <Route path="rapport-eau" element={<RapportEauPage />} />
                 <Route path="base-donnees" element={<PartenaireBaseDonneesPage />} />
                 <Route path="reclamations" element={<PartenaireReclamationsPage />} />
-                <Route path="demande-materiel" element={<PartenaireDemandeMaterielPage />} />
                 <Route path="users/verify-email" element={<PartenaireVerifyEmailPage />} />
               </Route>
               <Route path="*" element={<NotFound />} />

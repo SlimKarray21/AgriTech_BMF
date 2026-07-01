@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getReclamations, updateReclamationStatus, deleteReclamation, createReclamation, getProfiles } from "@/services/data-service";
 import { useAuth } from "@/hooks/useAuth";
+import { useFilteredProfiles } from "@/hooks/useRoleFilter";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -24,9 +25,20 @@ export default function ReclamationsPage() {
   const [filterStatus, setFilterStatus] = useState<"all" | "en_attente" | "traite">("all");
 
   const { data: reclamations = [] } = useQuery({ queryKey: ["reclamations"], queryFn: getReclamations });
-  const { data: profiles = [] } = useQuery({ queryKey: ["profiles"], queryFn: getProfiles });
+  const { data: allProfiles = [] } = useQuery({ queryKey: ["profiles"], queryFn: getProfiles });
 
   const isPrivileged = profile?.user_role === "PARTENAIRE";
+
+  // Un partenaire ne voit que SES clients (created_by === son profil) + lui-même.
+  const profiles = useFilteredProfiles(allProfiles);
+  const myProfileIds = useMemo(
+    () => new Set([...profiles.map((p) => String(p.id)), String(profile?.id ?? "")]),
+    [profiles, profile?.id],
+  );
+  const visibleReclamations = useMemo(
+    () => reclamations.filter((r) => myProfileIds.has(String(r.profile_id))),
+    [reclamations, myProfileIds],
+  );
 
   const setStatusMut = useMutation({
     mutationFn: ({ id, statut }: { id: string; statut: "en_attente" | "traite" }) =>
@@ -59,7 +71,7 @@ export default function ReclamationsPage() {
     });
   };
 
-  const filtered = reclamations.filter(r => filterStatus === "all" || r.statut === filterStatus);
+  const filtered = visibleReclamations.filter(r => filterStatus === "all" || r.statut === filterStatus);
 
   const { sorted, sort } = useTableSort(filtered, {
     user: (r) => r.userName ?? r.userEmail,

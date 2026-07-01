@@ -14,6 +14,7 @@ export * from "./sols";
 export * from "./climats";
 export * from "./reclamations";
 export * from "./subscriptions";
+export * from "./emailCampaigns";
 export * from "./sales";
 export * from "./stock";
 export * from "./reservations";
