@@ -5,6 +5,8 @@ import { useFilteredProfiles } from "@/hooks/useRoleFilter";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import TunisiaGovMap, { governorateFromLocalisation } from "@/components/TunisiaGovMap";
 import {
   Users, Wallet, Package, ShoppingBag, Clock, CheckCircle2, ShieldCheck, ShieldOff,
   TrendingUp, CalendarDays, LayoutDashboard, MapPin, Wifi, XCircle, CreditCard,
@@ -67,12 +69,42 @@ export default function DashboardPage() {
   const { t } = useLanguage();
   const [range, setRange] = useState<Range>("month");
   const [view, setView] = useState<View>("overview");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [selectedGov, setSelectedGov] = useState<string | null>(null);
 
   const { data: allProfiles = [] } = useQuery({ queryKey: ["profiles"], queryFn: getProfiles });
   const allFiltered = useFilteredProfiles(allProfiles);
-  const { data: surfaces = [] } = useQuery<any[]>({ queryKey: ["surfaces-all"], queryFn: getSurfaces });
-  const { data: sales = [] } = useQuery<any[]>({ queryKey: ["sales"], queryFn: getDeviceSales });
-  const { data: subpays = [] } = useQuery<any[]>({ queryKey: ["subpays"], queryFn: getSubscriptionPayments });
+  const { data: rawSurfaces = [] } = useQuery<any[]>({ queryKey: ["surfaces-all"], queryFn: getSurfaces });
+  const { data: rawSales = [] } = useQuery<any[]>({ queryKey: ["sales"], queryFn: getDeviceSales });
+  const { data: rawSubpays = [] } = useQuery<any[]>({ queryKey: ["subpays"], queryFn: getSubscriptionPayments });
+
+  // ── Filtre « entre deux dates » (created_at) — actif si les 2 dates sont saisies ──
+  const dateActive = from !== "" && to !== "";
+  const winStart = dateActive ? new Date(from).getTime() : -Infinity;
+  const winEnd = dateActive ? new Date(to).getTime() + 86400000 : Infinity;
+  const sales = useMemo(
+    () => dateActive ? rawSales.filter((x) => { const tm = new Date(x.created_at).getTime(); return tm >= winStart && tm <= winEnd; }) : rawSales,
+    [rawSales, dateActive, winStart, winEnd],
+  );
+  const subpays = useMemo(
+    () => dateActive ? rawSubpays.filter((x) => { const tm = new Date(x.created_at).getTime(); return tm >= winStart && tm <= winEnd; }) : rawSubpays,
+    [rawSubpays, dateActive, winStart, winEnd],
+  );
+
+  // ── Filtre gouvernorat (carte Tunisie) : nombre de parcelles par gouvernorat + filtrage des parcelles ──
+  const govCounts = useMemo(() => {
+    const m: Record<string, number> = {};
+    rawSurfaces.forEach((s) => {
+      const g = governorateFromLocalisation(s.localisation);
+      if (g) m[g] = (m[g] || 0) + 1;
+    });
+    return m;
+  }, [rawSurfaces]);
+  const surfaces = useMemo(
+    () => selectedGov ? rawSurfaces.filter((s) => governorateFromLocalisation(s.localisation) === selectedGov) : rawSurfaces,
+    [rawSurfaces, selectedGov],
+  );
 
   const validSales = sales.filter((s) => s.status === "valide");
   const validSubs = subpays.filter((s) => s.status === "valide");
@@ -111,8 +143,8 @@ export default function DashboardPage() {
   const timeSeries = useMemo(() => {
     const buckets = range === "day" ? 12 : range === "week" ? 7 : range === "month" ? 15 : 12;
     const allCreated = allPays.map((x) => new Date(x.created_at).getTime()).filter((tm) => tm > 0);
-    const start = cutoff ?? (allCreated.length ? Math.min(...allCreated) : Date.now() - 30 * 86400_000);
-    const end = Date.now();
+    const start = dateActive ? winStart : (cutoff ?? (allCreated.length ? Math.min(...allCreated) : Date.now() - 30 * 86400_000));
+    const end = dateActive ? winEnd : Date.now();
     const step = (end - start) / buckets;
     const fmt = (d: Date) => {
       if (range === "day") return d.getHours() + "h";
@@ -239,18 +271,32 @@ export default function DashboardPage() {
             {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
           </p>
         </div>
-        <div className="flex gap-0.5 rounded-lg bg-white/15 p-0.5">
-          {ranges.map((r) => (
-            <Button
-              key={r.v}
-              size="sm"
-              variant="ghost"
-              onClick={() => setRange(r.v)}
-              className={`h-7 text-xs border-0 hover:text-white ${range === r.v ? "bg-white text-emerald-700 hover:bg-white hover:text-emerald-700" : "bg-transparent text-white hover:bg-white/20"}`}
-            >
-              {r.label}
-            </Button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex gap-0.5 rounded-lg bg-white/15 p-0.5">
+            {ranges.map((r) => (
+              <Button
+                key={r.v}
+                size="sm"
+                variant="ghost"
+                onClick={() => { setRange(r.v); setFrom(""); setTo(""); }}
+                className={`h-7 text-xs border-0 hover:text-white ${range === r.v && !dateActive ? "bg-white text-emerald-700 hover:bg-white hover:text-emerald-700" : "bg-transparent text-white hover:bg-white/20"}`}
+              >
+                {r.label}
+              </Button>
+            ))}
+          </div>
+          {/* Filtre entre deux dates */}
+          <div className="flex items-center gap-1 rounded-lg bg-white/15 px-2 py-0.5 text-xs">
+            <span className="text-emerald-50/90">Du</span>
+            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-7 w-[130px] border-0 bg-white/90 text-foreground text-xs" />
+            <span className="text-emerald-50/90">au</span>
+            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-7 w-[130px] border-0 bg-white/90 text-foreground text-xs" />
+            {dateActive && (
+              <button type="button" onClick={() => { setFrom(""); setTo(""); }} className="ml-1 rounded p-0.5 text-white/90 hover:bg-white/20" title="Réinitialiser">
+                <XCircle className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -275,9 +321,29 @@ export default function DashboardPage() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
             <Stat icon={Wallet} label="Chiffre d'affaire" value={DT(ca)} color="bg-emerald-500/10 text-emerald-600" />
             <Stat icon={Users} label="Clients" value={clients} color="bg-blue-500/10 text-blue-600" />
-            <Stat icon={MapPin} label="Parcelles" value={parcelles} color="bg-violet-500/10 text-violet-600" />
+            <Stat icon={MapPin} label={selectedGov ? `Parcelles — ${selectedGov}` : "Parcelles"} value={parcelles} color="bg-violet-500/10 text-violet-600" />
             <Stat icon={ShieldCheck} label="Abonnements actifs" value={abosActifs} color="bg-teal-500/10 text-teal-600" />
           </div>
+
+          {/* Carte Tunisie — filtre par gouvernorat (24) */}
+          <Card className="overflow-hidden">
+            <CardHeader className="py-2 px-3 border-b bg-muted/30 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-xs font-bold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                <MapPin className="h-3.5 w-3.5" /> Parcelles par gouvernorat
+              </CardTitle>
+              {selectedGov ? (
+                <button type="button" onClick={() => setSelectedGov(null)} className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/15">
+                  {selectedGov} <XCircle className="h-3.5 w-3.5" />
+                </button>
+              ) : (
+                <span className="text-[11px] text-muted-foreground">Cliquez un gouvernorat pour filtrer</span>
+              )}
+            </CardHeader>
+            <CardContent className="p-0">
+              <TunisiaGovMap counts={govCounts} selected={selectedGov} onSelect={setSelectedGov} height={320} />
+            </CardContent>
+          </Card>
+
           <div className={chartsGrid}>
             <ChartCard title="Évolution des revenus (DT)">{revenueArea}</ChartCard>
             <ChartCard title="CA cumulé (DT)">{lineChart("Total", C.greenDark)}</ChartCard>
