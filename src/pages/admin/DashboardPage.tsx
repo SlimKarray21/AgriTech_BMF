@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getProfiles, getDeviceSales, getSubscriptionPayments, getSurfaces } from "@/services/data-service";
+import { getProfiles, getDeviceSales, getSubscriptionPayments, getSurfaces, getSubscriptionPlans } from "@/services/data-service";
 import { useFilteredProfiles } from "@/hooks/useRoleFilter";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -74,12 +74,18 @@ export default function DashboardPage() {
   const [to, setTo] = useState("");
   const [selectedGov, setSelectedGov] = useState<string | null>(null);
   const [method, setMethod] = useState("all");
+  const [revType, setRevType] = useState("all"); // all | abo | appareil
+  const [plan, setPlan] = useState("all");
+  const [status, setStatus] = useState("all"); // all | valide | en_attente | refuse
 
   const { data: allProfiles = [] } = useQuery({ queryKey: ["profiles"], queryFn: getProfiles });
   const allFiltered = useFilteredProfiles(allProfiles);
   const { data: rawSurfaces = [] } = useQuery<any[]>({ queryKey: ["surfaces-all"], queryFn: getSurfaces });
   const { data: rawSales = [] } = useQuery<any[]>({ queryKey: ["sales"], queryFn: getDeviceSales });
   const { data: rawSubpays = [] } = useQuery<any[]>({ queryKey: ["subpays"], queryFn: getSubscriptionPayments });
+  const { data: rawPlans = [] } = useQuery<any[]>({ queryKey: ["plans"], queryFn: getSubscriptionPlans });
+  const planNameById = useMemo(() => Object.fromEntries(rawPlans.map((p) => [String(p.id), String(p.name)])), [rawPlans]);
+  const planNames = useMemo(() => rawPlans.map((p) => String(p.name)), [rawPlans]);
 
   // ── Filtre « entre deux dates » (created_at) — actif si les 2 dates sont saisies ──
   const dateActive = from !== "" && to !== "";
@@ -88,10 +94,17 @@ export default function DashboardPage() {
   const keep = (x: any) => {
     if (dateActive) { const tm = new Date(x.created_at).getTime(); if (tm < winStart || tm > winEnd) return false; }
     if (method !== "all" && (x.payment_method || "") !== method) return false;
+    if (status !== "all" && (x.status || "") !== status) return false;
     return true;
   };
-  const sales = useMemo(() => rawSales.filter(keep), [rawSales, dateActive, winStart, winEnd, method]);
-  const subpays = useMemo(() => rawSubpays.filter(keep), [rawSubpays, dateActive, winStart, winEnd, method]);
+  const sales = useMemo(
+    () => revType === "abo" ? [] : rawSales.filter(keep),
+    [rawSales, dateActive, winStart, winEnd, method, status, revType],
+  );
+  const subpays = useMemo(
+    () => revType === "appareil" ? [] : rawSubpays.filter((x) => keep(x) && (plan === "all" || planNameById[String(x.plan_id)] === plan)),
+    [rawSubpays, dateActive, winStart, winEnd, method, status, revType, plan, planNameById],
+  );
 
   // ── Filtre gouvernorat (carte Tunisie) : nombre de parcelles par gouvernorat + filtrage des parcelles ──
   const govCounts = useMemo(() => {
@@ -316,7 +329,7 @@ export default function DashboardPage() {
         <div className="flex flex-col gap-1">
           <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Méthode de paiement</label>
           <Select value={method} onValueChange={setMethod}>
-            <SelectTrigger className="h-8 w-44 text-xs"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-8 w-40 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Toutes</SelectItem>
               {["especes", "carte", "virement", "cheque", "cimbielle", "mobile"].map((m) => (
@@ -325,12 +338,45 @@ export default function DashboardPage() {
             </SelectContent>
           </Select>
         </div>
-        {(selectedGov || method !== "all" || dateActive) && (
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Type de recette</label>
+          <Select value={revType} onValueChange={setRevType}>
+            <SelectTrigger className="h-8 w-40 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Toutes</SelectItem>
+              <SelectItem value="abo">Abonnements</SelectItem>
+              <SelectItem value="appareil">Appareils</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Plan d'abonnement</label>
+          <Select value={plan} onValueChange={setPlan} disabled={revType === "appareil"}>
+            <SelectTrigger className="h-8 w-40 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous</SelectItem>
+              {planNames.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Statut</label>
+          <Select value={status} onValueChange={setStatus}>
+            <SelectTrigger className="h-8 w-36 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous</SelectItem>
+              <SelectItem value="valide">Validé</SelectItem>
+              <SelectItem value="en_attente">En attente</SelectItem>
+              <SelectItem value="refuse">Refusé</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {(selectedGov || method !== "all" || revType !== "all" || plan !== "all" || status !== "all" || dateActive) && (
           <Button
             variant="ghost"
             size="sm"
             className="h-8 gap-1 text-muted-foreground hover:text-destructive"
-            onClick={() => { setSelectedGov(null); setMethod("all"); setFrom(""); setTo(""); setRange("month"); }}
+            onClick={() => { setSelectedGov(null); setMethod("all"); setRevType("all"); setPlan("all"); setStatus("all"); setFrom(""); setTo(""); setRange("month"); }}
           >
             <XCircle className="h-3.5 w-3.5" />Réinitialiser
           </Button>
