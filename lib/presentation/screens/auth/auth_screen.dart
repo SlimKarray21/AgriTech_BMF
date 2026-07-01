@@ -65,44 +65,78 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   }
 
   Future<void> _submit() async {
-    if (_mode == 'forgot') {
+    // ── Flux « mot de passe oublié » en 3 étapes : email → code → nouveau mdp ──
+    if (_mode == 'forgot' || _mode == 'forgot_code' || _mode == 'forgot_reset') {
       final fEmail = _emailC.text.trim();
+      final api = ref.read(uiEarthApiProvider);
+
+      // Étape 1 : demander le code
+      if (_mode == 'forgot') {
+        if (fEmail.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Renseignez votre email.')));
+          return;
+        }
+        _setLoading(true);
+        try {
+          await api.auth.forgotPassword(<String, dynamic>{'email': fEmail});
+          if (!mounted) return;
+          setState(() { _mode = 'forgot_code'; _codeC.clear(); });
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Un code de vérification a été envoyé à votre email.')));
+        } on ApiException catch (e) {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        } catch (e) {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur réseau : $e')));
+        } finally { _setLoading(false); }
+        return;
+      }
+
+      // Étape 2 : vérifier le code
+      if (_mode == 'forgot_code') {
+        final code = _codeC.text.trim();
+        if (code.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Entrez le code reçu par email.')));
+          return;
+        }
+        _setLoading(true);
+        try {
+          await api.auth.verifyResetCode(<String, dynamic>{'email': fEmail, 'code': code});
+          if (!mounted) return;
+          setState(() { _mode = 'forgot_reset'; });
+        } on ApiException catch (e) {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        } catch (e) {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur réseau : $e')));
+        } finally { _setLoading(false); }
+        return;
+      }
+
+      // Étape 3 : email + nouveau mot de passe + confirmation
       final fPassword = _passwordC.text;
       final fConfirm = _confirmPasswordC.text;
-      if (fEmail.isEmpty || fPassword.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Renseignez votre email et un nouveau mot de passe.')),
-        );
+      if (fPassword.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Entrez un nouveau mot de passe.')));
         return;
       }
       if (fPassword != fConfirm) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Les mots de passe ne correspondent pas.')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Les mots de passe ne correspondent pas.')));
         return;
       }
       _setLoading(true);
-      final api = ref.read(uiEarthApiProvider);
       try {
-        await api.auth.resetPassword(<String, dynamic>{'email': fEmail, 'newPassword': fPassword});
+        await api.auth.resetPasswordConfirm(<String, dynamic>{'email': fEmail, 'code': _codeC.text.trim(), 'newPassword': fPassword});
         if (!mounted) return;
         setState(() {
           _mode = 'login';
           _passwordC.clear();
           _confirmPasswordC.clear();
+          _codeC.clear();
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Mot de passe réinitialisé. Connectez-vous avec le nouveau.')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Mot de passe réinitialisé. Connectez-vous avec le nouveau.')));
       } on ApiException catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
       } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur réseau : $e')));
-      } finally {
-        _setLoading(false);
-      }
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur réseau : $e')));
+      } finally { _setLoading(false); }
       return;
     }
 
@@ -364,7 +398,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  if (_mode == 'forgot' || _mode == 'verify')
+                  if (_mode.startsWith('forgot') || _mode == 'verify')
                     GestureDetector(
                       onTap: () => setState(() {
                         _pendingUserId = null;
@@ -376,7 +410,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         Text('Retour', style: theme.textTheme.bodySmall),
                       ]),
                     ),
-                  if (_mode == 'forgot' || _mode == 'verify') const SizedBox(height: 16),
+                  if (_mode.startsWith('forgot') || _mode == 'verify') const SizedBox(height: 16),
                   Text(
                     _mode == 'login'  ? t('auth.login')  :
                     _mode == 'signup' ? t('auth.signup') :
@@ -392,7 +426,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     style: theme.textTheme.bodySmall,
                   ),
                   const SizedBox(height: 24),
-                  if (_mode == 'verify') ...[
+                  if (_mode == 'verify' || _mode == 'forgot_code') ...[
                     Text('Code de vérification', style: theme.textTheme.labelMedium),
                     const SizedBox(height: 4),
                     TextField(
@@ -437,7 +471,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     ],
                     Text(t('auth.email'), style: theme.textTheme.labelMedium),
                     const SizedBox(height: 4),
-                    TextField(controller: _emailC, decoration: const InputDecoration(), keyboardType: TextInputType.emailAddress),
+                    TextField(controller: _emailC, readOnly: _mode == 'forgot_reset', decoration: const InputDecoration(), keyboardType: TextInputType.emailAddress),
                     if (_mode == 'signup') ...[
                       const SizedBox(height: 16),
                       Text(t('auth.birthdate'), style: theme.textTheme.labelMedium),
@@ -460,10 +494,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         decoration: const InputDecoration(),
                       ),
                     ],
-                    if (_mode != 'verify') ...[
+                    if (_mode == 'login' || _mode == 'signup' || _mode == 'forgot_reset') ...[
                       const SizedBox(height: 16),
                       Text(
-                        _mode == 'forgot' ? 'Nouveau mot de passe' : t('auth.password'),
+                        _mode == 'forgot_reset' ? 'Nouveau mot de passe' : t('auth.password'),
                         style: theme.textTheme.labelMedium,
                       ),
                       const SizedBox(height: 4),
@@ -477,7 +511,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                           ),
                         ),
                       ),
-                      if (_mode == 'forgot') ...[
+                      if (_mode == 'forgot_reset') ...[
                         const SizedBox(height: 16),
                         Text(t('auth.confirm_password'), style: theme.textTheme.labelMedium),
                         const SizedBox(height: 4),
@@ -532,11 +566,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                           ? null
                           : (_mode == 'verify' ? _verifySubmit : _submit),
                       child: Text(
-                        _loading           ? t('auth.loading')       :
-                        _mode == 'verify'  ? t('auth.submit_verify') :
-                        _mode == 'login'   ? t('auth.submit_login')  :
-                        _mode == 'signup'  ? t('auth.submit_signup') :
-                                             t('auth.submit_forgot'),
+                        _loading                 ? t('auth.loading')       :
+                        _mode == 'verify'        ? t('auth.submit_verify') :
+                        _mode == 'login'         ? t('auth.submit_login')  :
+                        _mode == 'signup'        ? t('auth.submit_signup') :
+                        _mode == 'forgot'        ? 'Envoyer le code'       :
+                        _mode == 'forgot_code'   ? 'Vérifier le code'      :
+                        _mode == 'forgot_reset'  ? 'Réinitialiser'         :
+                                                   t('auth.submit_forgot'),
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                       ),
                     ),
@@ -551,7 +588,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     ),
                   ],
                   const SizedBox(height: 24),
-                  if (_mode != 'forgot' && _mode != 'verify')
+                  if (_mode == 'login' || _mode == 'signup')
                     Center(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 4),
