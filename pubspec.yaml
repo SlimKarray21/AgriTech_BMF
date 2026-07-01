@@ -46,6 +46,10 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/images/agritech_icon.png"
+  # Icône adaptative : fond vert plein (remplit tout le squircle, comme l'icône
+  # Claude) + logo centré en premier plan. Supprime la marge blanche.
+  adaptive_icon_background: "#178440"
+  adaptive_icon_foreground: "assets/images/agritech_fg.png"
   min_sdk_android: 21
   web:
     generate: false

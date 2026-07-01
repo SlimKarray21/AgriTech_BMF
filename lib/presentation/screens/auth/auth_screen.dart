@@ -173,21 +173,23 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       }
 
       if (_mode == 'signup') {
-        final uid = res?['userId']?.toString();
-        _applyOtpMetadata(res);
-        if (uid != null && uid.isNotEmpty) {
-          setState(() {
-            _pendingUserId = uid;
-            _mode = 'verify';
-            _codeC.clear();
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Inscription réussie. Entrez le code de vérification e-mail.'),
-            ),
-          );
+        // OTP désactivé côté backend : le compte est actif immédiatement.
+        // On connecte donc l'utilisateur automatiquement (aucune étape « code »).
+        final loginRes = await api.auth.login(<String, dynamic>{'email': email, 'password': password});
+        final loginToken = extractAuthTokenFromJson(loginRes);
+        if (loginToken != null) {
+          await jwt.setToken(loginToken);
           return;
         }
+        if (!mounted) return;
+        setState(() {
+          _mode = 'login';
+          _passwordC.clear();
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Compte créé. Connectez-vous avec votre email et mot de passe.')),
+        );
+        return;
       }
 
       final token = extractAuthTokenFromJson(res);

@@ -115,6 +115,9 @@ const Map<String, Map<String, String>> translations = {
   'vannes.days.sun':           {'fr': 'Dim', 'ar': 'الأح'},
   'vannes.last_action':        {'fr': 'Dernière action',                 'ar': 'آخر إجراء'},
   'vannes.created':            {'fr': "Créée à l'instant",              'ar': 'تم الإنشاء الآن'},
+  'vannes.parcelle':           {'fr': 'Parcelle',                        'ar': 'القطعة'},
+  'vannes.count_one':          {'fr': 'vanne',                           'ar': 'صمام'},
+  'vannes.count_other':        {'fr': 'vannes',                          'ar': 'صمامات'},
 
   // ── Wizard (formulaire) ───────────────────────────────────────────────────
   'wizard.title':                      {'fr': 'Nouveau projet',                   'ar': 'مشروع جديد'},
