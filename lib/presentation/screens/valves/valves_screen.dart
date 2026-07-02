@@ -114,64 +114,131 @@ class ValvesScreen extends ConsumerWidget {
             return GestureDetector(
               onTap: () => _showValveDetail(context, ref, v.id, langState),
               child: Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(16),
+                margin: const EdgeInsets.only(bottom: 20),
+                padding: const EdgeInsets.all(22),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surface,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(24),
                   border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.6)),
                   boxShadow: [
-                    BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4)),
+                    BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 14, offset: const Offset(0, 5)),
                   ],
                 ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(children: [
                       Container(
-                        width: 40, height: 40,
+                        width: 54, height: 54,
                         decoration: BoxDecoration(
                           color: v.isOpen ? AppColors.farmWater.withValues(alpha: 0.15) : theme.colorScheme.secondary,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(16),
                         ),
-                        child: const Center(child: Text('🚰', style: TextStyle(fontSize: 18))),
+                        child: const Center(child: Text('🚰', style: TextStyle(fontSize: 26))),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 14),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(children: [
-                              Text(v.name, style: theme.textTheme.titleSmall),
-                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  v.name,
+                                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
                                   color: v.isOpen ? AppColors.farmLeaf : theme.colorScheme.secondary,
-                                  borderRadius: BorderRadius.circular(4),
+                                  borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
                                   v.isOpen ? langState.t('vannes.opened') : langState.t('vannes.closed'),
-                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: v.isOpen ? Colors.white : theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: v.isOpen ? Colors.white : theme.colorScheme.onSurface.withValues(alpha: 0.5)),
                                 ),
                               ),
                             ]),
+                            const SizedBox(height: 3),
                             Text('${v.parcelleName} • ${v.nbPlants} ${langState.t('vannes.plants')}', style: theme.textTheme.bodySmall),
                           ],
                         ),
                       ),
-                      const Icon(Icons.chevron_right, size: 18, color: Colors.grey),
+                      const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
                     ]),
-                    const SizedBox(height: 12),
-                    Row(children: [
-                      Expanded(child: _DebitBar(vanne: v, theme: theme, t: langState.t)),
-                      const SizedBox(width: 12),
-                      Switch(
-                        value: v.isOpen,
-                        onChanged: (_) async {
+
+                    // ── Bandeau automatisation : plage horaire + jours ──────
+                    if (v.isAuto) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppColors.farmLeaf.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.farmLeaf.withValues(alpha: 0.25)),
+                        ),
+                        child: Row(children: [
+                          const Icon(Icons.schedule_rounded, size: 20, color: AppColors.farmLeaf),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${langState.t('vannes.auto_badge')} • ${v.startTime} → ${v.endTime}',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.farmLeaf,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _formatScheduleDays(v.selectedWeekDays, langState),
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ]),
+                      ),
+                    ],
+
+                    const SizedBox(height: 14),
+                    _DebitBar(vanne: v, theme: theme, t: langState.t),
+                    const SizedBox(height: 14),
+
+                    // ── Gros bouton Ouvrir / Fermer ─────────────────────────
+                    SizedBox(
+                      width: double.infinity,
+                      height: 54,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
                           await _toggleValve(context, ref, v);
                         },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: v.isOpen
+                              ? theme.colorScheme.error.withValues(alpha: 0.12)
+                              : AppColors.farmLeaf,
+                          foregroundColor: v.isOpen ? theme.colorScheme.error : Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                        icon: Icon(
+                          v.isOpen ? Icons.stop_circle_outlined : Icons.play_circle_outline_rounded,
+                          size: 26,
+                        ),
+                        label: Text(
+                          v.isOpen ? langState.t('vannes.btn_close') : langState.t('vannes.btn_open'),
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                        ),
                       ),
-                    ]),
+                    ),
                   ],
                 ),
               ),
@@ -184,6 +251,22 @@ class ValvesScreen extends ConsumerWidget {
           ),
         ],
       );
+  }
+
+  String _formatScheduleDays(Set<int> days, LanguageState langState) {
+    if (days.isEmpty) return langState.t('vannes.no_day');
+    if (days.length == 7) return langState.t('vannes.every_day');
+    const dayKeys = {
+      1: 'vannes.days.mon',
+      2: 'vannes.days.tue',
+      3: 'vannes.days.wed',
+      4: 'vannes.days.thu',
+      5: 'vannes.days.fri',
+      6: 'vannes.days.sat',
+      7: 'vannes.days.sun',
+    };
+    final sorted = days.toList()..sort();
+    return sorted.map((d) => langState.t(dayKeys[d] ?? '')).join(', ');
   }
 
   void _showValveDetail(BuildContext context, WidgetRef ref, String valveId, LanguageState langState) {
