@@ -21,8 +21,27 @@ object DatabaseFactory {
             ?: throw IllegalStateException("DATABASE_PASSWORD not set")
         
         logger.info { "Initializing database connection to $jdbcURL" }
-        
+
         Database.connect(createHikariDataSource(jdbcURL, driverClassName, user, password))
+        runMigrations()
+    }
+
+    /**
+     * Migrations idempotentes exécutées à chaque démarrage (ADD COLUMN IF NOT
+     * EXISTS) : les bases déjà déployées reçoivent les nouvelles colonnes sans
+     * intervention manuelle. init-db.sql ne s'applique qu'aux volumes neufs.
+     */
+    private fun runMigrations() {
+        val statements = listOf(
+            "ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS requires_qr BOOLEAN NOT NULL DEFAULT FALSE",
+        )
+        transaction {
+            statements.forEach { sql ->
+                runCatching { exec(sql) }
+                    .onSuccess { logger.info { "Migration OK: $sql" } }
+                    .onFailure { logger.error(it) { "Migration failed: $sql" } }
+            }
+        }
     }
     
     private fun createHikariDataSource(
