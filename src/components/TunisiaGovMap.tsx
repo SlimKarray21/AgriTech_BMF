@@ -12,12 +12,21 @@ const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCa
 /** Déduit le gouvernorat depuis une localisation libre (ex. "El Amra,Sfax,Tunisie"). */
 export function governorateFromLocalisation(loc?: string | null): string | null {
   if (!loc) return null;
-  const l = norm(loc);
-  const found = FEATURES.find((f) => {
+  // « Tunisie » contient « Tunis » : on retire le pays avant de comparer,
+  // sinon toutes les parcelles matchaient le gouvernorat de Tunis.
+  const l = norm(loc).replace(/tunisie|tunisia/g, " ");
+  // On garde la correspondance la plus longue (la plus spécifique).
+  let best: string | null = null;
+  let bestLen = 0;
+  for (const f of FEATURES) {
     const n = norm(f.properties.shapeName);
-    return l.includes(n) || (n.includes("kef") && l.includes("kef"));
-  });
-  return found?.properties.shapeName ?? null;
+    const hit = l.includes(n) || (n.includes("kef") && l.includes("kef"));
+    if (hit && n.length > bestLen) {
+      best = f.properties.shapeName;
+      bestLen = n.length;
+    }
+  }
+  return best;
 }
 
 // ── Projection lng/lat → x/y (équirectangulaire corrigée par la latitude) ──
