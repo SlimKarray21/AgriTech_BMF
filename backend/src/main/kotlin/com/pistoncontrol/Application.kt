@@ -90,6 +90,14 @@ fun Application.module() {
         logger.error(e) { "❌ Failed to start Schedule Executor" }
     }
 
+    // Automatisation des vannes : ouvre/ferme selon horaire (is_auto + jours + plage HH:mm).
+    try {
+        com.pistoncontrol.application.service.VanneScheduler(mqttManager).start()
+        logger.info { "✅ Vanne auto-scheduler started" }
+    } catch (e: Exception) {
+        logger.error(e) { "❌ Failed to start Vanne auto-scheduler" }
+    }
+
     // ════════════════════════════════════════════════════════════════
     // STEP 3.6: Initialize Email Service (SMTP)
     // ════════════════════════════════════════════════════════════════
