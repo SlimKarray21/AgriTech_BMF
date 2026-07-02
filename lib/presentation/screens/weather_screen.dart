@@ -322,7 +322,7 @@ class _WeatherScreenState extends ConsumerState<WeatherScreen> {
                     child: Container(
                       height: 48,
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.14),
+                        color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                             color: Colors.white.withValues(alpha: 0.18)),
@@ -331,15 +331,15 @@ class _WeatherScreenState extends ConsumerState<WeatherScreen> {
                         controller: _searchController,
                         textDirection:
                             isRtl ? TextDirection.rtl : TextDirection.ltr,
-                        style: const TextStyle(color: Colors.white),
-                        cursorColor: Colors.white,
+                        style: const TextStyle(color: Colors.black87),
+                        cursorColor: const Color(0xFF15803d),
                         onChanged: (v) => _searchQuery = v,
                         onSubmitted: (_) => _handleSearch(lang),
                         decoration: InputDecoration(
-                          prefixIcon: const Icon(Icons.search,
-                              color: Colors.white70, size: 20),
+                          prefixIcon: Icon(Icons.search,
+                              color: Colors.grey.shade600, size: 20),
                           hintText: t('weather.search'),
-                          hintStyle: const TextStyle(color: Colors.white70),
+                          hintStyle: TextStyle(color: Colors.grey.shade600),
                           border: InputBorder.none,
                           contentPadding:
                               const EdgeInsets.symmetric(vertical: 14),
@@ -732,7 +732,7 @@ class _WeatherKpiPill extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.12),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
         ),
@@ -741,9 +741,9 @@ class _WeatherKpiPill extends StatelessWidget {
             width: 28,
             height: 28,
             decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.25),
+                color: color.withValues(alpha: 0.45),
                 borderRadius: BorderRadius.circular(8)),
-            child: Icon(icon, size: 14, color: color),
+            child: Icon(icon, size: 14, color: Colors.black54),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -751,13 +751,13 @@ class _WeatherKpiPill extends StatelessWidget {
                   Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(value,
                 style: const TextStyle(
-                    color: Colors.white,
+                    color: Colors.black87,
                     fontSize: 12,
                     fontWeight: FontWeight.w800),
                 overflow: TextOverflow.ellipsis),
             Text(label,
                 style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.65), fontSize: 9),
+                    color: Colors.grey.shade700, fontSize: 9),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis),
           ])),
