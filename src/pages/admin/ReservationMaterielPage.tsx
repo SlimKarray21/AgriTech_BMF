@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { ClipboardList, Plus, Trash2, MapPin, User as UserIcon, Search, CheckCircle2, XCircle, RotateCcw, Wifi, WifiOff, Clock, Pencil, Sparkles, CreditCard, Package, AlertTriangle, Wrench } from "lucide-react";
+import { ClipboardList, Plus, Trash2, MapPin, User as UserIcon, Search, CheckCircle2, XCircle, RotateCcw, Wifi, WifiOff, Clock, Pencil, Sparkles, CreditCard, Package, AlertTriangle, Wrench, QrCode } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import {
   getSurfaces, updateSurface,
@@ -38,6 +39,7 @@ type Plan = { id: string; name: string; price_dt: number; duration_days: number 
 
 export default function ReservationMaterielPage() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const { profile } = useAuth();
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("non");
@@ -120,9 +122,14 @@ export default function ReservationMaterielPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold flex items-center gap-2"><ClipboardList className="h-6 w-6 text-primary" /> Réservation Matériel</h2>
-        <p className="text-sm text-muted-foreground">Workflow professionnel : Non Connectées → En Attente → Connectées</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-bold flex items-center gap-2"><ClipboardList className="h-6 w-6 text-primary" /> Réservation Matériel</h2>
+          <p className="text-sm text-muted-foreground">Workflow professionnel : Non Connectées → En Attente → Connectées</p>
+        </div>
+        <Button variant="outline" onClick={() => navigate("/admin/qr-codes")} title="QR codes des appareils réservés">
+          <QrCode className="h-4 w-4 mr-2" /> QR Codes
+        </Button>
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>

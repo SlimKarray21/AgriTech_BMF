@@ -1,5 +1,5 @@
 import { Outlet, Navigate, useLocation, useNavigate } from "react-router-dom";
-import { Grid3X3, Users, LogOut, CreditCard, LayoutDashboard, Cpu, Database, FileBarChart, HardDrive, MessageSquare, Wallet, Package, ClipboardList, Receipt, UserRound, Mail } from "lucide-react";
+import { Grid3X3, Users, LogOut, CreditCard, LayoutDashboard, Cpu, Database, FileBarChart, HardDrive, MessageSquare, Wallet, Package, ClipboardList, Receipt, UserRound } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -21,7 +21,6 @@ const navGlobal: NavItem[] = [
   { titleKey: "nav.subscriptions", url: "/admin/subscriptions", icon: CreditCard, roles: ["ADMIN"] },
   { titleKey: "nav.rapports", url: "/admin/rapports", icon: FileBarChart, roles: ["ADMIN"] },
   { titleKey: "nav.reclamations", url: "/admin/reclamations", icon: MessageSquare, roles: ["ADMIN"] },
-  { titleKey: "nav.mailAuto", url: "/admin/mail-automatique", icon: Mail, roles: ["ADMIN"] },
   { titleKey: "nav.baseDonnees", url: "/admin/base-donnees", icon: HardDrive, roles: ["ADMIN"] },
 ];
 
@@ -74,6 +73,7 @@ const pageTitleKeys: Record<string, string> = {
   "/admin/finance": "nav.finance",
   "/admin/stock": "nav.stock",
   "/admin/reservation-materiel": "nav.reservationMateriel",
+  "/admin/qr-codes": "nav.reservationMateriel",
   "/admin/recettes": "nav.recettes",
   "/admin/fiche-client": "nav.ficheClient",
   "/admin/profile": "nav.profile",

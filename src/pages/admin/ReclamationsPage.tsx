@@ -14,8 +14,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DeleteDialog } from "@/components/DeleteDialog";
-import { CheckCircle2, Clock, Plus, MessageSquare, RotateCcw } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { CheckCircle2, Clock, Plus, MessageSquare, RotateCcw, Mail } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import MailAutomatiquePage from "@/pages/admin/MailAutomatiquePage";
 
 export default function ReclamationsPage() {
   const { t } = useLanguage();
@@ -147,22 +149,39 @@ export default function ReclamationsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-2xl font-bold text-foreground">Liste des réclamations</h2>
-        <div className="flex items-center gap-2">
-          <Select value={filterStatus} onValueChange={(v: any) => setFilterStatus(v)}>
-            <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous statuts</SelectItem>
-              <SelectItem value="en_attente">En attente</SelectItem>
-              <SelectItem value="traite">Traité</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button onClick={() => setCreating(true)}><Plus className="mr-2 h-4 w-4" />Nouvelle réclamation</Button>
-        </div>
-      </div>
+      <Tabs defaultValue="reclamations">
+        <TabsList className="grid grid-cols-2 w-full max-w-md">
+          <TabsTrigger value="reclamations" className="gap-2">
+            <MessageSquare className="h-4 w-4" /> Réclamations
+          </TabsTrigger>
+          <TabsTrigger value="mail-auto" className="gap-2">
+            <Mail className="h-4 w-4" /> Mail Automatique
+          </TabsTrigger>
+        </TabsList>
 
-      {renderTable(userSorted.sorted, userSorted.sort, "Utilisateur", "Aucune réclamation")}
+        <TabsContent value="reclamations" className="space-y-6 mt-6">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-2xl font-bold text-foreground">Liste des réclamations</h2>
+            <div className="flex items-center gap-2">
+              <Select value={filterStatus} onValueChange={(v: any) => setFilterStatus(v)}>
+                <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous statuts</SelectItem>
+                  <SelectItem value="en_attente">En attente</SelectItem>
+                  <SelectItem value="traite">Traité</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button onClick={() => setCreating(true)}><Plus className="mr-2 h-4 w-4" />Nouvelle réclamation</Button>
+            </div>
+          </div>
+
+          {renderTable(userSorted.sorted, userSorted.sort, "Utilisateur", "Aucune réclamation")}
+        </TabsContent>
+
+        <TabsContent value="mail-auto" className="mt-6">
+          <MailAutomatiquePage />
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={creating} onOpenChange={setCreating}>
         <DialogContent>

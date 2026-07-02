@@ -10,7 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Package, Plus, Pencil, Trash2, History, AlertTriangle, Boxes, DollarSign, PackagePlus } from "lucide-react";
+import { Package, Plus, Pencil, Trash2, History, AlertTriangle, Boxes, DollarSign, PackagePlus, QrCode } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
 import {
   getStockItems,
@@ -30,6 +31,7 @@ type StockItem = {
   quantity: number;
   features: string | null;
   low_stock_threshold: number;
+  requires_qr: boolean;
   created_at: string;
 };
 
@@ -71,6 +73,7 @@ export default function StockPage() {
         quantity: Number(i.quantity ?? 0),
         features: i.features ?? null,
         low_stock_threshold: Number(i.low_stock_threshold ?? 5),
+        requires_qr: !!i.requires_qr,
         created_at: i.created_at ?? "",
       }));
     },
@@ -85,6 +88,7 @@ export default function StockPage() {
         quantity: i.quantity,
         low_stock_threshold: i.low_stock_threshold,
         features: i.features || null,
+        requires_qr: !!i.requires_qr,
       };
       if (i.id) {
         await updateStockItem(i.id, payload);
@@ -166,7 +170,7 @@ export default function StockPage() {
         </div>
         <Button
           onClick={() =>
-            setEdit({ name: "", category: "capteur", purchase_price_dt: 0, quantity: 0, low_stock_threshold: 5, features: "" })
+            setEdit({ name: "", category: "capteur", purchase_price_dt: 0, quantity: 0, low_stock_threshold: 5, features: "", requires_qr: false })
           }
         >
           <Plus className="h-4 w-4 mr-1" /> Ajouter Appareil
@@ -242,7 +246,14 @@ export default function StockPage() {
               {!isLoading && sorted.map((i) => (
                 <TableRow key={i.id}>
                   <TableCell className="font-medium">
-                    {i.name}
+                    <div className="flex items-center gap-1.5">
+                      {i.name}
+                      {i.requires_qr && (
+                        <Badge variant="outline" className="bg-violet-500/15 text-violet-700 border-violet-300 gap-1 px-1.5">
+                          <QrCode className="h-3 w-3" /> QR
+                        </Badge>
+                      )}
+                    </div>
                     {i.features && <div className="text-xs text-muted-foreground truncate max-w-xs">{i.features}</div>}
                   </TableCell>
                   <TableCell><Badge variant="outline">{CAT_LABEL[i.category] ?? i.category}</Badge></TableCell>
@@ -341,6 +352,18 @@ export default function StockPage() {
                   onChange={(e) => setEdit({ ...edit, features: e.target.value })}
                   placeholder="Capteur humidité + température, connectique GSM..."
                 />
+              </div>
+              <div className="flex items-center gap-2 rounded-lg border p-3 bg-violet-50/50 dark:bg-violet-950/20">
+                <Checkbox
+                  id="requires-qr"
+                  checked={!!edit.requires_qr}
+                  onCheckedChange={(c) => setEdit({ ...edit, requires_qr: c === true })}
+                />
+                <Label htmlFor="requires-qr" className="flex items-center gap-1.5 cursor-pointer font-normal">
+                  <QrCode className="h-4 w-4 text-violet-600" />
+                  Nécessite un QR code
+                  <span className="text-xs text-muted-foreground">(appareil à appairer, ex. carte ESP32)</span>
+                </Label>
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <Button type="button" variant="outline" onClick={() => setEdit(null)}>Annuler</Button>

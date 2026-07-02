@@ -26,6 +26,7 @@ import FinancePage from "@/pages/admin/FinancePage";
 import StockPage from "@/pages/admin/StockPage";
 import FicheClientPage from "@/pages/admin/FicheClientPage";
 import ReservationMaterielPage from "@/pages/admin/ReservationMaterielPage";
+import QrCodesPage from "@/pages/admin/QrCodesPage";
 import RecettesPage from "@/pages/admin/RecettesPage";
 import PartenaireDetailsPage from "@/pages/admin/PartenaireDetailsPage";
 import LoginPage from "@/pages/auth/LoginPage";
@@ -92,6 +93,7 @@ const App = () => (
                 <Route path="finance" element={<FinancePage />} />
                 <Route path="stock" element={<StockPage />} />
                 <Route path="reservation-materiel" element={<ReservationMaterielPage />} />
+                <Route path="qr-codes" element={<QrCodesPage />} />
                 <Route path="recettes" element={<RecettesPage />} />
                 <Route path="fiche-client" element={<FicheClientPage />} />
                 <Route path="fiche-client/:clientId" element={<FicheClientPage />} />
