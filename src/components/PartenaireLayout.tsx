@@ -1,5 +1,5 @@
 import { Outlet, Navigate, useLocation, useNavigate } from "react-router-dom";
-import { Grid3X3, Users, LogOut, CreditCard, LayoutDashboard, Cpu, Database, FileBarChart, HardDrive, MessageSquare, Wallet, Package, ClipboardList, ShoppingCart, UserRound } from "lucide-react";
+import { Grid3X3, Users, LogOut, CreditCard, LayoutDashboard, Cpu, Database, FileBarChart, HardDrive, MessageSquare, Wallet, Package, ClipboardList, ShoppingCart, UserRound, ArrowLeft } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -139,6 +139,14 @@ export default function PartenaireLayout() {
         <SidebarInset className="bg-muted/30">
           <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
             <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              title="Page précédente"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
             <div className="h-5 w-px bg-border" />
             <div className="flex flex-col leading-none">
               <span className="text-[11px] text-muted-foreground">Espace Partenaire</span>

@@ -26,12 +26,15 @@ import {
  * l'application avec l'appareil.
  */
 
-// Statuts où le matériel est effectivement affecté à la parcelle.
-const RESERVED_STATUSES = new Set(["reserve", "installe"]);
+// Toute réservation active compte (non connectée, en attente, connectée) ;
+// on exclut seulement les réservations abandonnées.
+const EXCLUDED_STATUSES = new Set(["annule", "refuse"]);
 
 const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
-  reserve: { label: "Réservé", cls: "bg-blue-500/15 text-blue-700 border-blue-300" },
-  installe: { label: "Installé", cls: "bg-emerald-500/15 text-emerald-700 border-emerald-300" },
+  nouvelle_demande: { label: "Non connectée", cls: "bg-orange-500/15 text-orange-700 border-orange-300" },
+  reserve: { label: "En attente", cls: "bg-blue-500/15 text-blue-700 border-blue-300" },
+  confirme: { label: "En attente", cls: "bg-blue-500/15 text-blue-700 border-blue-300" },
+  installe: { label: "Connectée", cls: "bg-emerald-500/15 text-emerald-700 border-emerald-300" },
 };
 
 type QrEntry = {
@@ -50,9 +53,9 @@ export default function QrCodesPage() {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<QrEntry | null>(null);
 
-  const { data: reservations = [] } = useQuery<any[]>({ queryKey: ["reservations-all"], queryFn: getMaterialReservations });
-  const { data: resItems = [] } = useQuery<any[]>({ queryKey: ["reservation-items-all"], queryFn: getReservationItems });
-  const { data: stockItems = [] } = useQuery<any[]>({ queryKey: ["stock-items-all"], queryFn: getStockItems });
+  const { data: reservations = [] } = useQuery<any[]>({ queryKey: ["reservations-all"], queryFn: getMaterialReservations, refetchInterval: 10000 });
+  const { data: resItems = [] } = useQuery<any[]>({ queryKey: ["reservation-items-all"], queryFn: getReservationItems, refetchInterval: 10000 });
+  const { data: stockItems = [] } = useQuery<any[]>({ queryKey: ["stock-items-all"], queryFn: getStockItems, refetchInterval: 10000 });
   const { data: profiles = [] } = useQuery<any[]>({ queryKey: ["profiles-all"], queryFn: getProfiles });
   const { data: surfaces = [] } = useQuery<any[]>({ queryKey: ["surfaces-all"], queryFn: getSurfaces });
 
@@ -65,7 +68,7 @@ export default function QrCodesPage() {
     return resItems.flatMap((ri) => {
       const stock = stockById[String(ri.stock_item_id)];
       const res = resById[String(ri.reservation_id)];
-      if (!stock?.requires_qr || !res || !RESERVED_STATUSES.has(res.status)) return [];
+      if (!stock?.requires_qr || !res || EXCLUDED_STATUSES.has(res.status)) return [];
 
       const prof = res.profile_id != null ? profById[String(res.profile_id)] : null;
       const surf = res.surface_id != null ? surfById[String(res.surface_id)] : null;
