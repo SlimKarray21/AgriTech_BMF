@@ -70,16 +70,43 @@ const qrOptions = (data: string, size: number) => ({
   imageOptions: { crossOrigin: "anonymous", margin: 6, imageSize: 0.32, hideBackgroundDots: true },
 });
 
+// Génère le QR stylisé en PNG (blob URL) — même pipeline que l'impression.
+// Si le logo empêche la génération, on retente sans logo (mieux que rien).
+async function renderQrPng(payload: string, size: number): Promise<string | null> {
+  const toUrl = (raw: Blob | Buffer | null) => {
+    if (!raw) return null;
+    const blob = raw instanceof Blob ? raw : new Blob([raw as BlobPart], { type: "image/png" });
+    return URL.createObjectURL(blob);
+  };
+  try {
+    return toUrl(await new QRCodeStyling(qrOptions(payload, size)).getRawData("png"));
+  } catch (e) {
+    console.error("QR avec logo KO, nouvel essai sans logo", e);
+    const { image: _image, ...noLogo } = qrOptions(payload, size);
+    return toUrl(await new QRCodeStyling(noLogo).getRawData("png"));
+  }
+}
+
 export default function QrCodesPage() {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<QrEntry | null>(null);
-  const qrRef = useRef<HTMLDivElement>(null);
+  const [qrUrl, setQrUrl] = useState<string | null>(null);
+  const lastUrl = useRef<string | null>(null);
 
-  // Rend le QR stylisé dans la fiche à chaque sélection.
+  // Génère l'image du QR à chaque sélection (et libère la précédente).
   useEffect(() => {
-    if (!selected || !qrRef.current) return;
-    qrRef.current.innerHTML = "";
-    new QRCodeStyling(qrOptions(selected.payload, 240)).append(qrRef.current);
+    let cancelled = false;
+    setQrUrl(null);
+    if (!selected) return;
+    renderQrPng(selected.payload, 480)
+      .then((url) => {
+        if (cancelled || !url) return;
+        if (lastUrl.current) URL.revokeObjectURL(lastUrl.current);
+        lastUrl.current = url;
+        setQrUrl(url);
+      })
+      .catch((e) => console.error("QR render error", e));
+    return () => { cancelled = true; };
   }, [selected]);
 
   const { data: reservations = [] } = useQuery<any[]>({ queryKey: ["reservations-all"], queryFn: getMaterialReservations, refetchInterval: 10000 });
@@ -255,8 +282,12 @@ export default function QrCodesPage() {
           </DialogHeader>
           {selected && (
             <div className="space-y-4">
-              <div className="flex justify-center rounded-xl border bg-white p-4">
-                <div ref={qrRef} />
+              <div className="flex items-center justify-center rounded-xl border bg-white p-4" style={{ minHeight: 272 }}>
+                {qrUrl ? (
+                  <img src={qrUrl} alt="QR code" className="h-60 w-60" />
+                ) : (
+                  <div className="h-60 w-60 animate-pulse rounded-lg bg-muted" />
+                )}
               </div>
               <div className="text-sm space-y-1">
                 <div className="flex items-center gap-2">
