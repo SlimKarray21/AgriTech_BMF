@@ -262,6 +262,10 @@ object StockItems : Table("stock_items") {
     val purchasePriceDt = double("purchase_price_dt").default(0.0)
     val lowStockThreshold = integer("low_stock_threshold").default(5)
     val features = text("features").nullable()
+
+    // Appareil nécessitant un QR code d'appairage (ex. carte ESP32) :
+    // affiché dans la page « QR Codes » quand il est réservé pour une parcelle.
+    val requiresQr = bool("requires_qr").default(false)
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at")
     override val primaryKey = PrimaryKey(id)

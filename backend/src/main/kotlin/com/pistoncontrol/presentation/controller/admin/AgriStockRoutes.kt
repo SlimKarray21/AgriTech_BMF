@@ -29,6 +29,7 @@ fun Route.stockItemsRoutes() {
                         put("purchase_price_dt",   it[StockItems.purchasePriceDt])
                         put("low_stock_threshold", it[StockItems.lowStockThreshold])
                         put("features",            it[StockItems.features])
+                        put("requires_qr",         it[StockItems.requiresQr])
                         put("created_at",          it[StockItems.createdAt].toString())
                         put("updated_at",          it[StockItems.updatedAt].toString())
                     }
@@ -47,6 +48,7 @@ fun Route.stockItemsRoutes() {
                     it[purchasePriceDt]   = body["purchase_price_dt"]?.jsonPrimitive?.double ?: 0.0
                     it[lowStockThreshold] = body["low_stock_threshold"]?.jsonPrimitive?.int ?: 5
                     it[features]          = vFeatures
+                    it[requiresQr]        = body["requires_qr"]?.jsonPrimitive?.booleanOrNull ?: false
                     it[createdAt]         = Instant.now()
                     it[updatedAt]         = Instant.now()
                 }[StockItems.id]
@@ -65,6 +67,7 @@ fun Route.stockItemsRoutes() {
                     body["purchase_price_dt"]?.jsonPrimitive?.doubleOrNull?.let { v -> it[StockItems.purchasePriceDt]   = v }
                     body["low_stock_threshold"]?.jsonPrimitive?.intOrNull?.let  { v -> it[StockItems.lowStockThreshold] = v }
                     body["features"]?.jsonPrimitive?.contentOrNull?.let         { v -> it[StockItems.features]          = v }
+                    body["requires_qr"]?.jsonPrimitive?.booleanOrNull?.let      { v -> it[StockItems.requiresQr]        = v }
                     it[StockItems.updatedAt] = Instant.now()
                 }
             }

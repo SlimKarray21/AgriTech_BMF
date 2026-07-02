@@ -288,6 +288,7 @@ CREATE TABLE IF NOT EXISTS stock_items (
     purchase_price_dt   DOUBLE PRECISION NOT NULL DEFAULT 0.0,
     low_stock_threshold INTEGER          NOT NULL DEFAULT 5,
     features            TEXT,
+    requires_qr         BOOLEAN          NOT NULL DEFAULT FALSE,
     created_at          TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
