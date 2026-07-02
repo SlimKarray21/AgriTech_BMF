@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import QRCode from "react-qr-code";
+import QRCodeStyling from "qr-code-styling";
 import agritechIcon from "@/assets/agritech-icon.png";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { QrCode, Search, Download, MapPin, User as UserIcon, Cpu } from "lucide-react";
+import { QrCode, Search, Download, Printer, MapPin, User as UserIcon, Cpu } from "lucide-react";
 import {
   getProfiles,
   getSurfaces,
@@ -50,9 +50,37 @@ type QrEntry = {
   payload: string;
 };
 
+/**
+ * Options du QR stylisé : points arrondis (pas de carrés pointus), coins
+ * extra-arrondis, logo AgriTech incrusté au centre. Correction d'erreur H
+ * pour que le logo ne gêne pas la lecture.
+ */
+const qrOptions = (data: string, size: number) => ({
+  width: size,
+  height: size,
+  type: "svg" as const,
+  data,
+  image: agritechIcon,
+  margin: 8,
+  qrOptions: { errorCorrectionLevel: "H" as const },
+  dotsOptions: { type: "rounded" as const, color: "#166534" },
+  cornersSquareOptions: { type: "extra-rounded" as const, color: "#14532d" },
+  cornersDotOptions: { type: "dot" as const, color: "#14532d" },
+  backgroundOptions: { color: "#ffffff" },
+  imageOptions: { crossOrigin: "anonymous", margin: 6, imageSize: 0.32, hideBackgroundDots: true },
+});
+
 export default function QrCodesPage() {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<QrEntry | null>(null);
+  const qrRef = useRef<HTMLDivElement>(null);
+
+  // Rend le QR stylisé dans la fiche à chaque sélection.
+  useEffect(() => {
+    if (!selected || !qrRef.current) return;
+    qrRef.current.innerHTML = "";
+    new QRCodeStyling(qrOptions(selected.payload, 240)).append(qrRef.current);
+  }, [selected]);
 
   const { data: reservations = [] } = useQuery<any[]>({ queryKey: ["reservations-all"], queryFn: getMaterialReservations, refetchInterval: 10000 });
   const { data: resItems = [] } = useQuery<any[]>({ queryKey: ["reservation-items-all"], queryFn: getReservationItems, refetchInterval: 10000 });
@@ -106,48 +134,29 @@ export default function QrCodesPage() {
     );
   }, [entries, search]);
 
-  // Télécharge le QR affiché dans la fiche (SVG → PNG via canvas),
-  // avec le logo AgriTech incrusté au centre.
+  // PNG 512×512 (points arrondis + logo) prêt à imprimer/coller.
   const downloadQr = (entry: QrEntry) => {
-    const svg = document.getElementById(`qr-svg-${entry.key}`);
-    if (!svg) return;
-    const xml = new XMLSerializer().serializeToString(svg);
-    const qrImg = new Image();
-    qrImg.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = 512;
-      canvas.height = 512;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, 512, 512);
-      ctx.drawImage(qrImg, 16, 16, 480, 480);
+    new QRCodeStyling(qrOptions(entry.payload, 512)).download({
+      name: `qr-${entry.itemName.replace(/\s+/g, "_")}-res${entry.reservationId}`,
+      extension: "png",
+    });
+  };
 
-      const save = () => {
-        const a = document.createElement("a");
-        a.href = canvas.toDataURL("image/png");
-        a.download = `qr-${entry.itemName.replace(/\s+/g, "_")}-res${entry.reservationId}.png`;
-        a.click();
-      };
-
-      const logo = new Image();
-      logo.onload = () => {
-        const box = 110;
-        const pad = 10;
-        const x = (512 - box) / 2;
-        const y = (512 - box) / 2;
-        // Pastille blanche arrondie derrière le logo pour garder le contraste.
-        ctx.fillStyle = "#ffffff";
-        ctx.beginPath();
-        ctx.roundRect(x - pad, y - pad, box + 2 * pad, box + 2 * pad, 18);
-        ctx.fill();
-        ctx.drawImage(logo, x, y, box, box);
-        save();
-      };
-      logo.onerror = save; // sans logo plutôt que rien
-      logo.src = agritechIcon;
-    };
-    qrImg.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(xml)));
+  // Ouvre une fenêtre d'impression avec le QR + libellé.
+  const printQr = async (entry: QrEntry) => {
+    const raw = await new QRCodeStyling(qrOptions(entry.payload, 512)).getRawData("png");
+    if (!raw) return;
+    const blob = raw instanceof Blob ? raw : new Blob([raw as BlobPart]);
+    const url = URL.createObjectURL(blob);
+    const w = window.open("", "_blank");
+    if (!w) return;
+    w.document.write(`<!doctype html><html><head><title>QR — ${entry.itemName}</title></head>
+      <body style="display:flex;flex-direction:column;align-items:center;justify-content:center;margin:0;height:100vh;font-family:sans-serif">
+        <img src="${url}" style="width:340px;height:340px" onload="setTimeout(function(){window.print()},200)" />
+        <p style="margin-top:14px;font-size:15px;font-weight:600">${entry.itemName}</p>
+        <p style="margin:2px 0 0;font-size:12px;color:#555">Réservation #${entry.reservationId} — ${entry.clientName} — ${entry.surfaceName}</p>
+      </body></html>`);
+    w.document.close();
   };
 
   return (
@@ -246,12 +255,8 @@ export default function QrCodesPage() {
           </DialogHeader>
           {selected && (
             <div className="space-y-4">
-              <div className="relative flex justify-center rounded-xl border bg-white p-6">
-                {/* level="H" : correction d'erreur élevée pour tolérer le logo au centre */}
-                <QRCode id={`qr-svg-${selected.key}`} value={selected.payload} size={220} level="H" />
-                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-1 shadow-md">
-                  <img src={agritechIcon} alt="AgriTech" className="h-11 w-11 rounded-lg" />
-                </div>
+              <div className="flex justify-center rounded-xl border bg-white p-4">
+                <div ref={qrRef} />
               </div>
               <div className="text-sm space-y-1">
                 <div className="flex items-center gap-2">
@@ -266,9 +271,14 @@ export default function QrCodesPage() {
                   pour connecter l'appareil.
                 </div>
               </div>
-              <Button className="w-full" onClick={() => downloadQr(selected)}>
-                <Download className="h-4 w-4 mr-2" /> Télécharger PNG
-              </Button>
+              <div className="flex gap-2">
+                <Button className="flex-1" onClick={() => downloadQr(selected)}>
+                  <Download className="h-4 w-4 mr-2" /> Télécharger PNG
+                </Button>
+                <Button className="flex-1" variant="outline" onClick={() => printQr(selected)}>
+                  <Printer className="h-4 w-4 mr-2" /> Imprimer
+                </Button>
+              </div>
             </div>
           )}
         </DialogContent>
