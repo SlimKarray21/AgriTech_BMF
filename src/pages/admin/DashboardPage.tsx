@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import TunisiaGovMap, { governorateFromLocalisation, TN_GOVERNORATES } from "@/components/TunisiaGovMap";
+import ClientPipeline from "@/components/ClientPipeline";
 import {
   Users, Wallet, Package, ShoppingBag, Clock, CheckCircle2, ShieldCheck, ShieldOff,
   TrendingUp, CalendarDays, LayoutDashboard, MapPin, Wifi, XCircle, CreditCard,
@@ -407,6 +408,9 @@ export default function DashboardPage() {
             <Stat icon={MapPin} label={selectedGov ? `Parcelles — ${selectedGov}` : "Parcelles"} value={parcelles} color="bg-violet-500/10 text-violet-600" />
             <Stat icon={ShieldCheck} label="Abonnements actifs" value={abosActifs} color="bg-teal-500/10 text-teal-600" />
           </div>
+
+          {/* Pipeline client façon Odoo : parcours jusqu'au client gagnant */}
+          <ClientPipeline />
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
             {/* Carte Tunisie (silhouette verte, 24 gouvernorats) — à gauche */}
